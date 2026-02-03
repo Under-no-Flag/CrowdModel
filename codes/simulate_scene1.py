@@ -67,12 +67,20 @@ def build_scene(cfg: SimConfig):
     gap = int(ny * 0.07)
     y_centers = [int(ny * 0.25), int(ny * 0.50), int(ny * 0.75)]
 
+    channel_masks = []  # 分别存 top/mid/bot
     channel_mask = np.zeros((ny, nx), dtype=bool)
+
     for yc in y_centers:
         y0 = max(1, yc - ch_h // 2)
         y1 = min(ny - 1, yc + ch_h // 2)
+
         walkable[y0:y1, wall_x0:wall_x1] = True
-        channel_mask[y0:y1, wall_x0:wall_x1] = True
+
+        m = np.zeros((ny, nx), dtype=bool)
+        m[y0:y1, wall_x0:wall_x1] = True
+        channel_masks.append(m)
+
+        channel_mask |= m   # 总 mask（如果你还想保留）
 
     # Add some horizontal "teeth" walls to mimic the comb-like obstacles
     # on the right side (purely for visual/flow complexity).
@@ -97,7 +105,7 @@ def build_scene(cfg: SimConfig):
     target_mask[1 : ny - 1, nx - 2] = True
     target_mask &= walkable
 
-    return walkable, spawn_mask, target_mask, channel_mask
+    return walkable, spawn_mask, target_mask, channel_mask,channel_masks
 
 
 def compute_potential_to_target(walkable: np.ndarray,
@@ -295,7 +303,7 @@ def plot_potential(T: np.ndarray, ux: np.ndarray, uy: np.ndarray, walkable: np.n
 def simulate(case: str, cfg: SimConfig):
     assert case in ("A", "B")
 
-    walkable, spawn_mask, target_mask, channel_mask = build_scene(cfg)
+    walkable, spawn_mask, target_mask, channel_mask,channel_masks = build_scene(cfg)
 
     # Initial density: second crowd from left
     rho = np.zeros((cfg.ny, cfg.nx), dtype=float)
@@ -318,8 +326,10 @@ def simulate(case: str, cfg: SimConfig):
     uy[m] = -gy[m] / gnorm[m]
 
     if case == "B":
-        ux[channel_mask] = np.minimum(ux[channel_mask], 0.0)
-        ren = np.sqrt(ux * ux + uy * uy) + 1e-12
+        mid_mask = channel_masks[1]  # 0=上, 1=中, 2=下
+        ux[mid_mask] = np.minimum(ux[mid_mask], 0.0)  # 禁止向右
+
+        ren = np.sqrt(ux*ux + uy*uy) + 1e-12
         ux /= ren
         uy /= ren
 
@@ -345,10 +355,12 @@ def simulate(case: str, cfg: SimConfig):
             uy[m] = -gy[m] / gnorm[m]
 
             if case == "B":
-                ux[channel_mask] = np.minimum(ux[channel_mask], 0.0)
+                mid_mask = channel_masks[1]          # 0=上, 1=中, 2=下
+                ux[mid_mask] = np.minimum(ux[mid_mask], 0.0)  # 只禁中间通道向右
                 ren = np.sqrt(ux * ux + uy * uy) + 1e-12
                 ux /= ren
                 uy /= ren
+
 
         # ---- 速度场 & 连续性方程更新（必须在循环里！）----
         f = greenshields_speed(rho, cfg.vmax, cfg.rho_max)
@@ -378,7 +390,7 @@ def simulate(case: str, cfg: SimConfig):
 
 def main():
     cfg = SimConfig()
-    simulate("A", cfg)
+    # simulate("A", cfg)
     simulate("B", cfg)
 
 
