@@ -65,9 +65,20 @@ $$U(x)=\{ \tau(x)\}, \quad x \in \Omega_c$$
 $$-f(\rho) \tau(x) \cdot \nabla \phi=1 \quad \Longleftrightarrow \quad \tau(x) \cdot \nabla \phi=-\frac{1}{f(\rho)} $$
 
 然后速度方向取“达到最大值的最优控制”
-$$\mathbf{u}^*(x) = \arg\max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \nabla \phi\},\quad \mathbf{v}=f(\rho)\mathbf{u}^*$$
+
+$$\mathbf{u}^*(x) = \text{arg} \max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \nabla \phi\},\quad \mathbf{v}=f(\rho)\mathbf{u}^*(x) $$
 
 接口层面只需要提供：
 - 通道区域指示函数 $\chi_c(x) \in \{0,1\}$
 - 通道切向$\tau(x)$
 - 通行方向标志$s_c\in \{+1,-1\}$
+
+
+
+### 整合两个修改
+
+- 势函数$\phi$ 不再解 eikonal，而解离散的 Bellman/HJB：
+
+$$\phi(x)=\min _{u \in U(x)}\left(\phi(x+\Delta x u)+\frac{\Delta x}{f(\rho)} \cdot \frac{1}{\sqrt{u^{\top} M(x) u}}\right)$$
+
+- 最优方向$\mathbf{u}^*$直接用 “使$\phi(\text{neighbor})+\text{stepCost}$ 最小的方向” 得到，严格对应argmax。

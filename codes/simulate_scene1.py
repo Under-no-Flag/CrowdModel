@@ -390,7 +390,7 @@ def simulate(case: str, cfg: SimConfig):
 
 def main():
     cfg = SimConfig()
-    # simulate("A", cfg)
+    simulate("A", cfg)
     simulate("B", cfg)
 
 
