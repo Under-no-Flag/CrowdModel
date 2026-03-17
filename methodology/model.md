@@ -11,7 +11,8 @@ $$\frac{\partial \rho}{\partial t} + \nabla \cdot (\rho \mathbf{v}) = 0$$
 
 $f(\rho)$是速度-密度关系的函数。在Greenshields 模型中：
 
-$ f(\rho) = v_{max}(1 - \frac{\rho}{\rho_{max}}) $。
+
+$f(\rho) = v_{max}(1 - \frac{\rho}{\rho_{max}})$
 
 ### 程函方程（势场更新）
 $$|\nabla \phi| = \frac{1}{f(\rho)}$$
