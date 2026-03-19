@@ -82,3 +82,44 @@ $$\mathbf{u}^*(x) = \text{arg} \max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \
 $$\phi(x)=\min _{u \in U(x)}\left(\phi(x+\Delta x u)+\frac{\Delta x}{f(\rho)} \cdot \frac{1}{\sqrt{u^{\top} M(x) u}}\right)$$
 
 - 最优方向$\mathbf{u}^*$直接用 “使$\phi(\text{neighbor})+\text{stepCost}$ 最小的方向” 得到，严格对应argmax。
+
+
+## 当前模型总结
+
+### 1. 基础未知量
+设：
+- $\rho(x,t)$：人群密度；
+- $\phi(x,t)$：到出口的最小剩余时间势函数；
+- $\mathbf v(x,t)$：人群速度场。
+
+其中 $x\in\Omega\subset\mathbb R^2$，$t\ge 0$
+### 2. 闭环模型
+(1) 密度方程
+$$\frac{\partial \rho}{\partial t}+\nabla\cdot(\rho\mathbf v)=0$$
+(2) 速度大小函数
+$$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right)$$
+
+(3) 势场方程
+
+无方向约束时：各向异性 eikonal
+$$\sqrt{\nabla\phi^\top M(x)\nabla\phi}=\frac1{f(\rho)}$$
+
+有方向约束时：HJB
+$$\max_{u\in U(x)}\{-f(\rho)\,u\cdot\nabla\phi\}=1$$
+
+数值统一实现时：离散 Bellman
+$$\phi(x)=\min_{u\in U(x)}\left(\phi(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M(x)u}}\right)$$
+(4) 速度方向
+$$u^*(x)=\operatorname*{arg\,min}_{u\in U(x)}\left(\phi(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M(x)u}}\right)$$
+(5) 速度场
+$$\mathbf v(x)=f(\rho)\,u^*(x)$$
+
+### 3. 接口变量总结
+当前最核心的输入可以整理为：
+- 通道区域指示函数 $\chi_c(x)$；
+- 通道切向单位向量场 $\tau(x)$；
+- 通道法向单位向量场 $n(x)$；
+- 各向异性参数 $\alpha(x),\beta(x)$；
+- 通行方向标志 $s_c\in\{+1,-1\}$；
+- 允许方向集合 $U(x)$。
+
