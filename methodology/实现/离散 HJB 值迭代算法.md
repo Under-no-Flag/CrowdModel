@@ -241,3 +241,161 @@ $$u_{ij}^*=\arg\min_{u\in U_{ij}^{(d)}}\left\{\mathcal I_h[\phi](x_{ij}+h\,u)+\f
 
 速度场
 $$\mathbf v_{ij}=f(\rho_{ij})u_{ij}^*.$$
+
+## 11. 当前仓库中的对应代码实现
+当前实现位于：
+- `codes/crowd_bellman/core.py`
+- `codes/crowd_bellman/scenes.py`
+- `codes/crowd_bellman/runner.py`
+
+### 11.1 控制集离散化
+仓库采用八邻域离散控制集：
+
+```python
+def build_eight_directions() -> DirectionLibrary:
+    names = ("E", "W", "N", "S", "NE", "NW", "SE", "SW")
+    offsets = np.array(
+        [
+            (0, 1),
+            (0, -1),
+            (1, 0),
+            (-1, 0),
+            (1, 1),
+            (1, -1),
+            (-1, 1),
+            (-1, -1),
+        ],
+        dtype=int,
+    )
+```
+
+也就是说，本文中的
+$$
+U_{ij}^{(d)}=\{u^{(1)},\dots,u^{(K)}\}
+$$
+在当前工程里具体取成了 $K=8$ 的八邻域方向集。
+
+### 11.2 单步代价
+```python
+ut_mu = (
+    DIRECTIONS.ux[k] * DIRECTIONS.ux[k] * m11
+    + 2.0 * DIRECTIONS.ux[k] * DIRECTIONS.uy[k] * m12
+    + DIRECTIONS.uy[k] * DIRECTIONS.uy[k] * m22
+)
+denom = np.sqrt(np.maximum(ut_mu, 1.0e-12))
+step_factor[:, :, k] = dx * DIRECTIONS.step[k] / denom
+```
+
+再结合
+```python
+speed_safe = np.maximum(speed, f_eps)
+candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+```
+就得到
+$$
+\phi(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M u}}.
+$$
+
+### 11.3 边界条件与初始化
+对应
+$$
+\phi=0 \text{ on } \Gamma_{\text{exit}},\qquad
+\phi=+\infty \text{ elsewhere initially}.
+$$
+
+```python
+phi = np.full((ny, nx), np.inf, dtype=float)
+for y, x in np.argwhere(exit_mask & walkable):
+    phi[y, x] = 0.0
+    heappush(queue, (0.0, int(y), int(x)))
+```
+
+### 11.4 Bellman 更新
+对应离散公式
+$$
+\phi_{ij}
+=
+\min_{u\in U_{ij}^{(d)}}
+\left\{
+\phi(x_{ij}+h\,u)
++
+\frac{h}{f(\rho_{ij})}\frac1{\sqrt{u^\top M_{ij}u}}
+\right\}.
+$$
+
+代码是：
+```python
+while queue:
+    value, y, x = heappop(queue)
+    if value > phi[y, x]:
+        continue
+
+    for k in range(len(DIRECTIONS.names)):
+        py = y - int(DIRECTIONS.dy[k])
+        px = x - int(DIRECTIONS.dx[k])
+        if py < 0 or py >= ny or px < 0 or px >= nx:
+            continue
+        if not walkable[py, px]:
+            continue
+        if (allowed_mask[py, px] & DIRECTIONS.bits[k]) == 0:
+            continue
+
+        candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+        if candidate + 1.0e-12 < phi[py, px]:
+            phi[py, px] = candidate
+            heappush(queue, (candidate, py, px))
+```
+
+这里虽然实现形式是优先队列松弛，而不是文中写的同步 Jacobi 值迭代，
+但两者求的都是同一个离散 Bellman 不动点。
+工程上采用优先队列的原因是传播更快、因果性更强。
+
+### 11.5 单向通道约束
+理论上单向通道是
+$$
+U(x)=\{\tau(x)\}.
+$$
+代码中对应成方向 bitmask：
+
+```python
+east_mask = np.uint16(DIRECTIONS.bits[0])
+allowed_mask = default_allowed_mask(case_walkable)
+allowed_mask[guided_lane] = east_mask
+```
+
+这表示在 `guided_lane` 内只允许向东（`+x`）传播。
+
+### 11.6 最优方向恢复
+对应
+$$
+u_{ij}^*
+=
+\arg\min_{u\in U_{ij}^{(d)}}
+\left\{
+\phi(x_{ij}+h\,u)
++
+\frac{h}{f(\rho_{ij})}\frac1{\sqrt{u^\top M_{ij}u}}
+\right\}.
+$$
+
+代码在 `recover_optimal_direction(...)`：
+```python
+candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
+if candidate < best_value:
+    best_value = candidate
+    best_ux = DIRECTIONS.ux[k]
+    best_uy = DIRECTIONS.uy[k]
+```
+
+### 11.7 速度场恢复
+对应
+$$
+\mathbf v_{ij}=f(\rho_{ij})u_{ij}^*.
+$$
+
+代码在主循环里：
+```python
+speed = greenshields_speed(rho, cfg.vmax, cfg.rho_max)
+vx = speed * ux
+vy = speed * uy
+```
