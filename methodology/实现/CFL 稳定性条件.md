@@ -362,3 +362,72 @@ f(\rho^n_{ij})
 }
 }$$
 其中 $0<\mathrm{CFL}<1$，例如取 $0.5\sim 0.9$。
+
+## 11. 当前仓库中的对应代码实现
+当前实现位于 `codes/crowd_bellman/core.py::compute_cfl_dt`，并在
+`codes/crowd_bellman/runner.py::simulate_case` 中逐步调用。
+
+### 11.1 对应公式
+代码采用的是正方网格 $\Delta x=\Delta y=dx$ 的简化形式：
+$$
+\Delta t^n
+=
+\mathrm{CFL}\cdot
+\frac{1}{
+\max_{(i,j)}
+f(\rho^n_{ij})
+\left(
+\frac{\sqrt{m_{11,ij}}}{dx}
++
+\frac{\sqrt{m_{22,ij}}}{dx}
+\right)}
+$$
+然后再与人工上限 `dt_cap` 取最小值。
+
+### 11.2 代码
+```python
+def compute_cfl_dt(
+    speed: np.ndarray,
+    m11: np.ndarray,
+    m22: np.ndarray,
+    dx: float,
+    cfl: float,
+    dt_cap: float,
+) -> float:
+    local_bound = speed * (np.sqrt(np.maximum(m11, 0.0)) + np.sqrt(np.maximum(m22, 0.0))) / max(dx, 1.0e-12)
+    vmax = float(np.max(local_bound))
+    if vmax <= 1.0e-12:
+        return dt_cap
+    return min(dt_cap, cfl / vmax)
+```
+
+### 11.3 在主循环中的使用方式
+```python
+dt = compute_cfl_dt(
+    speed=speed,
+    m11=case.m11,
+    m22=case.m22,
+    dx=cfg.dx,
+    cfl=cfg.cfl,
+    dt_cap=cfg.dt_cap,
+)
+
+rho, fx, _, sink_increment = update_density(
+    rho=rho,
+    walkable=case.walkable,
+    exit_mask=case.exit_mask,
+    vx=vx,
+    vy=vy,
+    dx=cfg.dx,
+    dt=dt,
+)
+```
+
+### 11.4 与密度显式更新的对应
+```python
+div_x[:, 1:-1] = (fx[:, 1:] - fx[:, :-1]) / dx
+div_y[1:-1, :] = (fy[1:, :] - fy[:-1, :]) / dx
+updated = rho - dt * (div_x + div_y)
+```
+
+因此这份文档中的 CFL 公式，在当前代码里不是“写在论文里但没用上”，而是每一个时间步都会实际控制显式密度推进。

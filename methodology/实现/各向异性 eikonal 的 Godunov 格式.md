@@ -181,3 +181,92 @@ u\cdot \nabla\phi+\frac1{f(\rho)\sqrt{u^\top M u}}
 所以它不是纯粹技巧，而是：
 >离散 Bellman 原理 + 上风因果性 = Godunov 型更新。
 这也是 fast marching 之类算法为什么和最短路径/Bellman 有深层联系的原因。
+
+## 当前仓库中的对应代码实现
+需要说明的是：当前仓库**没有单独实现一个显式命名为 Godunov 的局部二次更新核**，
+而是采用了统一的离散 Bellman 实现：
+- 当 $U(x)$ 取全方向集合时，它承担各向异性 eikonal 的数值求解角色；
+- 当 $U(x)$ 被截断时，它自然退化到受约束 HJB。
+
+因此，下述代码应理解为“当前工程里的等价实现”，而不是一套独立的专用 Godunov kernel。
+
+### 1. 张量 $M(x)$ 的代码构造
+对应 `codes/crowd_bellman/core.py::tensor_from_tau`
+
+```python
+def tensor_from_tau(
+    tau_x: np.ndarray,
+    tau_y: np.ndarray,
+    alpha: float | np.ndarray,
+    beta: float | np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    n_x = -tau_y
+    n_y = tau_x
+    m11 = alpha * tau_x * tau_x + beta * n_x * n_x
+    m12 = alpha * tau_x * tau_y + beta * n_x * n_y
+    m22 = alpha * tau_y * tau_y + beta * n_y * n_y
+    return m11, m12, m22
+```
+
+这对应公式
+$$
+M=\alpha\tau\tau^\top+\beta nn^\top.
+$$
+
+### 2. 单步代价
+对于方向 $u=(u_x,u_y)$，代码先预计算
+$$
+\frac{\Delta x}{\sqrt{u^\top M u}}
+$$
+这一部分：
+
+```python
+def precompute_step_factors(walkable, dx, m11, m12, m22):
+    step_factor = np.full((walkable.shape[0], walkable.shape[1], len(DIRECTIONS.names)), np.inf, dtype=float)
+    for k in range(len(DIRECTIONS.names)):
+        ut_mu = (
+            DIRECTIONS.ux[k] * DIRECTIONS.ux[k] * m11
+            + 2.0 * DIRECTIONS.ux[k] * DIRECTIONS.uy[k] * m12
+            + DIRECTIONS.uy[k] * DIRECTIONS.uy[k] * m22
+        )
+        denom = np.sqrt(np.maximum(ut_mu, 1.0e-12))
+        step_factor[:, :, k] = dx * DIRECTIONS.step[k] / denom
+```
+
+再在 Bellman 更新里除以 `speed_safe=f(\rho)`，形成
+$$
+\frac{\Delta x}{f(\rho)\sqrt{u^\top M u}}.
+$$
+
+### 3. 对应 eikonal 的统一数值更新
+```python
+candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+if candidate + 1.0e-12 < phi[py, px]:
+    phi[py, px] = candidate
+    heappush(queue, (candidate, py, px))
+```
+
+如果此时 `allowed_mask` 在每个可行点上都等于“全八方向”，那么这段代码在工程上就对应于：
+$$
+\sqrt{\nabla \phi^\top M(x)\nabla \phi}=\frac1{f(\rho)}
+$$
+的统一离散求解。
+
+### 4. 与理论 Godunov 公式的关系
+本文前面推导的是局部上风 Godunov 形式：
+$$
+\alpha \Bigl(\max\{D^-_s\phi,-D^+_s\phi,0\}\Bigr)^2
++
+\beta \Bigl(\max\{D^-_r\phi,-D^+_r\phi,0\}\Bigr)^2
+=
+\frac1{f(\rho)^2}.
+$$
+
+当前仓库没有把这一式子直接写成
+`godunov_local_update(...)` 这样的函数。
+相反，项目选择了更统一的实现路线：
+- 通过方向离散把局部 PDE 转成 Bellman 最短路问题；
+- 再用 `solve_bellman(...)` 一次性同时覆盖 eikonal 与 HJB 两类情形。
+
+因此，如果后续需要做“纯 Godunov 格式 vs 统一 Bellman 格式”的数值对比，
+还需要额外实现一个专门的 Godunov 局部更新函数。
