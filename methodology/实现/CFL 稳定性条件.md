@@ -54,7 +54,7 @@ $$\mathbf v=f(\rho)\frac{-M\nabla\phi}{\sqrt{\nabla\phi^\top M\nabla\phi}}.$$
 也就是说：**引入 $M$ 之后，CFL 条件本身就必须改。**
 
 ## 3. 研究 CFL 是为了保证密度方程和势场方程耦合后的整体稳定
-你现在不是只解一个 eikonal 或一个 HJB，而是一个闭环系统：
+现在不是只解一个 eikonal 或一个 HJB，而是一个闭环系统：
 - 已知 $\rho^n$，求 $\phi^n$；
 - 由 $\phi^n$ 求最优方向 $u^{*,n}$ 和速度 $\mathbf v^n$；
 - 再用 $\mathbf v^n$ 更新 $\rho^{n+1}$。
@@ -69,7 +69,7 @@ $$\mathbf v=f(\rho)\frac{-M\nabla\phi}{\sqrt{\nabla\phi^\top M\nabla\phi}}.$$
 保证“势场—速度—密度”这条闭环链条在数值上是可控的。
 
 # 针对 $M$ 张量各向异性特性的改进 CFL 条件
-我们考虑密度方程
+考虑密度方程
 $$\frac{\partial \rho}{\partial t}+\nabla\cdot(\rho \mathbf v)=0,$$
 其中速度场由各向异性势场给出：
 $$\mathbf v
