@@ -21,6 +21,8 @@
   Thin wrapper for `Case 2`.
 - `python codes/simulate_method3_scene1.py`
   Thin wrapper that runs both experiment cases together.
+- `python codes/simulate_multistage_tour.py`
+  Runs the new multi-stage / multi-route sightseeing case with fixed probability splitting.
 
 ## Available Cases
 
@@ -28,6 +30,7 @@
 - `case2_middle_guided`: soft guidance toward the middle channel, with one-way motion inside the middle lane.
 - `case3_top_guided`: soft guidance toward the top channel, with one-way motion inside the top lane.
 - `case4_bottom_guided`: soft guidance toward the bottom channel, with one-way motion inside the bottom lane.
+- `case5_multistage_tour`: multi-stage sightseeing route with shared congestion, per-group Bellman fields, and fixed split `8:20%`, `9:30%`, `10:50%`.
 
 ## Output
 
