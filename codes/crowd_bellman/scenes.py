@@ -290,7 +290,7 @@ def _directional_tensor_to_target(
 
 
 def build_tour_scene(cfg: SimulationConfig) -> BaseScene:
-    """Build multi-stage sightseeing scene with top-entry and bottom-exit channels."""
+    """Build multi-stage sightseeing scene with dedicated wall openings."""
 
     ny, nx = cfg.ny, cfg.nx
     walkable = np.ones((ny, nx), dtype=bool)
@@ -366,18 +366,20 @@ def build_multistage_tour_case(scene: BaseScene) -> CaseModel:
     allowed = default_allowed_mask(walkable)
 
     yy, xx = np.indices((ny, nx))
-    right_side = xx >= scene.wall_x1
+    right_side = (xx >= scene.wall_x1) & walkable
 
-    g1 = np.zeros((ny, nx), dtype=bool)
-    g1[:, :] = scene.channel_masks["entry_1_2"]
-    g1 |= right_side & (yy < int(ny * 0.36))
-
-    g2 = np.zeros((ny, nx), dtype=bool)
-    g2[:, :] = right_side & (yy >= int(ny * 0.78))
-
-    g38 = scene.channel_masks["exit_8"].copy()
-    g39 = scene.channel_masks["exit_9"].copy()
-    g310 = scene.channel_masks["exit_10"].copy()
+    # With plotting origin="lower", larger y means "up".
+    # Stage 1: move to the platform upper band (enter from lower channel, then go up).
+    g1 = right_side & (yy >= int(ny * 0.78))
+    # Stage 2: tour downward on platform.
+    g2 = right_side & (yy <= int(ny * 0.28))
+    # Stage 3: leave from the platform lower side; keep 8/9/10 route split by x-band.
+    lower_exit_band = right_side & (yy <= int(ny * 0.20))
+    split_left = scene.wall_x1 + max(1, (nx - scene.wall_x1) // 3)
+    split_right = scene.wall_x1 + max(2, 2 * (nx - scene.wall_x1) // 3)
+    g38 = lower_exit_band & (xx < split_left)
+    g39 = lower_exit_band & (xx >= split_left) & (xx < split_right)
+    g310 = lower_exit_band & (xx >= split_right)
     left_sink = scene.exit_mask.copy()
 
     m11_11, m12_11, m22_11 = _directional_tensor_to_target(walkable, g1, alpha=9.0, beta=0.3)

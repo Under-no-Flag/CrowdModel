@@ -138,6 +138,7 @@ def simulate_case(
         vx_by_group: dict[GroupKey, np.ndarray] = {}
         vy_by_group: dict[GroupKey, np.ndarray] = {}
         for key in groups:
+            # u is the Bellman-optimal heading (toward lower potential / goal); speed is non-negative.
             vx = speed * ux_by_group[key]
             vy = speed * uy_by_group[key]
             vx[~case.walkable] = 0.0
