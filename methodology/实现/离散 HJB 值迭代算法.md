@@ -1,6 +1,6 @@
 
 
-### 内容
+# 第一版
 当前模型中的
 $$\phi(x)=\min_{u\in U(x)}\left(\phi(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M(x)u}}\right)$$
 系统地推导成一个离散 HJB 值迭代算法
@@ -21,7 +21,7 @@ $$\phi(x)=\min_{u\in U(x)}
 \left\{
 \phi(x+\Delta x\,u)+\text{stepCost}(x,u)
 \right\}.$$
-这就是你写出的离散 HJB / 离散 Bellman 方程。
+这就是写出的离散 HJB / 离散 Bellman 方程。
 它的含义很直接：
 - 从当前位置 $x$ 先走一步到 $x+\Delta x u$；
 - 这一步付出时间代价 $\text{stepCost}(x,u)$；
@@ -399,3 +399,208 @@ speed = greenshields_speed(rho, cfg.vmax, cfg.rho_max)
 vx = speed * ux
 vy = speed * uy
 ```
+
+# 升级（2026-03-25）：从单目标 Hughes/Bellman 扩展到“多阶段—多路线群体”
+
+## 1. 基础未知量与群体索引
+为描述“多阶段 + 固定概率分流”的游客行为，将人群划分为多个子群体。设
+$$\rho_{s,r}(x,t)$$
+表示处于阶段 $s$、并属于路线类型 $r$ 的人群密度；
+$$\phi_{s,r}(x,t)$$
+表示该子群体从位置 $x$ 出发到当前阶段目标区域的最小剩余时间势函数；
+$$\mathbf v_{s,r}(x,t)$$
+表示该子群体的速度场。
+其中：
+- $s=1,\dots,S$ 表示行为阶段；
+- $r=1,\dots,R_s$ 表示阶段 $s$ 内的路线类型。
+
+
+总密度定义为
+$$\rho^{\mathrm{tot}}(x,t)=\sum_{s=1}^{S}\sum_{r=1}^{R_s}\rho_{s,r}(x,t).$$
+
+## 2. 总密度与共享拥堵速度函数
+所有子群体共享拥堵效应，因此速度大小函数由总密度决定：
+$$f(\rho^{\mathrm{tot}})
+=
+v_{\max}\left(1-\frac{\rho^{\mathrm{tot}}}{\rho_{\max}}\right).$$
+在离散网格点 $x_{ij}$ 处，记
+$$\rho^{\mathrm{tot}}_{ij}
+=
+\sum_{s=1}^{S}\sum_{r=1}^{R_s}\rho^{(s,r)}_{ij},$$
+则共享速度函数写为
+$$f_{ij}
+=
+v_{\max}\left(1-\frac{\rho^{\mathrm{tot}}_{ij}}{\rho_{\max}}\right).$$
+
+## 3. 每个群体的离散 Bellman 方程
+对每个子群体 $(s,r)$，设其允许方向集合为 $U_{ij}^{(s,r)}$，度量张量为 $M_{ij}^{(s,r)}$，则其势函数满足离散 Bellman 方程：
+$$\phi^{(s,r)}_{ij}
+=
+\min_{u\in U_{ij}^{(s,r)}}
+\left\{
+\mathcal I_h[\phi^{(s,r)}](x_{ij}+h\,u)
++
+\frac{h}{f_{ij}}
+\frac{1}{\sqrt{u^\top M^{(s,r)}_{ij}u}}
+\right\}.$$
+其中：
+- $h$ 为网格步长；
+- $\mathcal I_h[\cdot]$ 为插值算子；
+- $f_{ij}$ 使用总密度计算。
+
+## 4. 控制集、张量与目标边界
+对每个群体 $(s,r)$，定义：
+- 允许方向集合 $U_{ij}^{(s,r)}$；
+- 对称正定张量 $M_{ij}^{(s,r)}$；
+- 目标区域 $\Gamma_{\mathrm{goal}}^{(s,r)}$。
+
+
+边界条件取为
+$$\phi^{(s,r)}_{ij}=0,
+\qquad
+x_{ij}\in \Gamma_{\mathrm{goal}}^{(s,r)}.$$
+若 $x_{ij}$ 位于障碍区或不可通行区域，则取
+$$\phi^{(s,r)}_{ij}=+\infty.$$
+
+
+## 5. Bellman 算子与值迭代
+定义每个群体的 Bellman 算子 $T_{s,r}$：
+$$(T_{s,r}\phi)_{ij}
+=
+\min_{u\in U_{ij}^{(s,r)}}
+\left\{
+\mathcal I_h[\phi](x_{ij}+h\,u)
++
+\frac{h}{f_{ij}}
+\frac{1}{\sqrt{u^\top M^{(s,r)}_{ij}u}}
+\right\}.$$
+则离散 HJB 的求解等价于求不动点：
+$$\phi^{(s,r)}=T_{s,r}\phi^{(s,r)}.$$
+可采用值迭代：
+$$\phi^{(s,r),\,n+1}_{ij}
+=
+(T_{s,r}\phi^{(s,r),\,n})_{ij}.$$
+或单调值迭代形式：
+$$\phi^{(s,r),\,n+1}_{ij}
+=
+\min\left\{
+\phi^{(s,r),\,n}_{ij},
+\,
+(T_{s,r}\phi^{(s,r),\,n})_{ij}
+\right\}.$$
+
+## 6.最优方向与速度恢复
+在势场收敛后，对每个群体 $(s,r)$，最优方向定义为
+$$u_{ij}^{*,(s,r)}
+=
+\operatorname*{arg\,min}_{u\in U_{ij}^{(s,r)}}
+\left\{
+\mathcal I_h[\phi^{(s,r)}](x_{ij}+h\,u)
++
+\frac{h}{f_{ij}}
+\frac{1}{\sqrt{u^\top M^{(s,r)}_{ij}u}}
+\right\}.$$
+对应速度场为
+$$\mathbf v_{ij}^{(s,r)}
+=
+f_{ij}\,u_{ij}^{*,(s,r)}.$$
+注意：不同群体速度方向不同，但速度大小共享同一个 $f_{ij}$。
+
+
+## 7. 分群体连续性方程
+对每个群体 $(s,r)$，密度满足
+$$\frac{\partial \rho_{s,r}}{\partial t}
++
+\nabla\cdot(\rho_{s,r}\mathbf v_{s,r})
+=
+Q_{s,r}^{\mathrm{in}}-Q_{s,r}^{\mathrm{out}}.$$
+离散显式格式可写为
+$$\rho_{ij}^{(s,r),\,n+1}
+=
+\rho_{ij}^{(s,r),\,n}
+-
+\Delta t\,
+\bigl(\nabla_h\cdot(\rho^{(s,r),\,n}\mathbf v^{(s,r),\,n})\bigr)_{ij}
++
+\Delta t\,
+\bigl(Q_{ij}^{\mathrm{in},(s,r),\,n}-Q_{ij}^{\mathrm{out},(s,r),\,n}\bigr).$$
+
+## 8. 固定概率分流的阶段转移项
+设某一群体 $(s,r)$ 的目标/决策区域为 $G_{s,r}\subset\Omega$，其指示函数为
+$$\chi_{G_{s,r}}(x)=
+\begin{cases}
+1, & x\in G_{s,r},\\
+0, & x\notin G_{s,r}.
+\end{cases}$$
+当群体 $(s,r)$ 到达 $G_{s,r}$ 后，按固定概率分流到下一阶段的多个群体 $(s+1,q)$。设固定概率为
+$$p_{(s,r)\to q}\ge 0,
+\qquad
+\sum_q p_{(s,r)\to q}=1,$$
+切换率为 $\kappa_{s,r}>0$，则连续转移项定义为
+$$Q_{(s,r)\to (s+1,q)}(x,t)
+=
+p_{(s,r)\to q}\,
+\kappa_{s,r}\,
+\chi_{G_{s,r}}(x)\,
+\rho_{s,r}(x,t).$$
+于是：
+$$Q_{s,r}^{\mathrm{out}}
+=
+\sum_q Q_{(s,r)\to (s+1,q)},
+\qquad
+Q_{s+1,q}^{\mathrm{in}}
+=
+Q_{(s,r)\to (s+1,q)}.$$
+离散到一个时间步 $\Delta t$ 上，可写成转移质量
+$$\Delta \rho_{ij}^{(s,r)\to(s+1,q)}
+=
+p_{(s,r)\to q}\,
+\eta_{s,r}\,
+\chi_{G_{s,r},ij}\,
+\rho_{ij}^{(s,r)},
+\qquad
+\eta_{s,r}=\kappa_{s,r}\Delta t.$$
+更新公式为
+$$\rho_{ij}^{(s,r)}
+\leftarrow
+\rho_{ij}^{(s,r)}
+-
+\sum_q \Delta \rho_{ij}^{(s,r)\to(s+1,q)},$$
+$$\rho_{ij}^{(s+1,q)}
+\leftarrow
+\rho_{ij}^{(s+1,q)}
++
+\Delta \rho_{ij}^{(s,r)\to(s+1,q)}.$$
+这表示：群体 $(s,r)$ 在到达决策区后，以固定比例分流到下一阶段的不同路线群体。
+
+
+## 9.  一个时间步的完整闭环算法
+在时间步 $t^n\to t^{n+1}$ 中，算法按以下顺序执行：
+
+
+- (1) 汇总总密度
+
+
+$$\rho_{ij}^{\mathrm{tot},n}
+=
+\sum_{s,r}\rho_{ij}^{(s,r),n}.$$
+
+
+- (2) 计算共享速度函数
+
+
+$$f_{ij}^n
+=
+v_{\max}\left(1-\frac{\rho_{ij}^{\mathrm{tot},n}}{\rho_{\max}}\right).$$
+
+
+- (3) 对每个群体 $(s,r)$ 求解离散 Bellman 方程，得到 $\phi^{(s,r),n}$。
+
+
+- (4) 对每个群体恢复最优方向 $u^{*,(s,r),n}$ 与速度场 $\mathbf v^{(s,r),n}$。
+
+
+- (5) 用显式守恒格式推进各群体密度输运。
+
+
+- (6) 在各决策区执行固定概率分流更新。
