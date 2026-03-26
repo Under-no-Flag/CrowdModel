@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .core import DIRECTIONS, default_allowed_mask, tensor_from_tau
+from .core import DIRECTIONS, GroupKey, TransitionRule, default_allowed_mask, tensor_from_tau
 
 
 CHANNEL_NAMES = ("top", "middle", "bottom")
@@ -29,6 +29,8 @@ class SimulationConfig:
 
 @dataclass(frozen=True)
 class BaseScene:
+    """Geometric scene and baseline initialization."""
+
     walkable: np.ndarray
     initial_rho: np.ndarray
     exit_mask: np.ndarray
@@ -42,7 +44,26 @@ class BaseScene:
 
 
 @dataclass(frozen=True)
+class GroupModel:
+    """Per-(stage, route) model fields."""
+
+    key: GroupKey
+    name: str
+    goal_mask: np.ndarray
+    sink_mask: np.ndarray
+    allowed_mask: np.ndarray
+    m11: np.ndarray
+    m12: np.ndarray
+    m22: np.ndarray
+
+
+@dataclass(frozen=True)
 class CaseModel:
+    """Simulation-ready case configuration.
+
+    Legacy single-group fields are kept for backward compatibility.
+    """
+
     case_id: str
     title: str
     walkable: np.ndarray
@@ -53,6 +74,9 @@ class CaseModel:
     m12: np.ndarray
     m22: np.ndarray
     allowed_mask: np.ndarray
+    groups: dict[GroupKey, GroupModel] | None = None
+    transitions: tuple[TransitionRule, ...] = ()
+    initial_group_density: dict[GroupKey, np.ndarray] | None = None
 
 
 def scene_with_walkable(scene: BaseScene, walkable: np.ndarray) -> tuple[np.ndarray, dict[str, np.ndarray], dict[str, int]]:
@@ -230,6 +254,236 @@ def build_guided_channel_case(
     )
 
 
+def _directional_tensor_to_target(
+    walkable: np.ndarray,
+    target_mask: np.ndarray,
+    alpha: float,
+    beta: float,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    ny, nx = walkable.shape
+    yy, xx = np.indices((ny, nx))
+    points = np.argwhere(target_mask)
+    if points.size == 0:
+        return (
+            np.ones((ny, nx), dtype=float),
+            np.zeros((ny, nx), dtype=float),
+            np.ones((ny, nx), dtype=float),
+        )
+
+    center_y = float(np.mean(points[:, 0]))
+    center_x = float(np.mean(points[:, 1]))
+    tx = center_x - xx
+    ty = center_y - yy
+    norm = np.sqrt(tx * tx + ty * ty)
+
+    tau_x = np.zeros((ny, nx), dtype=float)
+    tau_y = np.zeros((ny, nx), dtype=float)
+    valid = walkable & (norm > 1.0e-12)
+    tau_x[valid] = tx[valid] / norm[valid]
+    tau_y[valid] = ty[valid] / norm[valid]
+
+    m11, m12, m22 = tensor_from_tau(tau_x=tau_x, tau_y=tau_y, alpha=alpha, beta=beta)
+    m11[~walkable] = 1.0
+    m12[~walkable] = 0.0
+    m22[~walkable] = 1.0
+    return m11, m12, m22
+
+
+def build_tour_scene(cfg: SimulationConfig) -> BaseScene:
+    """Build multi-stage sightseeing scene with dedicated wall openings."""
+
+    ny, nx = cfg.ny, cfg.nx
+    walkable = np.ones((ny, nx), dtype=bool)
+    walkable[0, :] = False
+    walkable[-1, :] = False
+    walkable[:, 0] = False
+    walkable[:, -1] = False
+
+    wall_x0 = int(nx * 0.52)
+    wall_w = max(3, int(nx * 0.04))
+    wall_x1 = min(nx - 2, wall_x0 + wall_w)
+    walkable[:, wall_x0:wall_x1] = False
+
+    top_centers = (int(ny * 0.17), int(ny * 0.30))
+    bottom_centers = (int(ny * 0.67), int(ny * 0.78), int(ny * 0.88))
+    all_centers = top_centers + bottom_centers
+    opening_h = max(5, int(ny * 0.08))
+
+    openings: dict[str, np.ndarray] = {}
+    for idx, cy in enumerate(all_centers):
+        y0 = max(1, cy - opening_h // 2)
+        y1 = min(ny - 1, cy + opening_h // 2)
+        walkable[y0:y1, wall_x0:wall_x1] = True
+        key = f"opening_{idx + 1}"
+        mask = np.zeros((ny, nx), dtype=bool)
+        mask[y0:y1, wall_x0:wall_x1] = True
+        openings[key] = mask
+
+    initial_rho = np.zeros((ny, nx), dtype=float)
+    spawn_mask = np.zeros((ny, nx), dtype=bool)
+    spawn_mask[1:ny - 1, 2:max(3, int(nx * 0.10))] = True
+    spawn_mask &= walkable
+    initial_rho[spawn_mask] = cfg.rho_init
+
+    left_sink = np.zeros((ny, nx), dtype=bool)
+    left_sink[1:ny - 1, 1] = True
+    left_sink &= walkable
+
+    channel_masks = {
+        "entry_1_2": openings["opening_1"] | openings["opening_2"],
+        "exit_8": openings["opening_3"],
+        "exit_9": openings["opening_4"],
+        "exit_10": openings["opening_5"],
+    }
+
+    probe_x = {
+        "entry_1_2": wall_x1,
+        "exit_8": wall_x0,
+        "exit_9": wall_x0,
+        "exit_10": wall_x0,
+    }
+
+    centers_y = (top_centers[0], int(ny * 0.52), bottom_centers[-1])
+    return BaseScene(
+        walkable=walkable,
+        initial_rho=initial_rho,
+        exit_mask=left_sink,
+        channel_masks=channel_masks,
+        probe_x=probe_x,
+        wall_x0=wall_x0,
+        wall_x1=wall_x1,
+        tooth_x1=wall_x1,
+        centers_y=centers_y,
+        middle_entry=(wall_x0, centers_y[1]),
+    )
+
+
+def build_multistage_tour_case(scene: BaseScene) -> CaseModel:
+    """Create multi-stage multi-route sightseeing case with fixed splitting probs."""
+
+    walkable = scene.walkable
+    ny, nx = walkable.shape
+    allowed = default_allowed_mask(walkable)
+
+    yy, xx = np.indices((ny, nx))
+    right_side = (xx >= scene.wall_x1) & walkable
+
+    # With plotting origin="lower", larger y means "up".
+    # Stage 1: move to the platform upper band (enter from lower channel, then go up).
+    g1 = right_side & (yy >= int(ny * 0.78))
+    # Stage 2: tour downward on platform.
+    g2 = right_side & (yy <= int(ny * 0.28))
+    # Stage 3: leave from the platform lower side; keep 8/9/10 route split by x-band.
+    lower_exit_band = right_side & (yy <= int(ny * 0.20))
+    split_left = scene.wall_x1 + max(1, (nx - scene.wall_x1) // 3)
+    split_right = scene.wall_x1 + max(2, 2 * (nx - scene.wall_x1) // 3)
+    g38 = lower_exit_band & (xx < split_left)
+    g39 = lower_exit_band & (xx >= split_left) & (xx < split_right)
+    g310 = lower_exit_band & (xx >= split_right)
+    left_sink = scene.exit_mask.copy()
+
+    m11_11, m12_11, m22_11 = _directional_tensor_to_target(walkable, g1, alpha=9.0, beta=0.3)
+    m11_21, m12_21, m22_21 = _directional_tensor_to_target(walkable, g2, alpha=10.0, beta=0.25)
+    m11_38, m12_38, m22_38 = _directional_tensor_to_target(walkable, g38, alpha=9.0, beta=0.3)
+    m11_39, m12_39, m22_39 = _directional_tensor_to_target(walkable, g39, alpha=9.0, beta=0.3)
+    m11_310, m12_310, m22_310 = _directional_tensor_to_target(walkable, g310, alpha=9.0, beta=0.3)
+    m11_41, m12_41, m22_41 = _directional_tensor_to_target(walkable, left_sink, alpha=8.0, beta=0.35)
+
+    groups: dict[GroupKey, GroupModel] = {
+        (1, 1): GroupModel(
+            key=(1, 1),
+            name="stage1_entry",
+            goal_mask=g1,
+            sink_mask=np.zeros_like(walkable, dtype=bool),
+            allowed_mask=allowed,
+            m11=m11_11,
+            m12=m12_11,
+            m22=m22_11,
+        ),
+        (2, 1): GroupModel(
+            key=(2, 1),
+            name="stage2_tour_down",
+            goal_mask=g2,
+            sink_mask=np.zeros_like(walkable, dtype=bool),
+            allowed_mask=allowed,
+            m11=m11_21,
+            m12=m12_21,
+            m22=m22_21,
+        ),
+        (3, 8): GroupModel(
+            key=(3, 8),
+            name="stage3_route8",
+            goal_mask=g38,
+            sink_mask=np.zeros_like(walkable, dtype=bool),
+            allowed_mask=allowed,
+            m11=m11_38,
+            m12=m12_38,
+            m22=m22_38,
+        ),
+        (3, 9): GroupModel(
+            key=(3, 9),
+            name="stage3_route9",
+            goal_mask=g39,
+            sink_mask=np.zeros_like(walkable, dtype=bool),
+            allowed_mask=allowed,
+            m11=m11_39,
+            m12=m12_39,
+            m22=m22_39,
+        ),
+        (3, 10): GroupModel(
+            key=(3, 10),
+            name="stage3_route10",
+            goal_mask=g310,
+            sink_mask=np.zeros_like(walkable, dtype=bool),
+            allowed_mask=allowed,
+            m11=m11_310,
+            m12=m12_310,
+            m22=m22_310,
+        ),
+        (4, 1): GroupModel(
+            key=(4, 1),
+            name="stage4_return_left",
+            goal_mask=left_sink,
+            sink_mask=left_sink,
+            allowed_mask=allowed,
+            m11=m11_41,
+            m12=m12_41,
+            m22=m22_41,
+        ),
+    }
+
+    transitions = (
+        TransitionRule(source=(1, 1), kappa=2.0, decision_mask=g1, targets={(2, 1): 1.0}),
+        TransitionRule(source=(2, 1), kappa=1.8, decision_mask=g2, targets={(3, 8): 0.2, (3, 9): 0.3, (3, 10): 0.5}),
+        TransitionRule(source=(3, 8), kappa=2.0, decision_mask=g38, targets={(4, 1): 1.0}),
+        TransitionRule(source=(3, 9), kappa=2.0, decision_mask=g39, targets={(4, 1): 1.0}),
+        TransitionRule(source=(3, 10), kappa=2.0, decision_mask=g310, targets={(4, 1): 1.0}),
+    )
+
+    initial_group_density = {key: np.zeros((ny, nx), dtype=float) for key in groups}
+    initial_group_density[(1, 1)] = scene.initial_rho.copy()
+
+    m11 = np.ones((ny, nx), dtype=float)
+    m12 = np.zeros((ny, nx), dtype=float)
+    m22 = np.ones((ny, nx), dtype=float)
+
+    return CaseModel(
+        case_id="case5_multistage_tour",
+        title="Case 5: multi-stage sightseeing with fixed-route splitting",
+        walkable=walkable,
+        exit_mask=scene.exit_mask,
+        channel_masks=scene.channel_masks,
+        probe_x=scene.probe_x,
+        m11=m11,
+        m12=m12,
+        m22=m22,
+        allowed_mask=allowed,
+        groups=groups,
+        transitions=transitions,
+        initial_group_density=initial_group_density,
+    )
+
+
 def build_case_model(case_id: str, scene: BaseScene) -> CaseModel:
     walkable = scene.walkable
     ny, nx = walkable.shape
@@ -277,4 +531,18 @@ def build_case_model(case_id: str, scene: BaseScene) -> CaseModel:
             guided_channel="bottom",
         )
 
+    if case_id == "case5_multistage_tour":
+        return build_multistage_tour_case(scene)
+
     raise ValueError(f"Unknown case id: {case_id}")
+
+
+def build_scene_for_case(case_id: str, cfg: SimulationConfig, cached_scene: BaseScene | None = None) -> BaseScene:
+    """Return case-specific scene while reusing cached common scene where possible."""
+
+    if case_id == "case5_multistage_tour":
+        return build_tour_scene(cfg)
+
+    if cached_scene is not None:
+        return cached_scene
+    return build_three_channel_scene(cfg)
