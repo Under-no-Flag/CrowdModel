@@ -54,7 +54,7 @@ $$\mathbf v=f(\rho)\frac{-M\nabla\phi}{\sqrt{\nabla\phi^\top M\nabla\phi}}.$$
 也就是说：**引入 $M$ 之后，CFL 条件本身就必须改。**
 
 ## 3. 研究 CFL 是为了保证密度方程和势场方程耦合后的整体稳定
-你现在不是只解一个 eikonal 或一个 HJB，而是一个闭环系统：
+现在不是只解一个 eikonal 或一个 HJB，而是一个闭环系统：
 - 已知 $\rho^n$，求 $\phi^n$；
 - 由 $\phi^n$ 求最优方向 $u^{*,n}$ 和速度 $\mathbf v^n$；
 - 再用 $\mathbf v^n$ 更新 $\rho^{n+1}$。
@@ -68,8 +68,8 @@ $$\mathbf v=f(\rho)\frac{-M\nabla\phi}{\sqrt{\nabla\phi^\top M\nabla\phi}}.$$
 因此 CFL 条件在这里的作用是：
 保证“势场—速度—密度”这条闭环链条在数值上是可控的。
 
-# 针对 $M$ 张量各向异性特性的改进 CFL 条件
-我们考虑密度方程
+# 第一版：针对 $M$ 张量各向异性特性的改进 CFL 条件
+考虑密度方程
 $$\frac{\partial \rho}{\partial t}+\nabla\cdot(\rho \mathbf v)=0,$$
 其中速度场由各向异性势场给出：
 $$\mathbf v
@@ -363,71 +363,148 @@ f(\rho^n_{ij})
 }$$
 其中 $0<\mathrm{CFL}<1$，例如取 $0.5\sim 0.9$。
 
-## 11. 当前仓库中的对应代码实现
-当前实现位于 `codes/crowd_bellman/core.py::compute_cfl_dt`，并在
-`codes/crowd_bellman/runner.py::simulate_case` 中逐步调用。
+# 升级（2026-03-26）：
+为何在多群体、各向异性张量、固定概率转移下需要重新表述 CFL 条件。
+## 2. 多群体显式输运更新
+在“多阶段—多路线群体”模型中，每个群体 $(s,r)$ 的密度更新写为
+$$\rho_{s,r}^{n+1}
+=
+\rho_{s,r}^{n}
+-
+\Delta t\,
+\nabla_h\cdot(\rho_{s,r}^{n}\mathbf v_{s,r}^{n})
++
+\Delta t\,
+\bigl(Q_{s,r}^{\mathrm{in},n}-Q_{s,r}^{\mathrm{out},n}\bigr).$$
+其中：
+- 第一项为旧时刻密度；
+- 第二项为显式输运项；
+- 第三项为固定概率分流带来的群体转移项。
 
-### 11.1 对应公式
-代码采用的是正方网格 $\Delta x=\Delta y=dx$ 的简化形式：
-$$
-\Delta t^n
+CFL 条件主要约束显式输运项的稳定性，而转移项将额外引入一个非负性时间步限制。
+
+## 3. 各向异性速度场与方向速度上界
+对每个群体 $(s,r)$，速度场写为
+$$\mathbf v_{s,r}
+=
+f(\rho^{\mathrm{tot}})
+\frac{-M_{s,r}\nabla \phi_{s,r}}
+{\sqrt{\nabla\phi_{s,r}^\top M_{s,r}\nabla\phi_{s,r}}}.$$
+设 $p=\nabla\phi_{s,r}$，则对任意单位方向 $\xi\in\mathbb R^2$，有
+$$|\xi\cdot \mathbf v_{s,r}|
+\le
+f(\rho^{\mathrm{tot}})\sqrt{\xi^\top M_{s,r}\xi}.$$
+因此，群体 $(s,r)$ 沿方向 $\xi$ 的局部传播速度上界为
+$$a_{\xi}^{(s,r)}
+=
+f(\rho^{\mathrm{tot}})
+\sqrt{\xi^\top M_{s,r}\xi}.$$
+
+## 4. Cartesian 网格上的改进 CFL 条件
+在 Cartesian 网格上，取
+$$e_x=(1,0)^\top,\qquad e_y=(0,1)^\top,$$
+则对每个群体 $(s,r)$ 有
+$$|v_{x}^{(s,r)}|
+\le
+f(\rho^{\mathrm{tot}})\sqrt{m_{11}^{(s,r)}},
+\qquad
+|v_{y}^{(s,r)}|
+\le
+f(\rho^{\mathrm{tot}})\sqrt{m_{22}^{(s,r)}}.$$
+因此其局部 CFL 限制可写成
+$$\Delta t
+\le
+\frac{1}{
+f(\rho^{\mathrm{tot}})
+\left(
+\frac{\sqrt{m_{11}^{(s,r)}}}{\Delta x}
++
+\frac{\sqrt{m_{22}^{(s,r)}}}{\Delta y}
+\right)
+}.$$
+
+## 5. 多群体系统中的全局 CFL 条件
+由于所有群体均采用显式更新，为保证整个系统稳定，时间步长应对所有群体同时满足 CFL 条件。因此取全局上界：
+$$\boxed{
+\Delta t_{\mathrm{adv}}^n
 =
 \mathrm{CFL}\cdot
 \frac{1}{
-\max_{(i,j)}
-f(\rho^n_{ij})
+\displaystyle
+\max_{(s,r)}\max_{(i,j)}
+f(\rho_{ij}^{\mathrm{tot},n})
 \left(
-\frac{\sqrt{m_{11,ij}}}{dx}
+\frac{\sqrt{m_{11,ij}^{(s,r),n}}}{\Delta x}
 +
-\frac{\sqrt{m_{22,ij}}}{dx}
-\right)}
-$$
-然后再与人工上限 `dt_cap` 取最小值。
+\frac{\sqrt{m_{22,ij}^{(s,r),n}}}{\Delta y}
+\right)
+}
+}$$
+其中 $0<\mathrm{CFL}<1$。
+若不同群体共享同一个张量场 $M$，则外层 $\max_{(s,r)}$ 可省略。
 
-### 11.2 代码
-```python
-def compute_cfl_dt(
-    speed: np.ndarray,
-    m11: np.ndarray,
-    m22: np.ndarray,
-    dx: float,
-    cfl: float,
-    dt_cap: float,
-) -> float:
-    local_bound = speed * (np.sqrt(np.maximum(m11, 0.0)) + np.sqrt(np.maximum(m22, 0.0))) / max(dx, 1.0e-12)
-    vmax = float(np.max(local_bound))
-    if vmax <= 1.0e-12:
-        return dt_cap
-    return min(dt_cap, cfl / vmax)
-```
+## 6. 固定概率转移项的显式时间步限制
+设群体 $(s,r)$ 在决策区 $G_{s,r}$ 内，以切换率 $\kappa_{s,r}$ 按固定概率分流到下一阶段各群体，则连续转移项为
+$$Q_{(s,r)\to(s+1,q)}
+=
+p_{(s,r)\to q}\,
+\kappa_{s,r}\,
+\chi_{G_{s,r}}\,\rho_{s,r}.$$
+因此该群体在单位时间内的总流出率为
+$$Q_{s,r}^{\mathrm{out}}
+=
+\sum_q Q_{(s,r)\to(s+1,q)}
+=
+\kappa_{s,r}\,\chi_{G_{s,r}}\,\rho_{s,r},$$
+因为
+$$\sum_q p_{(s,r)\to q}=1.$$
+为保持显式更新后的密度非负，必须要求单步流出不超过当前密度，即
+$$\Delta t\,\kappa_{s,r}\le 1.$$
+因此固定概率转移项对应的时间步限制为
+$$\boxed{
+\Delta t_{\mathrm{transfer}}
+\le
+\frac{1}{\displaystyle\max_{(s,r)}\kappa_{s,r}}
+}$$
+等价地，若记离散转移比例
+$$\eta_{s,r}=\kappa_{s,r}\Delta t,$$
+则需满足
+$$0\le \eta_{s,r}\le 1.$$
 
-### 11.3 在主循环中的使用方式
-```python
-dt = compute_cfl_dt(
-    speed=speed,
-    m11=case.m11,
-    m22=case.m22,
-    dx=cfg.dx,
-    cfl=cfg.cfl,
-    dt_cap=cfg.dt_cap,
-)
+## 7. 总时间步长选择原则
+综合输运 CFL 条件、固定概率转移项非负性限制以及人为设置的时间步上限 $dt_{\mathrm{cap}}$，在每个时间步应取
+$$\boxed{
+\Delta t^n
+=
+\min\left\{
+\Delta t_{\mathrm{adv}}^n,\;
+\Delta t_{\mathrm{transfer}},\;
+dt_{\mathrm{cap}}
+\right\}.
+}$$
+这保证：
+- 输运项满足显式 CFL 稳定性；
+- 固定概率分流不会在单步内转移超过当前群体质量；
+- 时间步长不会超过设定的工程上限。
 
-rho, fx, _, sink_increment = update_density(
-    rho=rho,
-    walkable=case.walkable,
-    exit_mask=case.exit_mask,
-    vx=vx,
-    vy=vy,
-    dx=cfg.dx,
-    dt=dt,
-)
-```
-
-### 11.4 与密度显式更新的对应
-```python
-div_x[:, 1:-1] = (fx[:, 1:] - fx[:, :-1]) / dx
-div_y[1:-1, :] = (fy[1:, :] - fy[:-1, :]) / dx
-updated = rho - dt * (div_x + div_y)
-```
-
-因此这份文档中的 CFL 公式，在当前代码里不是“写在论文里但没用上”，而是每一个时间步都会实际控制显式密度推进。
+## 8. 特例验证
+(1) 各向同性无分流情形
+若
+$$M_{s,r}=I,\qquad \kappa_{s,r}=0,$$
+则有
+$$m_{11}^{(s,r)}=m_{22}^{(s,r)}=1,$$
+时间步条件退化为经典二维显式迎风 CFL：
+$$\Delta t
+\le
+\frac{1}{
+\max f(\rho^{\mathrm{tot}})
+\left(
+\frac1{\Delta x}+\frac1{\Delta y}
+\right)
+}.$$
+(2) 固定概率分流但无输运
+若暂不考虑空间输运，仅考虑群体转移，则稳定性条件退化为
+$$\Delta t\le \frac{1}{\max_{(s,r)}\kappa_{s,r}},$$
+即要求每一步的转移比例不超过 1。
+(3) 多群体共享拥堵
+若不同群体共享总密度 $\rho^{\mathrm{tot}}$，则拥堵会共同影响所有群体速度大小，而全局时间步长应由最不利群体决定。
