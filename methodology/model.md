@@ -58,6 +58,17 @@ $$\mathbf{v} = f(\rho) \mathbf{u}= f(\rho) \frac{-\mathbf{M}(x)\nabla \phi}{\sqr
 $$\mathbf{M}(x)=\alpha(x) \tau \tau^{\top}+\beta(x) n n^{\top}, \quad \alpha \gg \beta(\text { 通道内 })$$
 这会显著抬高横向“代价”，让$\phi$的最短时间路径更倾向于沿$\tau$ 前进。
 
+> **代码实现**: `codes/crowd_bellman/core.py:94-107` (`tensor_from_tau`)
+> ```python
+> def tensor_from_tau(tau_x, tau_y, alpha, beta):
+>     n_x = -tau_y
+>     n_y = tau_x
+>     m11 = alpha * tau_x * tau_x + beta * n_x * n_x
+>     m12 = alpha * tau_x * tau_y + beta * n_x * n_y
+>     m22 = alpha * tau_y * tau_y + beta * n_y * n_y
+>     return m11, m12, m22
+> ```
+
 ### 单向通行：把程函方程写成“控制约束”的 Hamilton–Jacobi
 
 把 Hughes 的“行走方向选择”从固定$\frac{-\nabla \phi}{|\nabla \phi|}$改成：
@@ -98,6 +109,20 @@ $$\mathbf{u}^*(x) = \text{arg} \max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \
 $$\phi(x)=\min _{u \in U(x)}\left(\phi(x+\Delta x u)+\frac{\Delta x}{f(\rho)} \cdot \frac{1}{\sqrt{u^{\top} M(x) u}}\right)$$
 
 - 最优方向$\mathbf{u}^*$直接用 “使$\phi(\text{neighbor})+\text{stepCost}$ 最小的方向” 得到，严格对应argmax。
+
+> **代码实现**: `codes/crowd_bellman/core.py:132-174` (`solve_bellman`)
+> ```python
+> def solve_bellman(walkable, exit_mask, allowed_mask, speed, step_factor, f_eps):
+>     phi = np.full((ny, nx), np.inf, dtype=float)
+>     for y, x in np.argwhere(exit_mask & walkable):
+>         phi[y, x] = 0.0  # 边界条件
+>     while queue:
+>         value, y, x = heappop(queue)
+>         for k in range(len(DIRECTIONS.names)):
+>             candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+>             if candidate + 1.0e-12 < phi[py, px]:
+>                 phi[py, px] = candidate
+> ```
 
 
 ## 游客路线设置
@@ -299,6 +324,17 @@ $$\mathbf{v} = f(\rho) \mathbf{u}= f(\rho) \frac{-\mathbf{M}(x)\nabla \phi}{\sqr
 $$\mathbf{M}(x)=\alpha(x) \tau \tau^{\top}+\beta(x) n n^{\top}, \quad \alpha \gg \beta(\text { 通道内 })$$
 这会显著抬高横向“代价”，让$\phi$的最短时间路径更倾向于沿$\tau$ 前进。
 
+> **代码实现**: `codes/crowd_bellman/core.py:94-107` (`tensor_from_tau`)
+> ```python
+> def tensor_from_tau(tau_x, tau_y, alpha, beta):
+>     n_x = -tau_y
+>     n_y = tau_x
+>     m11 = alpha * tau_x * tau_x + beta * n_x * n_x
+>     m12 = alpha * tau_x * tau_y + beta * n_x * n_y
+>     m22 = alpha * tau_y * tau_y + beta * n_y * n_y
+>     return m11, m12, m22
+> ```
+
 ### 单向通行：把程函方程写成“控制约束”的 Hamilton–Jacobi
 
 把 Hughes 的“行走方向选择”从固定$\frac{-\nabla \phi}{|\nabla \phi|}$改成：
@@ -339,6 +375,20 @@ $$\mathbf{u}^*(x) = \text{arg} \max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \
 $$\phi(x)=\min _{u \in U(x)}\left(\phi(x+\Delta x u)+\frac{\Delta x}{f(\rho)} \cdot \frac{1}{\sqrt{u^{\top} M(x) u}}\right)$$
 
 - 最优方向$\mathbf{u}^*$直接用 “使$\phi(\text{neighbor})+\text{stepCost}$ 最小的方向” 得到，严格对应argmax。
+
+> **代码实现**: `codes/crowd_bellman/core.py:132-174` (`solve_bellman`)
+> ```python
+> def solve_bellman(walkable, exit_mask, allowed_mask, speed, step_factor, f_eps):
+>     phi = np.full((ny, nx), np.inf, dtype=float)
+>     for y, x in np.argwhere(exit_mask & walkable):
+>         phi[y, x] = 0.0  # 边界条件
+>     while queue:
+>         value, y, x = heappop(queue)
+>         for k in range(len(DIRECTIONS.names)):
+>             candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+>             if candidate + 1.0e-12 < phi[py, px]:
+>                 phi[py, px] = candidate
+> ```
 
 
 ## 游客路线设置
@@ -497,6 +547,16 @@ $$Q_{s\to (s+1,r)}(x,t)
 =
 p_{s\to r}\,\kappa_s\,\chi_{G_s}(x)\,\rho_s(x,t),$$
 其中 $\kappa_s>0$ 为阶段切换率。
+
+> **代码实现**: `codes/crowd_bellman/core.py:329-373` (`apply_fixed_probability_splitting`)
+> ```python
+> mask = rule.decision_mask & walkable
+> transferable = dt * max(rule.kappa, 0.0) * source_rho * mask.astype(float)
+> transferable = np.minimum(transferable, source_rho)  # 保证非负
+> deltas[rule.source] -= transferable
+> for target, prob in zip(rule.targets.keys(), probs):
+>     deltas[target] += prob * transferable
+> ```
 于是有
 $$\frac{\partial \rho_s}{\partial t}
 +
@@ -508,6 +568,17 @@ $$\frac{\partial \rho_{s+1,r}}{\partial t}
 \nabla\cdot(\rho_{s+1,r}\mathbf v_{s+1,r})
 =
 Q_{s\to (s+1,r)}-Q^{\text{out}}_{s+1,r}.$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:302-326` (`update_density`)
+> ```python
+> def update_density(rho, walkable, exit_mask, vx, vy, dx, dt):
+>     fx, fy = compute_face_fluxes(rho, vx, vy)  # 迎风通量
+>     div_x[:, 1:-1] = (fx[:, 1:] - fx[:, :-1]) / dx
+>     div_y[1:-1, :] = (fy[1:, :] - fy[:-1, :]) / dx
+>     updated = rho - dt * (div_x + div_y)  # 显式守恒格式
+>     sink_mass = float(np.sum(updated[exit_mask]) * dx * dx)
+>     updated[exit_mask] = 0.0  # sink 项处理
+> ```
 
 #### 若当前已是多路线群体
 若当前阶段也有多个群体，则每个群体都可用同样方式按固定概率继续分流。
@@ -543,6 +614,13 @@ $$\rho(x,t)=\sum_{s=1}^{S}\sum_{r=1}^{R_s}\rho_{s,r}(x,t).$$
 $$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right)$$
 这里 $f(\rho)$ 依赖总密度 $\rho$，表示所有群体共同造成拥堵。
 
+> **代码实现**: `codes/crowd_bellman/core.py:71-75` (`greenshields_speed`)
+> ```python
+> def greenshields_speed(rho: np.ndarray, vmax: float, rho_max: float) -> np.ndarray:
+>     speed = vmax * (1.0 - rho / rho_max)
+>     return np.clip(speed, 0.0, vmax)
+> ```
+
 ### 3. 每个子群体的势场方程
 对每个 $(s,r)$，定义允许方向集合 $U_{s,r}(x)$、度量张量 $M_{s,r}(x)$，并求解离散 Bellman 方程：
 $$\phi_{s,r}(x)
@@ -559,8 +637,30 @@ $$\phi_{s,r}(x)
 
 ### 4. 每个子群体的最优方向
 $$u_{s,r}^*(x)=\operatorname*{arg\,min}_{u\in U_{s,r}(x)}\left(\phi_{s,r}(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}\right)$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:177-220` (`recover_optimal_direction`)
+> ```python
+> for k in range(len(DIRECTIONS.names)):
+>     if (allowed_mask[y, x] & DIRECTIONS.bits[k]) == 0: continue
+>     nyy = y + int(DIRECTIONS.dy[k])
+>     nxx = x + int(DIRECTIONS.dx[k])
+>     candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
+>     if candidate < best_value:
+>         best_value = candidate
+>         best_ux = DIRECTIONS.ux[k]
+>         best_uy = DIRECTIONS.uy[k]
+> ```
 ### 5. 每个子群体的速度场
 $$\mathbf v_{s,r}(x)=f(\rho)\,u_{s,r}^*(x)$$
+
+> **代码实现**: `codes/crowd_bellman/runner.py:140-147`
+> ```python
+> for key in groups:
+>     vx = speed * ux_by_group[key]  # speed = f(rho)
+>     vy = speed * uy_by_group[key]
+>     vx[~case.walkable] = 0.0
+>     vy[~case.walkable] = 0.0
+> ```
 ### 6. 每个子群体的密度演化
 $$\frac{\partial \rho_{s,r}}{\partial t}
 +
@@ -604,6 +704,13 @@ $$\rho(x,t)=\sum_{s=1}^{S}\sum_{r=1}^{R_s}\rho_{s,r}(x,t).$$
 $$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right)$$
 这里 $f(\rho)$ 依赖总密度 $\rho$，表示所有群体共同造成拥堵。
 
+> **代码实现**: `codes/crowd_bellman/core.py:71-75` (`greenshields_speed`)
+> ```python
+> def greenshields_speed(rho: np.ndarray, vmax: float, rho_max: float) -> np.ndarray:
+>     speed = vmax * (1.0 - rho / rho_max)
+>     return np.clip(speed, 0.0, vmax)
+> ```
+
 ### 3. 每个子群体的势场方程
 对每个 $(s,r)$，定义允许方向集合 $U_{s,r}(x)$、度量张量 $M_{s,r}(x)$，并求解离散 Bellman 方程：
 $$\phi_{s,r}(x)
@@ -620,8 +727,30 @@ $$\phi_{s,r}(x)
 
 ### 4. 每个子群体的最优方向
 $$u_{s,r}^*(x)=\operatorname*{arg\,min}_{u\in U_{s,r}(x)}\left(\phi_{s,r}(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}\right)$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:177-220` (`recover_optimal_direction`)
+> ```python
+> for k in range(len(DIRECTIONS.names)):
+>     if (allowed_mask[y, x] & DIRECTIONS.bits[k]) == 0: continue
+>     nyy = y + int(DIRECTIONS.dy[k])
+>     nxx = x + int(DIRECTIONS.dx[k])
+>     candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
+>     if candidate < best_value:
+>         best_value = candidate
+>         best_ux = DIRECTIONS.ux[k]
+>         best_uy = DIRECTIONS.uy[k]
+> ```
 ### 5. 每个子群体的速度场
 $$\mathbf v_{s,r}(x)=f(\rho)\,u_{s,r}^*(x)$$
+
+> **代码实现**: `codes/crowd_bellman/runner.py:140-147`
+> ```python
+> for key in groups:
+>     vx = speed * ux_by_group[key]  # speed = f(rho)
+>     vy = speed * uy_by_group[key]
+>     vx[~case.walkable] = 0.0
+>     vy[~case.walkable] = 0.0
+> ```
 ### 6. 每个子群体的密度演化
 $$\frac{\partial \rho_{s,r}}{\partial t}
 +

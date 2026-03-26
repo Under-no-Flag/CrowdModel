@@ -49,6 +49,19 @@ $$\phi_{ij}
 \frac{h}{f(\rho_{ij})}\frac{1}{\sqrt{u^\top M_{ij}u}}
 \right\}.$$
 
+> **代码实现**: `codes/crowd_bellman/core.py:132-174` (`solve_bellman`)
+> ```python
+> phi = np.full((ny, nx), np.inf, dtype=float)
+> for y, x in np.argwhere(exit_mask & walkable):
+>     phi[y, x] = 0.0  # 边界条件
+> while queue:
+>     value, y, x = heappop(queue)
+>     for k in range(len(DIRECTIONS.names)):
+>         candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+>         if candidate + 1.0e-12 < phi[py, px]:
+>             phi[py, px] = candidate
+> ```
+
 ## 3. 控制集离散化
 为了真正实现算法，控制集 $U(x)$ 还要离散成有限方向集合。
 设
@@ -70,6 +83,19 @@ u^{(k)}:\; u^{(k)}\cdot (s_c\tau_{ij})>0
 \right\}$$
 或严格单向时
 $$U_{ij}^{(d)}=\{s_c\tau_{ij}\}.$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:37-68` (`build_eight_directions`)
+> ```python
+> def build_eight_directions() -> DirectionLibrary:
+>     names = ("E", "W", "N", "S", "NE", "NW", "SE", "SW")
+>     offsets = np.array([
+>         (0, 1), (0, -1), (1, 0), (-1, 0),
+>         (1, 1), (1, -1), (-1, 1), (-1, -1),
+>     ], dtype=int)
+>     step = np.sqrt(np.sum(offsets.astype(float) ** 2, axis=1))
+>     ux = offsets[:, 1] / step  # 单位方向向量
+>     uy = offsets[:, 0] / step
+> ```
 于是离散 Bellman 变成有限维最小化：
 $$\phi_{ij}
 =
@@ -98,6 +124,19 @@ $$\phi_{ij}
 \right\}.$$
 这就是数值实现中常说的半拉格朗日离散 HJB。
 
+> **代码实现**: `codes/crowd_bellman/core.py:110-129` (`precompute_step_factors`)
+> 预计算几何步长代价 $h/\sqrt{u^\top M u}$：
+> ```python
+> for k in range(len(DIRECTIONS.names)):
+>     ut_mu = (
+>         DIRECTIONS.ux[k] * DIRECTIONS.ux[k] * m11
+>         + 2.0 * DIRECTIONS.ux[k] * DIRECTIONS.uy[k] * m12
+>         + DIRECTIONS.uy[k] * DIRECTIONS.uy[k] * m22
+>     )
+>     denom = np.sqrt(np.maximum(ut_mu, 1.0e-12))
+>     step_factor[:, :, k] = dx * DIRECTIONS.step[k] / denom
+> ```
+
 ## 5. 边界条件
 值迭代算法必须先指定边界条件。
 ### 5.1 出口边界
@@ -105,11 +144,23 @@ $$\phi_{ij}
 $$\phi(x)=0,\qquad x\in \Gamma_{\text{exit}}.$$
 离散上即
 $$\phi_{ij}=0,\qquad x_{ij}\in \Gamma_{\text{exit}}.$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:147-149`
+> ```python
+> for y, x in np.argwhere(exit_mask & walkable):
+>     phi[y, x] = 0.0
+>     heappush(queue, (0.0, int(y), int(x)))
+> ```
 ### 5.2 障碍物边界
 若 $\Gamma_{\text{obs}}$ 是不可通行障碍边界，则通常取
 $$\phi(x)=+\infty$$
 或赋一个很大值。离散上可写成
 $$\phi_{ij}=+\infty,\qquad x_{ij}\in \Gamma_{\text{obs}}.$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:143`
+> ```python
+> phi = np.full((ny, nx), np.inf, dtype=float)
+> ```
 ### 5.3 其他区域
 其余点初始化为一个大值：
 $$\phi_{ij}^{(0)}=
@@ -117,6 +168,13 @@ $$\phi_{ij}^{(0)}=
 0, & x_{ij}\in \Gamma_{\text{exit}},\\
 +\infty, & \text{其他可行点}.
 \end{cases}$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:143-149`
+> ```python
+> phi = np.full((ny, nx), np.inf, dtype=float)
+> for y, x in np.argwhere(exit_mask & walkable):
+>     phi[y, x] = 0.0
+> ```
 
 ## 6. 值迭代公式的推导
 现在推导值迭代。
@@ -143,6 +201,21 @@ $$\phi_{ij}^{(n+1)}
 \frac{h}{f(\rho_{ij})}\frac{1}{\sqrt{u^\top M_{ij}u}}
 \right\}.$$
 这就是离散 HJB 值迭代算法的核心公式。
+
+> **代码实现**: `codes/crowd_bellman/core.py:151-169` (Dijkstra-like 优先队列松弛)
+> ```python
+> while queue:
+>     value, y, x = heappop(queue)
+>     if value > phi[y, x]: continue
+>     for k in range(len(DIRECTIONS.names)):
+>         py = y - int(DIRECTIONS.dy[k])
+>         px = x - int(DIRECTIONS.dx[k])
+>         if not walkable[py, px]: continue
+>         candidate = value + step_factor[py, px, k] / speed_safe[py, px]
+>         if candidate + 1.0e-12 < phi[py, px]:
+>             phi[py, px] = candidate
+>             heappush(queue, (candidate, py, px))
+> ```
 
 ## 7. 单调值迭代形式
 由于出口代价是 0，其他点初始为大值，因此更常用的写法是“单调下降更新”：
@@ -182,6 +255,21 @@ $$u_{ij}^*
 然后速度场为
 $$\mathbf v_{ij}=f(\rho_{ij})\,u_{ij}^*.$$
 这和你前面总结的公式完全一致，只是现在明确成了可计算的离散版本。
+
+> **代码实现**: `codes/crowd_bellman/core.py:177-220` (`recover_optimal_direction`)
+> ```python
+> for k in range(len(DIRECTIONS.names)):
+>     if (allowed_mask[y, x] & DIRECTIONS.bits[k]) == 0: continue
+>     nyy = y + int(DIRECTIONS.dy[k])
+>     nxx = x + int(DIRECTIONS.dx[k])
+>     candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
+>     if candidate < best_value:
+>         best_value = candidate
+>         best_ux = DIRECTIONS.ux[k]
+>         best_uy = DIRECTIONS.uy[k]
+> ux[y, x] = best_ux
+> uy[y, x] = best_uy
+> ```
 
 ## 10. 整个离散 HJB 值迭代算法
 可以整理成下面的算法步骤。
@@ -525,6 +613,17 @@ $$\rho_{ij}^{(s,r),\,n+1}
 \Delta t\,
 \bigl(Q_{ij}^{\mathrm{in},(s,r),\,n}-Q_{ij}^{\mathrm{out},(s,r),\,n}\bigr).$$
 
+> **代码实现**: `codes/crowd_bellman/core.py:302-326` (`update_density`)
+> ```python
+> def update_density(rho, walkable, exit_mask, vx, vy, dx, dt):
+>     fx, fy = compute_face_fluxes(rho, vx, vy)  # 迎风通量
+>     div_x[:, 1:-1] = (fx[:, 1:] - fx[:, :-1]) / dx
+>     div_y[1:-1, :] = (fy[1:, :] - fy[:-1, :]) / dx
+>     updated = rho - dt * (div_x + div_y)  # 显式守恒格式
+>     sink_mass = float(np.sum(updated[exit_mask]) * dx * dx)
+>     updated[exit_mask] = 0.0  # sink 项处理
+> ```
+
 ## 8. 固定概率分流的阶段转移项
 设某一群体 $(s,r)$ 的目标/决策区域为 $G_{s,r}\subset\Omega$，其指示函数为
 $$\chi_{G_{s,r}}(x)=
@@ -543,6 +642,16 @@ p_{(s,r)\to q}\,
 \kappa_{s,r}\,
 \chi_{G_{s,r}}(x)\,
 \rho_{s,r}(x,t).$$
+
+> **代码实现**: `codes/crowd_bellman/core.py:329-373` (`apply_fixed_probability_splitting`)
+> ```python
+> mask = rule.decision_mask & walkable
+> transferable = dt * max(rule.kappa, 0.0) * source_rho * mask.astype(float)
+> transferable = np.minimum(transferable, source_rho)  # 保证非负
+> deltas[rule.source] -= transferable
+> for target, prob in zip(rule.targets.keys(), probs):
+>     deltas[target] += prob * transferable
+> ```
 于是：
 $$Q_{s,r}^{\mathrm{out}}
 =
@@ -572,6 +681,15 @@ $$\rho_{ij}^{(s+1,q)}
 +
 \Delta \rho_{ij}^{(s,r)\to(s+1,q)}.$$
 这表示：群体 $(s,r)$ 在到达决策区后，以固定比例分流到下一阶段的不同路线群体。
+
+> **代码实现**: `codes/crowd_bellman/core.py:354-362` (`apply_fixed_probability_splitting` 更新部分)
+> ```python
+> deltas[rule.source] -= transferable  # 源群体减少
+> for target, prob in zip(rule.targets.keys(), probs):
+>     deltas[target] += prob * transferable  # 目标群体按比例增加
+> # 最终应用更新
+> result = np.clip(rho + delta, 0.0, None)
+> ```
 
 
 ## 9.  一个时间步的完整闭环算法

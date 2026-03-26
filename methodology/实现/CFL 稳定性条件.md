@@ -201,6 +201,8 @@ $$f(\rho)\left(\frac{\sqrt{m_{11}}}{\Delta x}+\frac{\sqrt{m_{22}}}{\Delta y}\rig
 f(\rho)\sqrt{\lambda_{\max}(M)}\left(\frac1{\Delta x}+\frac1{\Delta y}\right).$$
 因此改进 CFL 不比谱上界更严格，通常更宽松，但仍然稳定。
 
+> **代码实现**: `codes/crowd_bellman/core.py:238-252` (`compute_cfl_dt`)
+
 ## 6. 在通道张量 $M=\alpha \tau\tau^\top+\beta nn^\top$ 下的具体形式
 若
 $$M(x)=\alpha(x)\tau\tau^\top+\beta(x)nn^\top,$$
@@ -363,6 +365,13 @@ f(\rho^n_{ij})
 }$$
 其中 $0<\mathrm{CFL}<1$，例如取 $0.5\sim 0.9$。
 
+> **代码实现**: `codes/crowd_bellman/core.py:238-252` (`compute_cfl_dt`)
+> ```python
+> local_bound = speed * (np.sqrt(np.maximum(m11, 0.0)) + np.sqrt(np.maximum(m22, 0.0))) / max(dx, 1.0e-12)
+> vmax = float(np.max(local_bound))
+> return min(dt_cap, cfl / vmax)
+> ```
+
 # 升级（2026-03-26）：
 为何在多群体、各向异性张量、固定概率转移下需要重新表述 CFL 条件。
 ## 2. 多群体显式输运更新
@@ -443,6 +452,14 @@ f(\rho_{ij}^{\mathrm{tot},n})
 其中 $0<\mathrm{CFL}<1$。
 若不同群体共享同一个张量场 $M$，则外层 $\max_{(s,r)}$ 可省略。
 
+> **代码实现**: `codes/crowd_bellman/core.py:255-286` (`compute_cfl_dt_multigroup`)
+> ```python
+> for key, m11 in m11_by_group.items():
+>     m22 = m22_by_group[key]
+>     local = speed * (np.sqrt(np.maximum(m11, 0.0)) + np.sqrt(np.maximum(m22, 0.0))) * inv_dx
+>     vmax_transport = max(vmax_transport, float(np.max(local)))
+> ```
+
 ## 6. 固定概率转移项的显式时间步限制
 设群体 $(s,r)$ 在决策区 $G_{s,r}$ 内，以切换率 $\kappa_{s,r}$ 按固定概率分流到下一阶段各群体，则连续转移项为
 $$Q_{(s,r)\to(s+1,q)}
@@ -471,6 +488,16 @@ $$\eta_{s,r}=\kappa_{s,r}\Delta t,$$
 则需满足
 $$0\le \eta_{s,r}\le 1.$$
 
+> **代码实现**: `codes/crowd_bellman/core.py:255-286` (`compute_cfl_dt_multigroup` 中 transition 部分)
+> ```python
+> if transition_out_rate_by_group:
+>     rate_max = 0.0
+>     for rate in transition_out_rate_by_group.values():
+>         rate_max = max(rate_max, float(np.max(np.maximum(rate, 0.0))))
+>     if rate_max > 1.0e-12:
+>         dt_transition = 1.0 / rate_max
+> ```
+
 ## 7. 总时间步长选择原则
 综合输运 CFL 条件、固定概率转移项非负性限制以及人为设置的时间步上限 $dt_{\mathrm{cap}}$，在每个时间步应取
 $$\boxed{
@@ -486,6 +513,11 @@ dt_{\mathrm{cap}}
 - 输运项满足显式 CFL 稳定性；
 - 固定概率分流不会在单步内转移超过当前群体质量；
 - 时间步长不会超过设定的工程上限。
+
+> **代码实现**: `codes/crowd_bellman/core.py:286`
+> ```python
+> return min(dt_cap, dt_transport, dt_transition)
+> ```
 
 ## 8. 特例验证
 (1) 各向同性无分流情形
