@@ -1,6 +1,6 @@
 
 # AGENT.md
-
+AGENT.md for codex
 ## 项目概述
 
 这是博士学位论文研究的部分研究内容
