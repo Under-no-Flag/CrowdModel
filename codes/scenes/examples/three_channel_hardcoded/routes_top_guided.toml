@@ -1,0 +1,34 @@
+[case]
+case_id = "case3_top_guided"
+title = "Case 3: geometry-guided top one-way channel"
+
+[[stages]]
+stage_id = "main_exit"
+group_key = [1, 1]
+goal_region = "exit_east"
+sink_region = "exit_east"
+
+[[stages.controls]]
+mode = "target_point"
+region = "feeder_band"
+target_point = [48, 16]
+alpha = 8.0
+beta = 0.35
+
+[[stages.controls]]
+mode = "fixed_direction"
+region = "top_channel"
+direction = "E"
+alpha = 10.0
+beta = 0.2
+allowed_directions = ["E"]
+
+[[stages.controls]]
+mode = "isotropic"
+region = "middle_channel"
+value = 0.15
+
+[[stages.controls]]
+mode = "isotropic"
+region = "bottom_channel"
+value = 0.15

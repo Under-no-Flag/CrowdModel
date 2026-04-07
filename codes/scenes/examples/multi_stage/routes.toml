@@ -1,0 +1,96 @@
+[case]
+case_id = "phase1_multi_stage"
+title = "Phase 1 Multi Stage Config"
+
+[[stages]]
+stage_id = "entry"
+group_key = [1, 1]
+goal_region = "platform_upper"
+decision_region = "platform_upper"
+next_stage = "tour_down"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "platform_upper"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "tour_down"
+group_key = [2, 1]
+goal_region = "platform_lower"
+decision_region = "platform_lower"
+kappa = 1.8
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "platform_lower"
+alpha = 10.0
+beta = 0.25
+
+[[stages.targets]]
+stage_id = "route8"
+probability = 0.2
+
+[[stages.targets]]
+stage_id = "route9"
+probability = 0.3
+
+[[stages.targets]]
+stage_id = "route10"
+probability = 0.5
+
+[[stages]]
+stage_id = "route8"
+group_key = [3, 8]
+goal_region = "route8_goal"
+decision_region = "route8_goal"
+next_stage = "return_left"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "route8_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "route9"
+group_key = [3, 9]
+goal_region = "route9_goal"
+decision_region = "route9_goal"
+next_stage = "return_left"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "route9_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "route10"
+group_key = [3, 10]
+goal_region = "route10_goal"
+decision_region = "route10_goal"
+next_stage = "return_left"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "route10_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "return_left"
+group_key = [4, 1]
+goal_region = "return_exit"
+sink_region = "return_exit"
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "return_exit"
+alpha = 8.0
+beta = 0.35

@@ -1,0 +1,5 @@
+[[initial_groups]]
+group_id = "tour_visitors"
+stage_id = "entry"
+region = "spawn_left"
+density = 1.8

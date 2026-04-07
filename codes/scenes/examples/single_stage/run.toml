@@ -1,0 +1,22 @@
+[simulation]
+nx = 40
+ny = 32
+dx = 0.5
+steps = 120
+time_horizon = 20.0
+save_every = 40
+
+[objective]
+name = "single_stage_demo"
+
+[scene]
+file = "scene.toml"
+
+[population]
+file = "population.toml"
+
+[routes]
+file = "routes.toml"
+
+[outputs]
+output_root = "../../../results/config_single_stage"

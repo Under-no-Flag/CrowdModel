@@ -1,0 +1,32 @@
+block_boundaries = true
+obstacles = []
+
+[[regions]]
+name = "spawn_left"
+x0 = 2
+x1 = 8
+y0 = 8
+y1 = 24
+
+[[regions]]
+name = "exit_east"
+x0 = 38
+x1 = 39
+y0 = 4
+y1 = 28
+
+[[regions]]
+name = "main_band"
+x0 = 12
+x1 = 35
+y0 = 10
+y1 = 22
+
+[[exits]]
+name = "exit_east"
+region = "exit_east"
+
+[[channels]]
+name = "main"
+region = "main_band"
+probe_x = 24

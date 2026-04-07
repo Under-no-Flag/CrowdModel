@@ -1,0 +1,22 @@
+[simulation]
+nx = 48
+ny = 36
+dx = 0.5
+steps = 160
+time_horizon = 25.0
+save_every = 40
+
+[objective]
+name = "multi_stage_demo"
+
+[scene]
+file = "scene.toml"
+
+[population]
+file = "population.toml"
+
+[routes]
+file = "routes.toml"
+
+[outputs]
+output_root = "../../../results/config_multi_stage"

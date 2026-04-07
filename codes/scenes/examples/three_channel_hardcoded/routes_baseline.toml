@@ -1,0 +1,9 @@
+[case]
+case_id = "case1_baseline"
+title = "Case 1: baseline"
+
+[[stages]]
+stage_id = "main_exit"
+group_key = [1, 1]
+goal_region = "exit_east"
+sink_region = "exit_east"

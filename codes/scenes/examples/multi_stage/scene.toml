@@ -1,0 +1,75 @@
+block_boundaries = true
+obstacles = []
+
+[[regions]]
+name = "spawn_left"
+x0 = 3
+x1 = 9
+y0 = 10
+y1 = 26
+
+[[regions]]
+name = "platform_upper"
+x0 = 30
+x1 = 40
+y0 = 24
+y1 = 31
+
+[[regions]]
+name = "platform_lower"
+x0 = 30
+x1 = 40
+y0 = 5
+y1 = 12
+
+[[regions]]
+name = "route8_goal"
+x0 = 39
+x1 = 45
+y0 = 4
+y1 = 10
+
+[[regions]]
+name = "route9_goal"
+x0 = 39
+x1 = 45
+y0 = 14
+y1 = 20
+
+[[regions]]
+name = "route10_goal"
+x0 = 39
+x1 = 45
+y0 = 24
+y1 = 30
+
+[[regions]]
+name = "return_exit"
+x0 = 1
+x1 = 2
+y0 = 8
+y1 = 28
+
+[[channels]]
+name = "entry"
+region = "platform_upper"
+probe_x = 32
+
+[[channels]]
+name = "exit_8"
+region = "route8_goal"
+probe_x = 42
+
+[[channels]]
+name = "exit_9"
+region = "route9_goal"
+probe_x = 42
+
+[[channels]]
+name = "exit_10"
+region = "route10_goal"
+probe_x = 42
+
+[[exits]]
+name = "return_exit"
+region = "return_exit"

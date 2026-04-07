@@ -1,0 +1,159 @@
+block_boundaries = true
+obstacles = [
+  "wall_seg_1",
+  "wall_seg_2",
+  "wall_seg_3",
+  "wall_seg_4",
+  "wall_seg_5",
+  "wall_seg_6",
+]
+
+[[regions]]
+name = "spawn_left"
+x0 = 2
+x1 = 9
+y0 = 1
+y1 = 71
+
+[[regions]]
+name = "return_exit"
+x0 = 1
+x1 = 2
+y0 = 1
+y1 = 71
+
+[[regions]]
+name = "entry_opening_1"
+x0 = 49
+x1 = 52
+y0 = 10
+y1 = 14
+
+[[regions]]
+name = "entry_opening_2"
+x0 = 49
+x1 = 52
+y0 = 19
+y1 = 23
+
+[[regions]]
+name = "exit_opening_8"
+x0 = 49
+x1 = 52
+y0 = 46
+y1 = 50
+
+[[regions]]
+name = "exit_opening_9"
+x0 = 49
+x1 = 52
+y0 = 54
+y1 = 58
+
+[[regions]]
+name = "exit_opening_10"
+x0 = 49
+x1 = 52
+y0 = 61
+y1 = 65
+
+[[regions]]
+name = "stage1_goal"
+x0 = 52
+x1 = 95
+y0 = 56
+y1 = 71
+
+[[regions]]
+name = "stage2_goal"
+x0 = 52
+x1 = 95
+y0 = 1
+y1 = 21
+
+[[regions]]
+name = "route8_goal"
+x0 = 52
+x1 = 66
+y0 = 1
+y1 = 15
+
+[[regions]]
+name = "route9_goal"
+x0 = 66
+x1 = 81
+y0 = 1
+y1 = 15
+
+[[regions]]
+name = "route10_goal"
+x0 = 81
+x1 = 95
+y0 = 1
+y1 = 15
+
+[[regions]]
+name = "wall_seg_1"
+x0 = 49
+x1 = 52
+y0 = 1
+y1 = 10
+
+[[regions]]
+name = "wall_seg_2"
+x0 = 49
+x1 = 52
+y0 = 14
+y1 = 19
+
+[[regions]]
+name = "wall_seg_3"
+x0 = 49
+x1 = 52
+y0 = 23
+y1 = 46
+
+[[regions]]
+name = "wall_seg_4"
+x0 = 49
+x1 = 52
+y0 = 50
+y1 = 54
+
+[[regions]]
+name = "wall_seg_5"
+x0 = 49
+x1 = 52
+y0 = 58
+y1 = 61
+
+[[regions]]
+name = "wall_seg_6"
+x0 = 49
+x1 = 52
+y0 = 65
+y1 = 71
+
+[[exits]]
+name = "return_exit"
+region = "return_exit"
+
+[[channels]]
+name = "entry_1_2"
+regions = ["entry_opening_1", "entry_opening_2"]
+probe_x = 52
+
+[[channels]]
+name = "exit_8"
+region = "exit_opening_8"
+probe_x = 49
+
+[[channels]]
+name = "exit_9"
+region = "exit_opening_9"
+probe_x = 49
+
+[[channels]]
+name = "exit_10"
+region = "exit_opening_10"
+probe_x = 49

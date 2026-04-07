@@ -1,0 +1,15 @@
+[case]
+case_id = "phase1_single_stage"
+title = "Phase 1 Single Stage Config"
+
+[[stages]]
+stage_id = "main_exit"
+group_key = [1, 1]
+goal_region = "exit_east"
+sink_region = "exit_east"
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "exit_east"
+alpha = 8.0
+beta = 0.35

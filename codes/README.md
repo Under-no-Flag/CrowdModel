@@ -11,6 +11,9 @@
 
 - `python codes/run_experiments.py`
   Runs the three-channel scene experiments, the one-way validation, and the Section 5.1 report under one `codes/results/` folder by default.
+- `python codes/simulate_from_config.py --config <run.toml>`
+  Runs a config-driven simulation from TOML files. Phase 1 supports pure configuration inputs for scene geometry, initial populations, and route/stage compilation without image parsing.
+  Migrated hardcoded examples are available under `codes/scenes/examples/three_channel_hardcoded/` and `codes/scenes/examples/tour_hardcoded/`.
 - `python codes/search_parameters.py`
   Runs the first-stage parameter search for discrete control strategy, geometry intensity `eta`, and fixed split probabilities, and saves a ranking table plus per-run summaries under `codes/results/parameter_search/` by default.
 - `python codes/verify_unidirectional_hjb.py`
@@ -42,6 +45,7 @@ Typical contents:
 
 - per-case time-series csv;
 - per-case summary json;
+- config-driven run summary json;
 - parameter-search ranking csv and aggregated summary json;
 - section 5.1 csv and markdown tables;
 - section 5.1 comparison figures;

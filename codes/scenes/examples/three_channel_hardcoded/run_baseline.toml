@@ -1,0 +1,29 @@
+[simulation]
+nx = 96
+ny = 72
+dx = 0.5
+steps = 600
+time_horizon = 40.0
+vmax = 1.5
+rho_max = 5.0
+rho_init = 2.2
+bellman_every = 1
+bellman_f_eps = 0.08
+cfl = 0.9
+dt_cap = 0.18
+save_every = 40
+
+[objective]
+name = "three_channel_baseline"
+
+[scene]
+file = "scene.toml"
+
+[population]
+file = "population.toml"
+
+[routes]
+file = "routes_baseline.toml"
+
+[outputs]
+output_root = "../../../results/config_three_channel_baseline"

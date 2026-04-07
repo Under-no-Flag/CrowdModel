@@ -1,0 +1,5 @@
+[[initial_groups]]
+group_id = "visitors"
+stage_id = "main_exit"
+region = "spawn_left"
+density = 2.2
