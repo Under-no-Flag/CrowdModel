@@ -7,6 +7,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .config import ObjectiveConfig
+
 
 @dataclass
 class CaseStats:
@@ -17,6 +19,8 @@ class CaseStats:
     velocity_discontinuity: list[float] = field(default_factory=list)
     density_gradient_intensity: list[float] = field(default_factory=list)
     dt: list[float] = field(default_factory=list)
+    travel_time_cumulative: list[float] = field(default_factory=list)
+    high_density_exposure_cumulative: list[float] = field(default_factory=list)
     channel_density: dict[str, list[float]] = field(default_factory=dict)
     channel_flux_cumulative: dict[str, float] = field(default_factory=dict)
 
@@ -72,6 +76,47 @@ def channel_flux_increment(
     return float(np.sum(positive_flux) * dx * dt)
 
 
+def channel_flux_variance(channel_flux_cumulative: dict[str, float]) -> float:
+    values = np.array(list(channel_flux_cumulative.values()), dtype=float)
+    if values.size == 0:
+        return 0.0
+    return float(np.var(values))
+
+
+def compute_objective_terms(
+    stats: CaseStats,
+    objective_cfg: ObjectiveConfig,
+) -> dict[str, float]:
+    j1_raw = float(stats.travel_time_cumulative[-1]) if stats.travel_time_cumulative else 0.0
+    j2_raw = float(stats.high_density_exposure_cumulative[-1]) if stats.high_density_exposure_cumulative else 0.0
+    j5_raw = channel_flux_variance(stats.channel_flux_cumulative)
+
+    if objective_cfg.use_normalized_terms:
+        j1_eval = j1_raw / objective_cfg.j1_scale
+        j2_eval = j2_raw / objective_cfg.j2_scale
+        j5_eval = j5_raw / objective_cfg.j5_scale
+    else:
+        j1_eval = j1_raw
+        j2_eval = j2_raw
+        j5_eval = j5_raw
+
+    objective_value = (
+        objective_cfg.lambda_j1 * j1_eval
+        + objective_cfg.lambda_j2 * j2_eval
+        + objective_cfg.lambda_j5 * j5_eval
+    )
+
+    return {
+        "j1_total_travel_time": j1_raw,
+        "j2_high_density_exposure": j2_raw,
+        "j5_channel_flux_variance": j5_raw,
+        "j1_eval": float(j1_eval),
+        "j2_eval": float(j2_eval),
+        "j5_eval": float(j5_eval),
+        "objective_value": float(objective_value),
+    }
+
+
 def record_step(
     stats: CaseStats,
     time_value: float,
@@ -83,16 +128,27 @@ def record_step(
     sink_total: float,
     dt: float,
     dx: float,
+    rho_safe: float,
     channel_masks: dict[str, np.ndarray],
     probe_x: dict[str, int],
 ) -> None:
+    cell_area = dx * dx
+    walkable_rho = rho[walkable]
+
     stats.times.append(time_value)
-    stats.mean_density.append(float(np.mean(rho[walkable])))
-    stats.peak_density.append(float(np.max(rho[walkable])))
+    stats.mean_density.append(float(np.mean(walkable_rho)))
+    stats.peak_density.append(float(np.max(walkable_rho)))
     stats.sink_cumulative.append(sink_total)
     stats.velocity_discontinuity.append(velocity_discontinuity_metric(walkable, vx, vy))
     stats.density_gradient_intensity.append(density_gradient_metric(walkable, rho, dx))
     stats.dt.append(dt)
+
+    travel_increment = float(np.sum(walkable_rho) * cell_area * dt)
+    exposure_increment = float(np.sum(walkable_rho > rho_safe) * cell_area * dt)
+    prev_j1 = stats.travel_time_cumulative[-1] if stats.travel_time_cumulative else 0.0
+    prev_j2 = stats.high_density_exposure_cumulative[-1] if stats.high_density_exposure_cumulative else 0.0
+    stats.travel_time_cumulative.append(prev_j1 + travel_increment)
+    stats.high_density_exposure_cumulative.append(prev_j2 + exposure_increment)
 
     for name, channel_mask in channel_masks.items():
         stats.channel_density[name].append(float(np.mean(rho[channel_mask])) if np.any(channel_mask) else 0.0)
@@ -105,7 +161,12 @@ def record_step(
         )
 
 
-def build_summary(case_id: str, title: str, stats: CaseStats) -> dict[str, object]:
+def build_summary(
+    case_id: str,
+    title: str,
+    stats: CaseStats,
+    objective_cfg: ObjectiveConfig | None = None,
+) -> dict[str, object]:
     channel_flux_total = sum(stats.channel_flux_cumulative.values())
     if channel_flux_total <= 1.0e-12:
         channel_share = {name: 0.0 for name in stats.channel_flux_cumulative}
@@ -120,7 +181,7 @@ def build_summary(case_id: str, title: str, stats: CaseStats) -> dict[str, objec
         for name, series in stats.channel_density.items()
     }
 
-    return {
+    summary = {
         "case_id": case_id,
         "title": title,
         "final_time": float(stats.times[-1]) if stats.times else 0.0,
@@ -132,7 +193,14 @@ def build_summary(case_id: str, title: str, stats: CaseStats) -> dict[str, objec
         "channel_time_mean_density": channel_time_mean_density,
         "channel_flux_cumulative": {k: float(v) for k, v in stats.channel_flux_cumulative.items()},
         "channel_flux_share": channel_share,
+        "j1_total_travel_time": float(stats.travel_time_cumulative[-1]) if stats.travel_time_cumulative else 0.0,
+        "j2_high_density_exposure": float(stats.high_density_exposure_cumulative[-1]) if stats.high_density_exposure_cumulative else 0.0,
+        "j5_channel_flux_variance": channel_flux_variance(stats.channel_flux_cumulative),
     }
+    if objective_cfg is not None:
+        summary["objective"] = compute_objective_terms(stats, objective_cfg)
+        summary["objective_value"] = float(summary["objective"]["objective_value"])
+    return summary
 
 
 def save_case_timeseries(path: Path, stats: CaseStats) -> None:
@@ -144,6 +212,8 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
         "sink_cumulative",
         "velocity_discontinuity",
         "density_gradient_intensity",
+        "travel_time_cumulative",
+        "high_density_exposure_cumulative",
     ] + [f"channel_density_{name}" for name in stats.channel_density]
 
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -158,6 +228,8 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
                 "sink_cumulative": stats.sink_cumulative[idx],
                 "velocity_discontinuity": stats.velocity_discontinuity[idx],
                 "density_gradient_intensity": stats.density_gradient_intensity[idx],
+                "travel_time_cumulative": stats.travel_time_cumulative[idx],
+                "high_density_exposure_cumulative": stats.high_density_exposure_cumulative[idx],
             }
             for name, series in stats.channel_density.items():
                 row[f"channel_density_{name}"] = series[idx]

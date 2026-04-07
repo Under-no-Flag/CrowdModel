@@ -3,3 +3,4 @@
 codes/results/*
 codes/__pycache__/
 *.pyc
+codes/results_*/

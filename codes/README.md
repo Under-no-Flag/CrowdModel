@@ -11,6 +11,8 @@
 
 - `python codes/run_experiments.py`
   Runs the three-channel scene experiments, the one-way validation, and the Section 5.1 report under one `codes/results/` folder by default.
+- `python codes/search_parameters.py`
+  Runs the first-stage parameter search for discrete control strategy, geometry intensity `eta`, and fixed split probabilities, and saves a ranking table plus per-run summaries under `codes/results/parameter_search/` by default.
 - `python codes/verify_unidirectional_hjb.py`
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
@@ -40,6 +42,7 @@ Typical contents:
 
 - per-case time-series csv;
 - per-case summary json;
+- parameter-search ranking csv and aggregated summary json;
 - section 5.1 csv and markdown tables;
 - section 5.1 comparison figures;
 - field snapshots and time-series figures;

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .config import CaseOverrides
 from .core import DIRECTIONS, GroupKey, TransitionRule, default_allowed_mask, tensor_from_tau
 
 
@@ -178,6 +179,7 @@ def build_guided_channel_case(
     case_id: str,
     title: str,
     guided_channel: str,
+    overrides: CaseOverrides | None = None,
 ) -> CaseModel:
     walkable = scene.walkable
     ny, nx = walkable.shape
@@ -201,11 +203,19 @@ def build_guided_channel_case(
     mask = feeder & (norm > 1.0e-12)
     tau_x[mask] = tx[mask] / norm[mask]
     tau_y[mask] = ty[mask] / norm[mask]
+    feeder_beta = 0.35
+    feeder_alpha = 8.0
+    lane_beta = 0.20
+    lane_alpha = 10.0
+    if overrides is not None and overrides.guidance_eta is not None:
+        feeder_alpha = feeder_beta * overrides.guidance_eta
+        lane_alpha = lane_beta * overrides.guidance_eta
+
     feeder_m11, feeder_m12, feeder_m22 = tensor_from_tau(
         tau_x=tau_x,
         tau_y=tau_y,
-        alpha=8.0,
-        beta=0.35,
+        alpha=feeder_alpha,
+        beta=feeder_beta,
     )
     m11[mask] = feeder_m11[mask]
     m12[mask] = feeder_m12[mask]
@@ -217,8 +227,8 @@ def build_guided_channel_case(
     lane_m11, lane_m12, lane_m22 = tensor_from_tau(
         tau_x=lane_tau_x,
         tau_y=lane_tau_y,
-        alpha=10.0,
-        beta=0.20,
+        alpha=lane_alpha,
+        beta=lane_beta,
     )
     m11[guided_lane] = lane_m11[guided_lane]
     m12[guided_lane] = lane_m12[guided_lane]
@@ -358,7 +368,7 @@ def build_tour_scene(cfg: SimulationConfig) -> BaseScene:
     )
 
 
-def build_multistage_tour_case(scene: BaseScene) -> CaseModel:
+def build_multistage_tour_case(scene: BaseScene, overrides: CaseOverrides | None = None) -> CaseModel:
     """Create multi-stage multi-route sightseeing case with fixed splitting probs."""
 
     walkable = scene.walkable
@@ -452,9 +462,22 @@ def build_multistage_tour_case(scene: BaseScene) -> CaseModel:
         ),
     }
 
+    split_probabilities = (0.2, 0.3, 0.5)
+    if overrides is not None and overrides.split_probabilities is not None:
+        probs = np.array(overrides.split_probabilities, dtype=float)
+        prob_sum = float(np.sum(probs))
+        if prob_sum > 1.0e-12:
+            probs = probs / prob_sum
+            split_probabilities = (float(probs[0]), float(probs[1]), float(probs[2]))
+
     transitions = (
         TransitionRule(source=(1, 1), kappa=2.0, decision_mask=g1, targets={(2, 1): 1.0}),
-        TransitionRule(source=(2, 1), kappa=1.8, decision_mask=g2, targets={(3, 8): 0.2, (3, 9): 0.3, (3, 10): 0.5}),
+        TransitionRule(
+            source=(2, 1),
+            kappa=1.8,
+            decision_mask=g2,
+            targets={(3, 8): split_probabilities[0], (3, 9): split_probabilities[1], (3, 10): split_probabilities[2]},
+        ),
         TransitionRule(source=(3, 8), kappa=2.0, decision_mask=g38, targets={(4, 1): 1.0}),
         TransitionRule(source=(3, 9), kappa=2.0, decision_mask=g39, targets={(4, 1): 1.0}),
         TransitionRule(source=(3, 10), kappa=2.0, decision_mask=g310, targets={(4, 1): 1.0}),
@@ -484,7 +507,7 @@ def build_multistage_tour_case(scene: BaseScene) -> CaseModel:
     )
 
 
-def build_case_model(case_id: str, scene: BaseScene) -> CaseModel:
+def build_case_model(case_id: str, scene: BaseScene, overrides: CaseOverrides | None = None) -> CaseModel:
     walkable = scene.walkable
     ny, nx = walkable.shape
     m11 = np.ones((ny, nx), dtype=float)
@@ -513,6 +536,7 @@ def build_case_model(case_id: str, scene: BaseScene) -> CaseModel:
             case_id=case_id,
             title="Case 2: geometry-guided middle one-way channel",
             guided_channel="middle",
+            overrides=overrides,
         )
 
     if case_id == "case3_top_guided":
@@ -521,6 +545,7 @@ def build_case_model(case_id: str, scene: BaseScene) -> CaseModel:
             case_id=case_id,
             title="Case 3: geometry-guided top one-way channel",
             guided_channel="top",
+            overrides=overrides,
         )
 
     if case_id == "case4_bottom_guided":
@@ -529,10 +554,11 @@ def build_case_model(case_id: str, scene: BaseScene) -> CaseModel:
             case_id=case_id,
             title="Case 4: geometry-guided bottom one-way channel",
             guided_channel="bottom",
+            overrides=overrides,
         )
 
     if case_id == "case5_multistage_tour":
-        return build_multistage_tour_case(scene)
+        return build_multistage_tour_case(scene, overrides=overrides)
 
     raise ValueError(f"Unknown case id: {case_id}")
 

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 
+from .config import CaseOverrides, ObjectiveConfig
 from .core import (
     GroupKey,
     apply_fixed_probability_splitting,
@@ -82,8 +83,11 @@ def simulate_case(
     scene: BaseScene,
     case: CaseModel,
     output_dir: Path,
+    objective_cfg: ObjectiveConfig | None = None,
 ) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
+    if objective_cfg is None:
+        objective_cfg = ObjectiveConfig()
 
     groups = _build_group_models(case)
     rho_by_group = _build_initial_group_density(scene, case, groups)
@@ -218,6 +222,7 @@ def simulate_case(
             sink_total=sink_total,
             dt=dt,
             dx=cfg.dx,
+            rho_safe=objective_cfg.rho_safe,
             channel_masks=case.channel_masks,
             probe_x=case.probe_x,
         )
@@ -239,11 +244,35 @@ def simulate_case(
     save_case_timeseries(output_dir / "timeseries.csv", stats)
     save_timeseries_plot(output_dir / "timeseries.png", case.title, stats)
 
-    summary = build_summary(case.case_id, case.title, stats)
+    summary = build_summary(case.case_id, case.title, stats, objective_cfg=objective_cfg)
     summary["config"] = asdict(cfg)
+    summary["objective_config"] = asdict(objective_cfg)
     summary["group_count"] = len(groups)
     summary["transition_count"] = len(transitions)
     save_json(output_dir / "summary.json", summary)
+    return summary
+
+
+def run_case(
+    cfg: SimulationConfig,
+    case_id: str,
+    output_root: Path,
+    objective_cfg: ObjectiveConfig | None = None,
+    case_overrides: CaseOverrides | None = None,
+    cached_scene: BaseScene | None = None,
+) -> dict[str, object]:
+    scene = build_scene_for_case(case_id=case_id, cfg=cfg, cached_scene=cached_scene)
+    case = build_case_model(case_id, scene, overrides=case_overrides)
+    summary = simulate_case(
+        cfg=cfg,
+        scene=scene,
+        case=case,
+        output_dir=output_root / case.case_id,
+        objective_cfg=objective_cfg,
+    )
+    if case_overrides is not None:
+        summary["case_overrides"] = asdict(case_overrides)
+        save_json(output_root / case.case_id / "summary.json", summary)
     return summary
 
 
@@ -251,13 +280,20 @@ def run_cases(
     cfg: SimulationConfig,
     cases: tuple[str, ...],
     output_root: Path,
+    objective_cfg: ObjectiveConfig | None = None,
 ) -> list[dict[str, object]]:
     shared_scene = build_three_channel_scene(cfg)
     summaries: list[dict[str, object]] = []
     for case_id in cases:
-        scene = build_scene_for_case(case_id=case_id, cfg=cfg, cached_scene=shared_scene)
-        case = build_case_model(case_id, scene)
-        summaries.append(simulate_case(cfg, scene, case, output_root / case_id))
+        summaries.append(
+            run_case(
+                cfg=cfg,
+                case_id=case_id,
+                output_root=output_root,
+                objective_cfg=objective_cfg,
+                cached_scene=shared_scene,
+            )
+        )
 
     save_json(output_root / "comparison_summary.json", {"cases": summaries})
     save_comparison_plot(output_root / "comparison.png", summaries)
