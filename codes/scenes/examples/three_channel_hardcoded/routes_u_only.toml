@@ -1,0 +1,14 @@
+[case]
+case_id = "case_u_only_middle"
+title = "Case U-only: middle channel block"
+
+[[stages]]
+stage_id = "main_exit"
+group_key = [1, 1]
+goal_region = "exit_east"
+sink_region = "exit_east"
+
+[[stages.controls]]
+mode = "identity"
+region = "middle_channel"
+allowed_directions = ["W"]

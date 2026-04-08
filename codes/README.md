@@ -11,6 +11,8 @@
 
 - `python codes/simulate_from_config.py --config <run.toml>`
   Runs a config-driven simulation from TOML files. This is now the primary simulation entrypoint.
+- `python codes/g1_runner.py`
+  Runs the G1 mechanism-validation batch for `C0/C1/C2/C3` and writes one shared `comparison_summary.json` plus `comparison.png`.
 - `python codes/verify_unidirectional_hjb.py`
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
@@ -27,7 +29,7 @@ Phase 1 examples:
 - `codes/scenes/examples/multi_stage/`
   Minimal multi-stage / split-routing config example.
 - `codes/scenes/examples/three_channel_hardcoded/`
-  Migrated TOML version of the old three-channel hardcoded scene family.
+  Migrated TOML version of the old three-channel hardcoded scene family, including `baseline`, `M-only`, `U-only`, and `M+U-middle`.
 - `codes/scenes/examples/tour_hardcoded/`
   Migrated TOML version of the old multi-stage sightseeing scene.
 
@@ -35,8 +37,11 @@ Example commands:
 
 - `python codes/simulate_from_config.py --config codes/scenes/examples/single_stage/run.toml`
 - `python codes/simulate_from_config.py --config codes/scenes/examples/multi_stage/run.toml`
+- `python codes/simulate_from_config.py --config codes/scenes/examples/three_channel_hardcoded/run_m_only.toml`
+- `python codes/simulate_from_config.py --config codes/scenes/examples/three_channel_hardcoded/run_u_only.toml`
 - `python codes/simulate_from_config.py --config codes/scenes/examples/three_channel_hardcoded/run_middle_guided.toml`
 - `python codes/simulate_from_config.py --config codes/scenes/examples/tour_hardcoded/run.toml`
+- `python codes/g1_runner.py --steps 600 --time-horizon 40`
 
 ## Output
 
