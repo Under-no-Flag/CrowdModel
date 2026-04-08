@@ -9,33 +9,34 @@
 
 ## Main entry points
 
-- `python codes/run_experiments.py`
-  Runs the three-channel scene experiments, the one-way validation, and the Section 5.1 report under one `codes/results/` folder by default.
 - `python codes/simulate_from_config.py --config <run.toml>`
-  Runs a config-driven simulation from TOML files. Phase 1 supports pure configuration inputs for scene geometry, initial populations, and route/stage compilation without image parsing.
-  Migrated hardcoded examples are available under `codes/scenes/examples/three_channel_hardcoded/` and `codes/scenes/examples/tour_hardcoded/`.
-- `python codes/search_parameters.py`
-  Runs the first-stage parameter search for discrete control strategy, geometry intensity `eta`, and fixed split probabilities, and saves a ranking table plus per-run summaries under `codes/results/parameter_search/` by default.
+  Runs a config-driven simulation from TOML files. This is now the primary simulation entrypoint.
 - `python codes/verify_unidirectional_hjb.py`
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
   Generates Section 5.1 summary tables and paper-ready figures from completed runs.
-- `python codes/simulate_scene1.py`
-  Thin wrapper for `Case 1`.
-- `python codes/simulate_method2_scene2.py`
-  Thin wrapper for `Case 2`.
-- `python codes/simulate_method3_scene1.py`
-  Thin wrapper that runs both experiment cases together.
-- `python codes/simulate_multistage_tour.py`
-  Runs the new multi-stage / multi-route sightseeing case with fixed probability splitting.
 
-## Available Cases
+## Config workflow
 
-- `case1_baseline`: no geometry guidance, all three channels remain available.
-- `case2_middle_guided`: soft guidance toward the middle channel, with one-way motion inside the middle lane.
-- `case3_top_guided`: soft guidance toward the top channel, with one-way motion inside the top lane.
-- `case4_bottom_guided`: soft guidance toward the bottom channel, with one-way motion inside the bottom lane.
-- `case5_multistage_tour`: multi-stage sightseeing route with shared congestion, per-group Bellman fields, and fixed split `8:20%`, `9:30%`, `10:50%`.
+The old hardcoded case-id workflow has been removed. Scene geometry, initial populations, and route/stage logic are now expected to come from TOML files.
+
+Phase 1 examples:
+
+- `codes/scenes/examples/single_stage/`
+  Minimal single-stage config example.
+- `codes/scenes/examples/multi_stage/`
+  Minimal multi-stage / split-routing config example.
+- `codes/scenes/examples/three_channel_hardcoded/`
+  Migrated TOML version of the old three-channel hardcoded scene family.
+- `codes/scenes/examples/tour_hardcoded/`
+  Migrated TOML version of the old multi-stage sightseeing scene.
+
+Example commands:
+
+- `python codes/simulate_from_config.py --config codes/scenes/examples/single_stage/run.toml`
+- `python codes/simulate_from_config.py --config codes/scenes/examples/multi_stage/run.toml`
+- `python codes/simulate_from_config.py --config codes/scenes/examples/three_channel_hardcoded/run_middle_guided.toml`
+- `python codes/simulate_from_config.py --config codes/scenes/examples/tour_hardcoded/run.toml`
 
 ## Output
 
@@ -46,9 +47,7 @@ Typical contents:
 - per-case time-series csv;
 - per-case summary json;
 - config-driven run summary json;
-- parameter-search ranking csv and aggregated summary json;
 - section 5.1 csv and markdown tables;
 - section 5.1 comparison figures;
 - field snapshots and time-series figures;
-- cross-case comparison figure;
 - one-way HJB validation report.

@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import argparse
 from dataclasses import asdict
 from pathlib import Path
 
 import numpy as np
 
-from .config import CaseOverrides, ObjectiveConfig
+from .config import ObjectiveConfig
 from .core import (
     GroupKey,
     apply_fixed_probability_splitting,
@@ -21,15 +20,12 @@ from .core import (
     update_density,
 )
 from .metrics import build_summary, init_case_stats, record_step, save_case_timeseries, save_json
-from .plotting import save_case_snapshot, save_comparison_plot, save_timeseries_plot
+from .plotting import save_case_snapshot, save_timeseries_plot
 from .scenes import (
     BaseScene,
     CaseModel,
     GroupModel,
     SimulationConfig,
-    build_case_model,
-    build_scene_for_case,
-    build_three_channel_scene,
 )
 
 
@@ -251,70 +247,3 @@ def simulate_case(
     summary["transition_count"] = len(transitions)
     save_json(output_dir / "summary.json", summary)
     return summary
-
-
-def run_case(
-    cfg: SimulationConfig,
-    case_id: str,
-    output_root: Path,
-    objective_cfg: ObjectiveConfig | None = None,
-    case_overrides: CaseOverrides | None = None,
-    cached_scene: BaseScene | None = None,
-) -> dict[str, object]:
-    scene = build_scene_for_case(case_id=case_id, cfg=cfg, cached_scene=cached_scene)
-    case = build_case_model(case_id, scene, overrides=case_overrides)
-    summary = simulate_case(
-        cfg=cfg,
-        scene=scene,
-        case=case,
-        output_dir=output_root / case.case_id,
-        objective_cfg=objective_cfg,
-    )
-    if case_overrides is not None:
-        summary["case_overrides"] = asdict(case_overrides)
-        save_json(output_root / case.case_id / "summary.json", summary)
-    return summary
-
-
-def run_cases(
-    cfg: SimulationConfig,
-    cases: tuple[str, ...],
-    output_root: Path,
-    objective_cfg: ObjectiveConfig | None = None,
-) -> list[dict[str, object]]:
-    shared_scene = build_three_channel_scene(cfg)
-    summaries: list[dict[str, object]] = []
-    for case_id in cases:
-        summaries.append(
-            run_case(
-                cfg=cfg,
-                case_id=case_id,
-                output_root=output_root,
-                objective_cfg=objective_cfg,
-                cached_scene=shared_scene,
-            )
-        )
-
-    save_json(output_root / "comparison_summary.json", {"cases": summaries})
-    save_comparison_plot(output_root / "comparison.png", summaries)
-    return summaries
-
-
-def run_cli(default_cases: tuple[str, ...]) -> None:
-    parser = argparse.ArgumentParser(description="Run unified Bellman crowd experiments.")
-    parser.add_argument("--cases", nargs="+", default=list(default_cases))
-    parser.add_argument("--output-root", default="codes/results")
-    parser.add_argument("--steps", type=int, default=None)
-    parser.add_argument("--save-every", type=int, default=None)
-    parser.add_argument("--time-horizon", type=float, default=None)
-    args = parser.parse_args()
-
-    cfg = SimulationConfig()
-    if args.steps is not None:
-        cfg = SimulationConfig(**{**asdict(cfg), "steps": args.steps})
-    if args.save_every is not None:
-        cfg = SimulationConfig(**{**asdict(cfg), "save_every": args.save_every})
-    if args.time_horizon is not None:
-        cfg = SimulationConfig(**{**asdict(cfg), "time_horizon": args.time_horizon})
-
-    run_cases(cfg=cfg, cases=tuple(args.cases), output_root=Path(args.output_root))
