@@ -66,6 +66,32 @@ def build_eight_directions() -> DirectionLibrary:
 
 
 DIRECTIONS = build_eight_directions()
+_DIRECTION_COUNT = len(DIRECTIONS.names)
+_DIRECTION_BITS = tuple(int(bit) for bit in DIRECTIONS.bits.tolist())
+_DIRECTION_DY = tuple(int(value) for value in DIRECTIONS.dy.tolist())
+_DIRECTION_DX = tuple(int(value) for value in DIRECTIONS.dx.tolist())
+_DIRECTION_UX = np.asarray(DIRECTIONS.ux, dtype=float)
+_DIRECTION_UY = np.asarray(DIRECTIONS.uy, dtype=float)
+
+
+def _axis_shift_slices(offset: int) -> tuple[slice, slice]:
+    if offset > 0:
+        return slice(None, -offset), slice(offset, None)
+    if offset < 0:
+        return slice(-offset, None), slice(None, offset)
+    return slice(None), slice(None)
+
+
+def _direction_shift_slices(dy: int, dx: int) -> tuple[slice, slice, slice, slice]:
+    src_y, dst_y = _axis_shift_slices(dy)
+    src_x, dst_x = _axis_shift_slices(dx)
+    return src_y, src_x, dst_y, dst_x
+
+
+_DIRECTION_SHIFT_SLICES = tuple(
+    _direction_shift_slices(dy, dx)
+    for dy, dx in zip(_DIRECTION_DY, _DIRECTION_DX)
+)
 
 
 def greenshields_speed(rho: np.ndarray, vmax: float, rho_max: float) -> np.ndarray:
@@ -116,8 +142,8 @@ def precompute_step_factors(
 ) -> np.ndarray:
     """Precompute geometric step costs h/sqrt(u^T M u) for each control."""
 
-    step_factor = np.full((walkable.shape[0], walkable.shape[1], len(DIRECTIONS.names)), np.inf, dtype=float)
-    for k in range(len(DIRECTIONS.names)):
+    step_factor = np.full((walkable.shape[0], walkable.shape[1], _DIRECTION_COUNT), np.inf, dtype=float)
+    for k in range(_DIRECTION_COUNT):
         ut_mu = (
             DIRECTIONS.ux[k] * DIRECTIONS.ux[k] * m11
             + 2.0 * DIRECTIONS.ux[k] * DIRECTIONS.uy[k] * m12
@@ -129,7 +155,7 @@ def precompute_step_factors(
     return step_factor
 
 
-def solve_bellman(
+def _solve_bellman_python(
     walkable: np.ndarray,
     exit_mask: np.ndarray,
     allowed_mask: np.ndarray,
@@ -153,7 +179,7 @@ def solve_bellman(
         if value > phi[y, x]:
             continue
 
-        for k in range(len(DIRECTIONS.names)):
+        for k in range(_DIRECTION_COUNT):
             py = y - int(DIRECTIONS.dy[k])
             px = x - int(DIRECTIONS.dx[k])
             if py < 0 or py >= ny or px < 0 or px >= nx:
@@ -174,7 +200,89 @@ def solve_bellman(
     return phi
 
 
-def recover_optimal_direction(
+def _solve_bellman_optimized(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    f_eps: float,
+) -> np.ndarray:
+    """Same Bellman solve with lower Python overhead in the inner loop."""
+
+    ny, nx = walkable.shape
+    phi = np.full((ny, nx), np.inf, dtype=float)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
+    queue: list[tuple[float, int, int]] = []
+    push = heappush
+    pop = heappop
+
+    for y, x in np.argwhere(exit_mask & walkable):
+        yy = int(y)
+        xx = int(x)
+        phi[yy, xx] = 0.0
+        push(queue, (0.0, yy, xx))
+
+    while queue:
+        value, y, x = pop(queue)
+        if value > phi[y, x]:
+            continue
+
+        for k in range(_DIRECTION_COUNT):
+            py = y - _DIRECTION_DY[k]
+            px = x - _DIRECTION_DX[k]
+            if py < 0 or py >= ny or px < 0 or px >= nx:
+                continue
+            if not walkable[py, px]:
+                continue
+            if (allowed_mask[py, px] & _DIRECTION_BITS[k]) == 0:
+                continue
+
+            candidate = value + step_factor[py, px, k] * inv_speed[py, px]
+            if candidate + 1.0e-12 < phi[py, px]:
+                phi[py, px] = candidate
+                push(queue, (candidate, py, px))
+
+    finite = np.isfinite(phi) & walkable
+    if np.any(finite):
+        phi[finite] -= np.min(phi[finite])
+    return phi
+
+
+def solve_bellman(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    f_eps: float,
+    *,
+    backend: str = "optimized",
+) -> np.ndarray:
+    """Solve the discrete Bellman equation with a selectable backend."""
+
+    if backend == "python":
+        return _solve_bellman_python(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=f_eps,
+        )
+    if backend == "optimized":
+        return _solve_bellman_optimized(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=f_eps,
+        )
+    raise ValueError(f"Unsupported Bellman backend: {backend}")
+
+
+def _recover_optimal_direction_python(
     walkable: np.ndarray,
     exit_mask: np.ndarray,
     allowed_mask: np.ndarray,
@@ -188,7 +296,7 @@ def recover_optimal_direction(
     ny, nx = walkable.shape
     ux = np.zeros((ny, nx), dtype=float)
     uy = np.zeros((ny, nx), dtype=float)
-    speed_safe = np.maximum(speed, f_eps)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
 
     for y in range(ny):
         for x in range(nx):
@@ -199,25 +307,102 @@ def recover_optimal_direction(
             best_ux = 0.0
             best_uy = 0.0
 
-            for k in range(len(DIRECTIONS.names)):
-                if (allowed_mask[y, x] & DIRECTIONS.bits[k]) == 0:
+            for k in range(_DIRECTION_COUNT):
+                if (allowed_mask[y, x] & _DIRECTION_BITS[k]) == 0:
                     continue
-                nyy = y + int(DIRECTIONS.dy[k])
-                nxx = x + int(DIRECTIONS.dx[k])
+                nyy = y + _DIRECTION_DY[k]
+                nxx = x + _DIRECTION_DX[k]
                 if nyy < 0 or nyy >= ny or nxx < 0 or nxx >= nx:
                     continue
                 if (not walkable[nyy, nxx]) or (not np.isfinite(phi[nyy, nxx])):
                     continue
-                candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
+                candidate = phi[nyy, nxx] + step_factor[y, x, k] * inv_speed[y, x]
                 if candidate < best_value:
                     best_value = candidate
-                    best_ux = DIRECTIONS.ux[k]
-                    best_uy = DIRECTIONS.uy[k]
+                    best_ux = float(_DIRECTION_UX[k])
+                    best_uy = float(_DIRECTION_UY[k])
 
             ux[y, x] = best_ux
             uy[y, x] = best_uy
 
     return ux, uy
+
+
+def _recover_optimal_direction_vectorized(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    phi: np.ndarray,
+    f_eps: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Recover optimal headings by evaluating all directions in vectorized form."""
+
+    ny, nx = walkable.shape
+    candidate = np.full((ny, nx, _DIRECTION_COUNT), np.inf, dtype=float)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
+
+    for k in range(_DIRECTION_COUNT):
+        src_y, src_x, dst_y, dst_x = _DIRECTION_SHIFT_SLICES[k]
+        phi_dst = phi[dst_y, dst_x]
+        valid = (
+            ((allowed_mask[src_y, src_x] & _DIRECTION_BITS[k]) != 0)
+            & walkable[dst_y, dst_x]
+            & np.isfinite(phi_dst)
+        )
+        if not np.any(valid):
+            continue
+
+        candidate_slice = candidate[src_y, src_x, k]
+        candidate_values = phi_dst + step_factor[src_y, src_x, k] * inv_speed[src_y, src_x]
+        candidate_slice[valid] = candidate_values[valid]
+
+    best_idx = np.argmin(candidate, axis=2)
+    best_value = np.take_along_axis(candidate, best_idx[..., None], axis=2)[..., 0]
+
+    valid_cells = walkable & (~exit_mask) & np.isfinite(phi) & np.isfinite(best_value)
+    ux = np.zeros((ny, nx), dtype=float)
+    uy = np.zeros((ny, nx), dtype=float)
+    ux[valid_cells] = _DIRECTION_UX[best_idx[valid_cells]]
+    uy[valid_cells] = _DIRECTION_UY[best_idx[valid_cells]]
+    return ux, uy
+
+
+def recover_optimal_direction(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    phi: np.ndarray,
+    f_eps: float,
+    *,
+    backend: str = "vectorized",
+) -> tuple[np.ndarray, np.ndarray]:
+    """Recover argmin controls from a solved Bellman value function."""
+
+    if backend == "python":
+        return _recover_optimal_direction_python(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            phi=phi,
+            f_eps=f_eps,
+        )
+    if backend == "vectorized":
+        return _recover_optimal_direction_vectorized(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            phi=phi,
+            f_eps=f_eps,
+        )
+    raise ValueError(f"Unsupported direction recovery backend: {backend}")
 
 
 def compute_total_density(rho_by_group: Mapping[GroupKey, np.ndarray]) -> np.ndarray:
