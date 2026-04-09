@@ -1,0 +1,37 @@
+[simulation]
+nx = 144
+ny = 120
+dx = 0.5
+steps = 800
+time_horizon = 60.0
+vmax = 1.5
+rho_max = 5.0
+rho_init = 1.8
+bellman_every = 1
+bellman_f_eps = 0.08
+cfl = 0.9
+dt_cap = 0.18
+save_every = 40
+
+[objective]
+name = "bund_simplified_default"
+lambda_j1 = 1.0
+lambda_j2 = 1.0
+lambda_j5 = 1.0
+rho_safe = 3.5
+use_normalized_terms = false
+j1_scale = 1.0
+j2_scale = 1.0
+j5_scale = 1.0
+
+[scene]
+file = "scene.toml"
+
+[population]
+file = "population.toml"
+
+[routes]
+file = "routes.toml"
+
+[outputs]
+output_root = "../../../results/config_bund_simplified"

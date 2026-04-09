@@ -1,0 +1,5 @@
+[[initial_groups]]
+group_id = "nanjing_road_visitors"
+stage_id = "enter_platform"
+region = "street_mid"
+density = 1.8

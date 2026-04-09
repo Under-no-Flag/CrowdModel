@@ -1,0 +1,290 @@
+block_boundaries = true
+obstacles = [
+  "void_upper_left",
+  "spine_top",
+  "spine_1",
+  "spine_2",
+  "spine_3",
+  "spine_4",
+  "spine_5",
+  "spine_6",
+  "spine_7",
+  "spine_8",
+  "spine_9",
+  "spine_bottom",
+]
+
+[[regions]]
+name = "street_main"
+x0 = 1
+x1 = 56
+y0 = 1
+y1 = 86
+
+[[regions]]
+name = "street_mid"
+x0 = 1
+x1 = 56
+y0 = 54
+y1 = 86
+
+[[regions]]
+name = "street_south"
+x0 = 1
+x1 = 56
+y0 = 1
+y1 = 54
+
+[[regions]]
+name = "platform_main"
+x0 = 92
+x1 = 143
+y0 = 1
+y1 = 119
+
+[[regions]]
+name = "platform_entry_56"
+x0 = 92
+x1 = 118
+y0 = 58
+y1 = 74
+
+[[regions]]
+name = "platform_south_view"
+x0 = 98
+x1 = 138
+y0 = 8
+y1 = 30
+
+[[regions]]
+name = "return_entry_56_west"
+x0 = 12
+x1 = 56
+y0 = 58
+y1 = 74
+
+[[regions]]
+name = "exit_9_10_west"
+x0 = 1
+x1 = 18
+y0 = 18
+y1 = 34
+
+[[regions]]
+name = "west_exit"
+x0 = 1
+x1 = 4
+y0 = 58
+y1 = 74
+
+[[regions]]
+name = "channel_1"
+x0 = 56
+x1 = 92
+y0 = 108
+y1 = 114
+
+[[regions]]
+name = "channel_2"
+x0 = 56
+x1 = 92
+y0 = 98
+y1 = 104
+
+[[regions]]
+name = "channel_3"
+x0 = 56
+x1 = 92
+y0 = 88
+y1 = 94
+
+[[regions]]
+name = "channel_4"
+x0 = 56
+x1 = 92
+y0 = 78
+y1 = 84
+
+[[regions]]
+name = "channel_5"
+x0 = 56
+x1 = 92
+y0 = 68
+y1 = 74
+
+[[regions]]
+name = "channel_6"
+x0 = 56
+x1 = 92
+y0 = 58
+y1 = 64
+
+[[regions]]
+name = "channel_7"
+x0 = 56
+x1 = 92
+y0 = 48
+y1 = 54
+
+[[regions]]
+name = "channel_8"
+x0 = 56
+x1 = 92
+y0 = 38
+y1 = 44
+
+[[regions]]
+name = "channel_9"
+x0 = 56
+x1 = 92
+y0 = 28
+y1 = 34
+
+[[regions]]
+name = "channel_10"
+x0 = 56
+x1 = 92
+y0 = 18
+y1 = 24
+
+[[regions]]
+name = "void_upper_left"
+x0 = 1
+x1 = 56
+y0 = 86
+y1 = 119
+
+[[regions]]
+name = "spine_top"
+x0 = 70
+x1 = 92
+y0 = 114
+y1 = 119
+
+[[regions]]
+name = "spine_1"
+x0 = 70
+x1 = 92
+y0 = 104
+y1 = 108
+
+[[regions]]
+name = "spine_2"
+x0 = 70
+x1 = 92
+y0 = 94
+y1 = 98
+
+[[regions]]
+name = "spine_3"
+x0 = 70
+x1 = 92
+y0 = 84
+y1 = 88
+
+[[regions]]
+name = "spine_4"
+x0 = 70
+x1 = 92
+y0 = 74
+y1 = 78
+
+[[regions]]
+name = "spine_5"
+x0 = 70
+x1 = 92
+y0 = 64
+y1 = 68
+
+[[regions]]
+name = "spine_6"
+x0 = 70
+x1 = 92
+y0 = 54
+y1 = 58
+
+[[regions]]
+name = "spine_7"
+x0 = 70
+x1 = 92
+y0 = 44
+y1 = 48
+
+[[regions]]
+name = "spine_8"
+x0 = 70
+x1 = 92
+y0 = 34
+y1 = 38
+
+[[regions]]
+name = "spine_9"
+x0 = 70
+x1 = 92
+y0 = 24
+y1 = 28
+
+[[regions]]
+name = "spine_bottom"
+x0 = 70
+x1 = 92
+y0 = 1
+y1 = 18
+
+[[exits]]
+name = "west_exit"
+region = "west_exit"
+
+[[exits]]
+name = "exit_9_10_west"
+region = "exit_9_10_west"
+
+[[channels]]
+name = "channel_1"
+region = "channel_1"
+probe_x = 74
+
+[[channels]]
+name = "channel_2"
+region = "channel_2"
+probe_x = 74
+
+[[channels]]
+name = "channel_3"
+region = "channel_3"
+probe_x = 74
+
+[[channels]]
+name = "channel_4"
+region = "channel_4"
+probe_x = 74
+
+[[channels]]
+name = "channel_5"
+region = "channel_5"
+probe_x = 74
+
+[[channels]]
+name = "channel_6"
+region = "channel_6"
+probe_x = 74
+
+[[channels]]
+name = "channel_7"
+region = "channel_7"
+probe_x = 74
+
+[[channels]]
+name = "channel_8"
+region = "channel_8"
+probe_x = 74
+
+[[channels]]
+name = "channel_9"
+region = "channel_9"
+probe_x = 74
+
+[[channels]]
+name = "channel_10"
+region = "channel_10"
+probe_x = 74

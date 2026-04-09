@@ -26,6 +26,8 @@ The old hardcoded case-id workflow has been removed. Scene geometry, initial pop
 
 Phase 1 examples:
 
+- `codes/scenes/examples/bund_simplified/`
+  Simplified Nanjing Road to Bund scene with channels `5/6` entry, southward touring on the platform, and split departure via channels `9/10` or return via `5/6`.
 - `codes/scenes/examples/single_stage/`
   Minimal single-stage config example.
 - `codes/scenes/examples/multi_stage/`

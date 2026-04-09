@@ -1,0 +1,81 @@
+[case]
+case_id = "bund_simplified"
+title = "Bund Simplified: channels 5/6 entry, south tour, split exit"
+
+[[stages]]
+stage_id = "enter_platform"
+group_key = [1, 1]
+goal_region = "platform_entry_56"
+decision_region = "platform_entry_56"
+next_stage = "tour_south"
+kappa = 2.2
+
+[[stages.controls]]
+mode = "target_region"
+region = "street_main"
+target_region = "platform_entry_56"
+alpha = 10.0
+beta = 0.25
+
+[[stages]]
+stage_id = "tour_south"
+group_key = [2, 1]
+goal_region = "platform_south_view"
+decision_region = "platform_south_view"
+kappa = 1.6
+
+[[stages.controls]]
+mode = "target_region"
+region = "platform_main"
+target_region = "platform_south_view"
+alpha = 9.0
+beta = 0.3
+
+[[stages.targets]]
+stage_id = "leave_via_9_10"
+probability = 0.5
+
+[[stages.targets]]
+stage_id = "return_via_5_6"
+probability = 0.5
+
+[[stages]]
+stage_id = "leave_via_9_10"
+group_key = [3, 10]
+goal_region = "exit_9_10_west"
+sink_region = "exit_9_10_west"
+
+[[stages.controls]]
+mode = "target_region"
+region = "platform_main"
+target_region = "exit_9_10_west"
+alpha = 10.0
+beta = 0.22
+
+[[stages]]
+stage_id = "return_via_5_6"
+group_key = [3, 56]
+goal_region = "return_entry_56_west"
+decision_region = "return_entry_56_west"
+next_stage = "walk_west_exit"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+region = "platform_main"
+target_region = "return_entry_56_west"
+alpha = 10.0
+beta = 0.22
+
+[[stages]]
+stage_id = "walk_west_exit"
+group_key = [4, 1]
+goal_region = "west_exit"
+sink_region = "west_exit"
+
+[[stages.controls]]
+mode = "target_region"
+region = "street_main"
+target_region = "west_exit"
+alpha = 8.0
+beta = 0.35
