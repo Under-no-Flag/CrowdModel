@@ -1,0 +1,17 @@
+[[objective_sets]]
+name = "efficiency_priority"
+lambda_j1 = 1.0
+lambda_j2 = 0.2
+lambda_j5 = 0.1
+
+[[objective_sets]]
+name = "safety_priority"
+lambda_j1 = 0.3
+lambda_j2 = 1.0
+lambda_j5 = 0.2
+
+[[objective_sets]]
+name = "balance_priority"
+lambda_j1 = 0.3
+lambda_j2 = 0.3
+lambda_j5 = 1.0

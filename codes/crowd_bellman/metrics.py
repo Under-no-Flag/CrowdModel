@@ -4,6 +4,7 @@ import csv
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Iterable
 
 import numpy as np
 
@@ -83,13 +84,21 @@ def channel_flux_variance(channel_flux_cumulative: dict[str, float]) -> float:
     return float(np.var(values))
 
 
-def compute_objective_terms(
-    stats: CaseStats,
+def objective_terms_from_stats(stats: CaseStats) -> dict[str, float]:
+    return {
+        "j1_total_travel_time": float(stats.travel_time_cumulative[-1]) if stats.travel_time_cumulative else 0.0,
+        "j2_high_density_exposure": float(stats.high_density_exposure_cumulative[-1]) if stats.high_density_exposure_cumulative else 0.0,
+        "j5_channel_flux_variance": channel_flux_variance(stats.channel_flux_cumulative),
+    }
+
+
+def _objective_evaluation_from_terms(
+    objective_terms: dict[str, float],
     objective_cfg: ObjectiveConfig,
-) -> dict[str, float]:
-    j1_raw = float(stats.travel_time_cumulative[-1]) if stats.travel_time_cumulative else 0.0
-    j2_raw = float(stats.high_density_exposure_cumulative[-1]) if stats.high_density_exposure_cumulative else 0.0
-    j5_raw = channel_flux_variance(stats.channel_flux_cumulative)
+) -> dict[str, float | str | bool]:
+    j1_raw = float(objective_terms["j1_total_travel_time"])
+    j2_raw = float(objective_terms["j2_high_density_exposure"])
+    j5_raw = float(objective_terms["j5_channel_flux_variance"])
 
     if objective_cfg.use_normalized_terms:
         j1_eval = j1_raw / objective_cfg.j1_scale
@@ -107,6 +116,15 @@ def compute_objective_terms(
     )
 
     return {
+        "name": objective_cfg.name,
+        "lambda_j1": float(objective_cfg.lambda_j1),
+        "lambda_j2": float(objective_cfg.lambda_j2),
+        "lambda_j5": float(objective_cfg.lambda_j5),
+        "rho_safe": float(objective_cfg.rho_safe),
+        "use_normalized_terms": bool(objective_cfg.use_normalized_terms),
+        "j1_scale": float(objective_cfg.j1_scale),
+        "j2_scale": float(objective_cfg.j2_scale),
+        "j5_scale": float(objective_cfg.j5_scale),
         "j1_total_travel_time": j1_raw,
         "j2_high_density_exposure": j2_raw,
         "j5_channel_flux_variance": j5_raw,
@@ -115,6 +133,49 @@ def compute_objective_terms(
         "j5_eval": float(j5_eval),
         "objective_value": float(objective_value),
     }
+
+
+def compute_objective_terms(
+    stats: CaseStats,
+    objective_cfg: ObjectiveConfig,
+) -> dict[str, float | str | bool]:
+    return _objective_evaluation_from_terms(objective_terms_from_stats(stats), objective_cfg)
+
+
+def extract_objective_terms(summary: dict[str, object]) -> dict[str, float]:
+    raw_terms = summary.get("objective_terms")
+    if isinstance(raw_terms, dict):
+        j1 = float(raw_terms.get("j1_total_travel_time", 0.0))
+        j2 = float(raw_terms.get("j2_high_density_exposure", 0.0))
+        j5 = float(raw_terms.get("j5_channel_flux_variance", 0.0))
+    else:
+        j1 = float(summary.get("j1_total_travel_time", 0.0))
+        j2 = float(summary.get("j2_high_density_exposure", 0.0))
+        j5 = float(summary.get("j5_channel_flux_variance", 0.0))
+
+    return {
+        "j1_total_travel_time": j1,
+        "j2_high_density_exposure": j2,
+        "j5_channel_flux_variance": j5,
+    }
+
+
+def evaluate_objective_from_summary(
+    summary: dict[str, object],
+    objective_cfg: ObjectiveConfig,
+) -> dict[str, float | str | bool]:
+    return _objective_evaluation_from_terms(extract_objective_terms(summary), objective_cfg)
+
+
+def evaluate_objective_batch_from_summary(
+    summary: dict[str, object],
+    objective_cfgs: Iterable[ObjectiveConfig],
+) -> list[dict[str, float | str | bool]]:
+    objective_terms = extract_objective_terms(summary)
+    return [
+        _objective_evaluation_from_terms(objective_terms, objective_cfg)
+        for objective_cfg in objective_cfgs
+    ]
 
 
 def record_step(
@@ -167,6 +228,7 @@ def build_summary(
     stats: CaseStats,
     objective_cfg: ObjectiveConfig | None = None,
 ) -> dict[str, object]:
+    objective_terms = objective_terms_from_stats(stats)
     channel_flux_total = sum(stats.channel_flux_cumulative.values())
     if channel_flux_total <= 1.0e-12:
         channel_share = {name: 0.0 for name in stats.channel_flux_cumulative}
@@ -193,9 +255,10 @@ def build_summary(
         "channel_time_mean_density": channel_time_mean_density,
         "channel_flux_cumulative": {k: float(v) for k, v in stats.channel_flux_cumulative.items()},
         "channel_flux_share": channel_share,
-        "j1_total_travel_time": float(stats.travel_time_cumulative[-1]) if stats.travel_time_cumulative else 0.0,
-        "j2_high_density_exposure": float(stats.high_density_exposure_cumulative[-1]) if stats.high_density_exposure_cumulative else 0.0,
-        "j5_channel_flux_variance": channel_flux_variance(stats.channel_flux_cumulative),
+        "objective_terms": objective_terms,
+        "j1_total_travel_time": float(objective_terms["j1_total_travel_time"]),
+        "j2_high_density_exposure": float(objective_terms["j2_high_density_exposure"]),
+        "j5_channel_flux_variance": float(objective_terms["j5_channel_flux_variance"]),
     }
     if objective_cfg is not None:
         summary["objective"] = compute_objective_terms(stats, objective_cfg)

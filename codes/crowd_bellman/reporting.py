@@ -31,6 +31,9 @@ def _summary_rows(comparison: dict[str, object]) -> list[dict[str, object]]:
     for case in comparison["cases"]:
         channel_density = case["channel_time_mean_density"]
         channel_share = case["channel_flux_share"]
+        channel_flux = case["channel_flux_cumulative"]
+        objective = case.get("objective", {})
+        objective_config = case.get("objective_config", {})
         rows.append(
             {
                 "case_id": case["case_id"],
@@ -39,9 +42,17 @@ def _summary_rows(comparison: dict[str, object]) -> list[dict[str, object]]:
                 "final_sink_cumulative": case["final_sink_cumulative"],
                 "mean_density_avg": case["mean_density_avg"],
                 "peak_density_max": case["peak_density_max"],
+                "j1_total_travel_time": case["j1_total_travel_time"],
+                "j2_high_density_exposure": case["j2_high_density_exposure"],
+                "j5_channel_flux_variance": case["j5_channel_flux_variance"],
+                "objective_value": case.get("objective_value", objective.get("objective_value", 0.0)),
+                "objective_name": objective_config.get("name", objective.get("name", "")),
                 "channel_mean_density_top": channel_density["top"],
                 "channel_mean_density_middle": channel_density["middle"],
                 "channel_mean_density_bottom": channel_density["bottom"],
+                "channel_flux_cumulative_top": channel_flux["top"],
+                "channel_flux_cumulative_middle": channel_flux["middle"],
+                "channel_flux_cumulative_bottom": channel_flux["bottom"],
                 "channel_flux_share_top": channel_share["top"],
                 "channel_flux_share_middle": channel_share["middle"],
                 "channel_flux_share_bottom": channel_share["bottom"],
@@ -69,9 +80,17 @@ def save_section_5_1_tables(output_root: Path, comparison: dict[str, object]) ->
         "Sink Throughput",
         "Mean Density",
         "Peak Density",
+        "J1",
+        "J2",
+        "J5",
+        "J",
+        "Objective",
         "Top Density",
         "Middle Density",
         "Bottom Density",
+        "Top Flux",
+        "Middle Flux",
+        "Bottom Flux",
         "Top Share",
         "Middle Share",
         "Bottom Share",
@@ -92,9 +111,17 @@ def save_section_5_1_tables(output_root: Path, comparison: dict[str, object]) ->
                         f'{row["final_sink_cumulative"]:.3f}',
                         f'{row["mean_density_avg"]:.3f}',
                         f'{row["peak_density_max"]:.3f}',
+                        f'{row["j1_total_travel_time"]:.3f}',
+                        f'{row["j2_high_density_exposure"]:.3f}',
+                        f'{row["j5_channel_flux_variance"]:.3f}',
+                        f'{row["objective_value"]:.3f}',
+                        str(row["objective_name"]),
                         f'{row["channel_mean_density_top"]:.3f}',
                         f'{row["channel_mean_density_middle"]:.3f}',
                         f'{row["channel_mean_density_bottom"]:.3f}',
+                        f'{row["channel_flux_cumulative_top"]:.3f}',
+                        f'{row["channel_flux_cumulative_middle"]:.3f}',
+                        f'{row["channel_flux_cumulative_bottom"]:.3f}',
                         f'{row["channel_flux_share_top"]:.3%}',
                         f'{row["channel_flux_share_middle"]:.3%}',
                         f'{row["channel_flux_share_bottom"]:.3%}',

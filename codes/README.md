@@ -17,6 +17,8 @@
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
   Generates Section 5.1 summary tables and paper-ready figures from completed runs.
+- `python codes/evaluate_objectives.py --input <summary.json|comparison_summary.json> --weights <weights.toml>`
+  Re-evaluates `J1/J2/J5/J` for one or more weight sets directly from saved results, without rerunning the PDE solver.
 
 ## Config workflow
 
@@ -32,6 +34,8 @@ Phase 1 examples:
   Migrated TOML version of the old three-channel hardcoded scene family, including `baseline`, `M-only`, `U-only`, and `M+U-middle`.
 - `codes/scenes/examples/tour_hardcoded/`
   Migrated TOML version of the old multi-stage sightseeing scene.
+- `codes/scenes/README.md`
+  Field-by-field guide for writing `run.toml`, `scene.toml`, `population.toml`, and `routes.toml`.
 
 Example commands:
 
@@ -51,6 +55,7 @@ Typical contents:
 
 - per-case time-series csv;
 - per-case summary json;
+- per-case config snapshot copied from the resolved TOML inputs;
 - config-driven run summary json;
 - section 5.1 csv and markdown tables;
 - section 5.1 comparison figures;
