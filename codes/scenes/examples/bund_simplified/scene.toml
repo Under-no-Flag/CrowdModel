@@ -50,6 +50,41 @@ y0 = 58
 y1 = 74
 
 [[regions]]
+name = "platform_switch_56"
+x0 = 118
+x1 = 132
+y0 = 56
+y1 = 78
+
+[[regions]]
+name = "platform_switch_5"
+x0 = 118
+x1 = 132
+y0 = 66
+y1 = 78
+
+[[regions]]
+name = "platform_return_lobby"
+x0 = 98
+x1 = 122
+y0 = 56
+y1 = 76
+
+[[regions]]
+name = "platform_return_lobby_6"
+x0 = 98
+x1 = 122
+y0 = 56
+y1 = 66
+
+[[regions]]
+name = "platform_exit_910_lobby"
+x0 = 96
+x1 = 122
+y0 = 16
+y1 = 36
+
+[[regions]]
 name = "platform_south_view"
 x0 = 98
 x1 = 138
@@ -62,6 +97,13 @@ x0 = 12
 x1 = 56
 y0 = 58
 y1 = 74
+
+[[regions]]
+name = "return_entry_6_west"
+x0 = 12
+x1 = 56
+y0 = 58
+y1 = 64
 
 [[regions]]
 name = "exit_9_10_west"
@@ -146,6 +188,27 @@ x0 = 56
 x1 = 92
 y0 = 18
 y1 = 24
+
+[[regions]]
+name = "channels_band"
+x0 = 56
+x1 = 92
+y0 = 18
+y1 = 114
+
+[[regions]]
+name = "channel_56"
+x0 = 56
+x1 = 92
+y0 = 58
+y1 = 74
+
+[[regions]]
+name = "channel_910"
+x0 = 56
+x1 = 92
+y0 = 18
+y1 = 34
 
 [[regions]]
 name = "void_upper_left"

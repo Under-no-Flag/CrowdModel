@@ -5,24 +5,49 @@ title = "Bund Simplified: channels 5/6 entry, south tour, split exit"
 [[stages]]
 stage_id = "enter_platform"
 group_key = [1, 1]
-goal_region = "platform_entry_56"
-decision_region = "platform_entry_56"
+goal_region = "platform_switch_5"
+decision_region = "platform_switch_5"
 next_stage = "tour_south"
-kappa = 2.2
+kappa = 3.0
 
 [[stages.controls]]
 mode = "target_region"
 region = "street_main"
-target_region = "platform_entry_56"
+target_region = "platform_switch_5"
 alpha = 10.0
 beta = 0.25
+
+[[stages.controls]]
+mode = "target_region"
+region = "platform_entry_56"
+target_region = "platform_switch_5"
+alpha = 8.0
+beta = 0.25
+
+[[stages.controls]]
+mode = "isotropic"
+region = "channels_band"
+value = 0.12
+
+[[stages.controls]]
+mode = "fixed_direction"
+region = "channel_5"
+direction = "E"
+alpha = 14.0
+beta = 0.15
+allowed_directions = ["E"]
+
+[[stages.controls]]
+mode = "isotropic"
+region = "channel_6"
+value = 0.03
 
 [[stages]]
 stage_id = "tour_south"
 group_key = [2, 1]
 goal_region = "platform_south_view"
 decision_region = "platform_south_view"
-kappa = 1.6
+kappa = 1.8
 
 [[stages.controls]]
 mode = "target_region"
@@ -32,44 +57,105 @@ alpha = 9.0
 beta = 0.3
 
 [[stages.targets]]
-stage_id = "leave_via_9_10"
+stage_id = "leave_lobby_9_10"
 probability = 0.5
 
 [[stages.targets]]
-stage_id = "return_via_5_6"
+stage_id = "return_lobby_5_6"
 probability = 0.5
 
 [[stages]]
-stage_id = "leave_via_9_10"
+stage_id = "leave_lobby_9_10"
 group_key = [3, 10]
+goal_region = "platform_exit_910_lobby"
+decision_region = "platform_exit_910_lobby"
+next_stage = "leave_via_9_10"
+kappa = 2.4
+
+[[stages.controls]]
+mode = "target_region"
+region = "platform_main"
+target_region = "platform_exit_910_lobby"
+alpha = 10.0
+beta = 0.22
+
+[[stages]]
+stage_id = "leave_via_9_10"
+group_key = [4, 10]
 goal_region = "exit_9_10_west"
 sink_region = "exit_9_10_west"
 
 [[stages.controls]]
+mode = "isotropic"
+region = "channels_band"
+value = 0.08
+
+[[stages.controls]]
+mode = "fixed_direction"
+region = "channel_910"
+direction = "W"
+alpha = 14.0
+beta = 0.15
+allowed_directions = ["W"]
+
+[[stages.controls]]
+mode = "target_region"
+region = "street_south"
+target_region = "exit_9_10_west"
+alpha = 9.0
+beta = 0.25
+
+[[stages]]
+stage_id = "return_lobby_5_6"
+group_key = [5, 56]
+goal_region = "platform_return_lobby_6"
+decision_region = "platform_return_lobby_6"
+next_stage = "return_via_5_6"
+kappa = 2.4
+
+[[stages.controls]]
 mode = "target_region"
 region = "platform_main"
-target_region = "exit_9_10_west"
+target_region = "platform_return_lobby_6"
 alpha = 10.0
 beta = 0.22
 
 [[stages]]
 stage_id = "return_via_5_6"
-group_key = [3, 56]
-goal_region = "return_entry_56_west"
-decision_region = "return_entry_56_west"
+group_key = [6, 56]
+goal_region = "return_entry_6_west"
+decision_region = "return_entry_6_west"
 next_stage = "walk_west_exit"
-kappa = 2.0
+kappa = 2.4
+
+[[stages.controls]]
+mode = "isotropic"
+region = "channels_band"
+value = 0.08
+
+[[stages.controls]]
+mode = "fixed_direction"
+region = "channel_6"
+direction = "W"
+alpha = 14.0
+beta = 0.15
+allowed_directions = ["W"]
+
+[[stages.controls]]
+mode = "isotropic"
+region = "channel_5"
+value = 0.03
 
 [[stages.controls]]
 mode = "target_region"
-region = "platform_main"
-target_region = "return_entry_56_west"
-alpha = 10.0
-beta = 0.22
+region = "street_main"
+target_region = "return_entry_6_west"
+alpha = 9.0
+beta = 0.25
 
 [[stages]]
 stage_id = "walk_west_exit"
-group_key = [4, 1]
+group_key = [7, 1]
 goal_region = "west_exit"
 sink_region = "west_exit"
 
