@@ -124,6 +124,7 @@ def simulate_case(
                     speed=speed,
                     step_factor=step_factors[key],
                     f_eps=cfg.bellman_f_eps,
+                    backend=cfg.bellman_backend,
                 )
                 ux_by_group[key], uy_by_group[key] = recover_optimal_direction(
                     walkable=case.walkable,
@@ -133,6 +134,7 @@ def simulate_case(
                     step_factor=step_factors[key],
                     phi=phi_by_group[key],
                     f_eps=cfg.bellman_f_eps,
+                    backend=cfg.direction_recovery_backend,
                 )
 
         vx_by_group: dict[GroupKey, np.ndarray] = {}

@@ -21,6 +21,8 @@ class SimulationConfig:
     cfl: float = 0.9
     dt_cap: float = 0.18
     save_every: int = 40
+    bellman_backend: str = "optimized"
+    direction_recovery_backend: str = "vectorized"
 
 
 @dataclass(frozen=True)
