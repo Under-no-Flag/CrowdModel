@@ -2,8 +2,8 @@
 nx = 144
 ny = 120
 dx = 0.5
-steps = 800
-time_horizon = 60.0
+steps = 1800
+time_horizon = 160.0
 vmax = 1.5
 rho_max = 5.0
 rho_init = 1.8
