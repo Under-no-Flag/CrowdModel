@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la *.txt *.toml *.cfg setup.py pyproject.toml)"
+    ]
+  }
+}
