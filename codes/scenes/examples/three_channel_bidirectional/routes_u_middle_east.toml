@@ -1,0 +1,25 @@
+[case]
+case_id = "case_u_bidirectional_middle_rule"
+title = "Case U bidirectional: middle channel east-only rule"
+
+[[stages]]
+stage_id = "west_to_east"
+group_key = [1, 1]
+goal_region = "exit_east"
+sink_region = "exit_east"
+
+[[stages.controls]]
+mode = "identity"
+region = "middle_channel"
+allowed_directions = ["E"]
+
+[[stages]]
+stage_id = "east_to_west"
+group_key = [2, 1]
+goal_region = "exit_west"
+sink_region = "exit_west"
+
+[[stages.controls]]
+mode = "identity"
+region = "middle_channel"
+allowed_directions = ["E"]

@@ -5,42 +5,37 @@ title = "Bund Simplified: channels 5/6 entry, south tour, split exit"
 [[stages]]
 stage_id = "enter_platform"
 group_key = [1, 1]
-goal_region = "platform_switch_5"
-decision_region = "platform_switch_5"
+goal_region = "platform_switch_56"
+decision_region = "platform_switch_56"
 next_stage = "tour_south"
 kappa = 3.0
 
 [[stages.controls]]
 mode = "target_region"
 region = "street_main"
-target_region = "platform_switch_5"
+target_region = "platform_switch_56"
 alpha = 10.0
 beta = 0.25
 
 [[stages.controls]]
 mode = "target_region"
 region = "platform_entry_56"
-target_region = "platform_switch_5"
+target_region = "platform_switch_56"
 alpha = 8.0
 beta = 0.25
 
 [[stages.controls]]
 mode = "isotropic"
 region = "channels_band"
-value = 0.12
+value = 0.16
 
 [[stages.controls]]
 mode = "fixed_direction"
-region = "channel_5"
+region = "channel_56"
 direction = "E"
-alpha = 14.0
-beta = 0.15
-allowed_directions = ["E"]
-
-[[stages.controls]]
-mode = "isotropic"
-region = "channel_6"
-value = 0.03
+alpha = 12.0
+beta = 0.18
+allowed_directions = ["E", "NE", "SE"]
 
 [[stages]]
 stage_id = "tour_south"
@@ -108,48 +103,43 @@ beta = 0.25
 [[stages]]
 stage_id = "return_lobby_5_6"
 group_key = [5, 56]
-goal_region = "platform_return_lobby_6"
-decision_region = "platform_return_lobby_6"
+goal_region = "platform_return_lobby"
+decision_region = "platform_return_lobby"
 next_stage = "return_via_5_6"
 kappa = 2.4
 
 [[stages.controls]]
 mode = "target_region"
 region = "platform_main"
-target_region = "platform_return_lobby_6"
+target_region = "platform_return_lobby"
 alpha = 10.0
 beta = 0.22
 
 [[stages]]
 stage_id = "return_via_5_6"
 group_key = [6, 56]
-goal_region = "return_entry_6_west"
-decision_region = "return_entry_6_west"
+goal_region = "return_entry_56_west"
+decision_region = "return_entry_56_west"
 next_stage = "walk_west_exit"
 kappa = 2.4
 
 [[stages.controls]]
 mode = "isotropic"
 region = "channels_band"
-value = 0.08
+value = 0.12
 
 [[stages.controls]]
 mode = "fixed_direction"
-region = "channel_6"
+region = "channel_56"
 direction = "W"
-alpha = 14.0
-beta = 0.15
-allowed_directions = ["W"]
-
-[[stages.controls]]
-mode = "isotropic"
-region = "channel_5"
-value = 0.03
+alpha = 12.0
+beta = 0.18
+allowed_directions = ["W", "NW", "SW"]
 
 [[stages.controls]]
 mode = "target_region"
 region = "street_main"
-target_region = "return_entry_6_west"
+target_region = "return_entry_56_west"
 alpha = 9.0
 beta = 0.25
 

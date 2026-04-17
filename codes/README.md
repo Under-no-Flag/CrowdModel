@@ -12,7 +12,7 @@
 - `python codes/simulate_from_config.py --config <run.toml>`
   Runs a config-driven simulation from TOML files. This is now the primary simulation entrypoint.
 - `python codes/g1_runner.py`
-  Runs the G1 mechanism-validation batch for `C0/C1/C2/C3` and writes one shared `comparison_summary.json` plus `comparison.png`.
+  Runs the reframed G1 mechanism-validation batch, covering the three-channel `baseline / M-only / U-only / middle / top / bottom` cases, one multi-stage bridge case, and one bidirectional `U(x)` counterflow-validation pair. It writes per-case behavior plots, `g1_behavior_metrics.csv`, `g1_u_bidirectional_metrics.csv`, branch comparison figures, and one shared `g1_mechanism_summary.json`.
 - `python codes/verify_unidirectional_hjb.py`
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
@@ -34,6 +34,8 @@ Phase 1 examples:
   Minimal multi-stage / split-routing config example.
 - `codes/scenes/examples/three_channel_hardcoded/`
   Migrated TOML version of the old three-channel hardcoded scene family, including `baseline`, `M-only`, `U-only`, and `M+U-middle`.
+- `codes/scenes/examples/three_channel_bidirectional/`
+  Three-channel counterflow variant with west-to-east and east-to-west groups, used to validate whether `U(x)` suppresses reverse motion and head-on conflicts inside the middle channel.
 - `codes/scenes/examples/tour_hardcoded/`
   Migrated TOML version of the old multi-stage sightseeing scene.
 - `codes/scenes/README.md`

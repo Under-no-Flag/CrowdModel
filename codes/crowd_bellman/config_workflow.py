@@ -4,6 +4,7 @@ from dataclasses import asdict
 from datetime import datetime
 from pathlib import Path
 import shutil
+from typing import Callable
 
 from .compilers.config_compiler import compile_case, compile_scene
 from .loaders.config_loader import (
@@ -15,6 +16,9 @@ from .loaders.config_loader import (
 from .metrics import save_json
 from .runner import simulate_case
 from .scenes import SimulationConfig
+
+
+StepObserverFactory = Callable[..., Callable[[dict[str, object]], None] | None]
 
 
 def _write_config_snapshot(
@@ -66,6 +70,7 @@ def run_from_config(
     output_root: Path | None = None,
     simulation_overrides: dict[str, object] | None = None,
     write_root_summary: bool = True,
+    step_observer_factory: StepObserverFactory | None = None,
 ) -> dict[str, object]:
     run_spec = load_run_config(config_path)
 
@@ -86,6 +91,20 @@ def run_from_config(
 
     run_output_root = (output_root if output_root is not None else run_spec.output_root).resolve()
     case_output_dir = run_output_root / case.case_id
+    step_observer = (
+        step_observer_factory(
+            config_path=run_spec.config_path,
+            run_spec=run_spec,
+            bundle=bundle,
+            scene=scene,
+            case=case,
+            output_root=run_output_root,
+            case_output_dir=case_output_dir,
+            simulation=simulation,
+        )
+        if step_observer_factory is not None
+        else None
+    )
 
     summary = simulate_case(
         cfg=simulation,
@@ -93,6 +112,7 @@ def run_from_config(
         case=case,
         output_dir=case_output_dir,
         objective_cfg=run_spec.objective,
+        step_observer=step_observer,
     )
     summary["config_path"] = str(run_spec.config_path)
     summary["scene_path"] = str(run_spec.scene_path)

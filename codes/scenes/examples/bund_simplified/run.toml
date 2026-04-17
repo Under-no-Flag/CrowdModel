@@ -1,9 +1,9 @@
 [simulation]
-nx = 144
-ny = 120
+nx = 192
+ny = 160
 dx = 0.5
-steps = 1800
-time_horizon = 160.0
+steps = 2200
+time_horizon = 220.0
 vmax = 1.5
 rho_max = 5.0
 rho_init = 1.8
@@ -11,7 +11,7 @@ bellman_every = 1
 bellman_f_eps = 0.08
 cfl = 0.9
 dt_cap = 0.18
-save_every = 40
+save_every = 60
 
 [objective]
 name = "bund_simplified_default"

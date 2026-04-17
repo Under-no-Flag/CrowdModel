@@ -1,0 +1,11 @@
+[[initial_groups]]
+group_id = "west_to_east"
+stage_id = "west_to_east"
+region = "spawn_left"
+density = 1.2
+
+[[initial_groups]]
+group_id = "east_to_west"
+stage_id = "east_to_west"
+region = "spawn_right"
+density = 1.2

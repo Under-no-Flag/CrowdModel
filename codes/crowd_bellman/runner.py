@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict
 from pathlib import Path
+from typing import Callable
 
 import numpy as np
 
@@ -27,6 +28,9 @@ from .scenes import (
     GroupModel,
     SimulationConfig,
 )
+
+
+StepObserver = Callable[[dict[str, object]], None]
 
 
 def _build_group_models(case: CaseModel) -> dict[GroupKey, GroupModel]:
@@ -80,6 +84,7 @@ def simulate_case(
     case: CaseModel,
     output_dir: Path,
     objective_cfg: ObjectiveConfig | None = None,
+    step_observer: StepObserver | None = None,
 ) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
     if objective_cfg is None:
@@ -224,6 +229,26 @@ def simulate_case(
             channel_masks=case.channel_masks,
             probe_x=case.probe_x,
         )
+
+        if step_observer is not None:
+            vis_key = (0, 0) if (0, 0) in groups else next(iter(groups.keys()))
+            step_observer(
+                {
+                    "step": step,
+                    "time": time_value,
+                    "dt": dt,
+                    "rho": rho_tot,
+                    "speed": speed,
+                    "vx": vx_total,
+                    "vy": vy_total,
+                    "phi": phi_by_group[vis_key],
+                    "ux": ux_by_group[vis_key],
+                    "uy": uy_by_group[vis_key],
+                    "rho_by_group": rho_by_group,
+                    "vx_by_group": vx_by_group,
+                    "vy_by_group": vy_by_group,
+                }
+            )
 
         if (step % cfg.save_every) == 0 or step == cfg.steps - 1 or time_value >= cfg.time_horizon - 1.0e-12:
             vis_key = (0, 0) if (0, 0) in groups else next(iter(groups.keys()))
