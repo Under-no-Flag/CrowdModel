@@ -1,0 +1,96 @@
+[case]
+case_id = "case5_multistage_uniform_preference"
+title = "Case 5B: multi-stage sightseeing with uniform exit preference"
+
+[[stages]]
+stage_id = "stage1_entry"
+group_key = [1, 1]
+goal_region = "stage1_goal"
+decision_region = "stage1_goal"
+next_stage = "stage2_tour_down"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "stage1_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "stage2_tour_down"
+group_key = [2, 1]
+goal_region = "stage2_goal"
+decision_region = "stage2_goal"
+kappa = 1.8
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "stage2_goal"
+alpha = 10.0
+beta = 0.25
+
+[[stages.targets]]
+stage_id = "stage3_route8"
+probability = 0.3333333333
+
+[[stages.targets]]
+stage_id = "stage3_route9"
+probability = 0.3333333333
+
+[[stages.targets]]
+stage_id = "stage3_route10"
+probability = 0.3333333334
+
+[[stages]]
+stage_id = "stage3_route8"
+group_key = [3, 8]
+goal_region = "route8_goal"
+decision_region = "route8_goal"
+next_stage = "stage4_return_left"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "route8_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "stage3_route9"
+group_key = [3, 9]
+goal_region = "route9_goal"
+decision_region = "route9_goal"
+next_stage = "stage4_return_left"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "route9_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "stage3_route10"
+group_key = [3, 10]
+goal_region = "route10_goal"
+decision_region = "route10_goal"
+next_stage = "stage4_return_left"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "route10_goal"
+alpha = 9.0
+beta = 0.3
+
+[[stages]]
+stage_id = "stage4_return_left"
+group_key = [4, 1]
+goal_region = "return_exit"
+sink_region = "return_exit"
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "return_exit"
+alpha = 8.0
+beta = 0.35

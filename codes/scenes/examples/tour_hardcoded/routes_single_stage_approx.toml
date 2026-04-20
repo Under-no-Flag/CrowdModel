@@ -1,0 +1,15 @@
+[case]
+case_id = "case5_single_stage_approx"
+title = "Case 5A: single-stage approximation toward lower platform"
+
+[[stages]]
+stage_id = "single_stage_goal"
+group_key = [1, 1]
+goal_region = "stage2_goal"
+sink_region = "stage2_goal"
+
+[[stages.controls]]
+mode = "target_region"
+target_region = "stage2_goal"
+alpha = 8.5
+beta = 0.35
