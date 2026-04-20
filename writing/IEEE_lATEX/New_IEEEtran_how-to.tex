@@ -8,860 +8,610 @@
 \usepackage{url}
 \usepackage{verbatim}
 \usepackage{graphicx}
-\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
-\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
-    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 \usepackage{balance}
-\begin{document}
-\title{How to Use the IEEEtran \LaTeX \ Templates}
-\author{IEEE Publication Technology Department
-\thanks{Manuscript created October, 2020; This work was developed by the IEEE Publication Technology Department. This work is distributed under the \LaTeX \ Project Public License (LPPL) ( http://www.latex-project.org/ ) version 1.3. A copy of the LPPL, version 1.3, is included in the base \LaTeX \ documentation of all distributions of \LaTeX \ released 2003/12/01 or later. The opinions expressed here are entirely that of the author. No warranty is expressed or implied. User assumes all risk.}}
+\usepackage{amssymb}
+\usepackage{bm}
 
-\markboth{Journal of \LaTeX\ Class Files,~Vol.~18, No.~9, September~2020}%
-{How to Use the IEEEtran \LaTeX \ Templates}
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
+
+\begin{document}
+
+\title{Bi-Level Optimization of Channel Direction and Geometric Guidance for Massive Crowd Management in Urban Pedestrian Zones}
+
+\author{Author Name
+\thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
+
+\markboth{Journal Name,~Vol.~XX, No.~X, Month~2026}%
+{Author: Channel Optimization for Crowd Management}
 
 \maketitle
 
 \begin{abstract}
-This document describes the most common article elements and how to use the IEEEtran class with \LaTeX \ to produce files that are suitable for submission to the Institute of Electrical and Electronics Engineers (IEEE).  IEEEtran can produce conference, journal and technical note (correspondence) papers with a suitable choice of class options.
+This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating anisotropic geometric guidance with discrete directional constraints. The lower level employs a Hughes-type macroscopic crowd model enhanced with metric tensor fields for channel guidance and constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way channel control. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three evaluation metrics are introduced: total travel time for efficiency, high-density exposure time for safety, and channel flow variance for load balancing. The proposed method exploits the local response characteristics of Bellman potential fields and employs surrogate pre-screening with Bellman warm-start strategies to reduce computational cost. Numerical experiments demonstrate the effectiveness of the proposed approach.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Class, IEEEtran, \LaTeX, paper, style, template, typesetting.
+Crowd dynamics, macroscopic modeling, channel optimization, Hamilton-Jacobi-Bellman equation, bi-level optimization.
 \end{IEEEkeywords}
-
 
 \section{Introduction}
-\IEEEPARstart{W}{elcome} to the updated and simplified documentation to using the IEEEtran \LaTeX \ class file. The IEEE has examined hundreds of author submissions using this package to help formulate this easy to follow guide. We will cover the most commonly used elements of a journal article. For less common elements we will refer back to the ``IEEEtran\_HOWTO.pdf''.
+\IEEEPARstart{L}{arge-scale} pedestrian management in urban areas such as waterfront promenades, stadiums, and transportation hubs presents significant challenges for public safety and operational efficiency. The dynamics of dense crowds involve complex interactions between individual behaviors, geometric constraints, and collective motion patterns that are difficult to predict and control.
 
-This document applies to version 1.8b of IEEEtran. 
+Macroscopic crowd models, pioneered by Hughes \cite{hughes2003}, treat pedestrian flows as continuous media described by density and velocity fields. These models offer computational efficiency and analytical tractability compared to microscopic approaches, making them suitable for real-time management applications. However, classical Hughes models assume isotropic movement and cannot adequately represent anisotropic channel geometries or directional control measures such as one-way corridors.
 
-The IEEEtran template package contains the following example files: 
-\begin{list}{}{}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
-\end{list}
-These are ``bare bones" templates to quickly understand the document structure.  
+To address these limitations, this paper develops an enhanced modeling framework that integrates:
+\begin{itemize}
+\item Anisotropic geometric guidance via spatially varying metric tensors to represent channel preferences;
+\item Discrete directional constraints via constrained HJB equations to enforce one-way rules;
+\item A bi-level optimization structure that treats the simulation as an evaluation oracle for control decisions.
+\end{itemize}
 
-It is assumed that the reader has a basic working knowledge of \LaTeX. Those who are new to \LaTeX \ are encouraged to read Tobias Oetiker's ``The Not So Short Introduction to \LaTeX '', available at: \url{http://tug.ctan.org/info/lshort/english/lshort.pdf} which provides an overview of working with \LaTeX.   
+The optimization variables include discrete channel direction configurations and continuous guidance intensity parameters. To handle the mixed discrete-continuous structure and expensive simulation evaluations, we propose a Structure-Aware Hybrid Block Optimization (SA-HBO) framework that exploits problem-specific structures including local Bellman response characteristics and surrogate pre-screening.
 
-\section{The Design, Intent and \\ Limitations of the Templates}
-\noindent The templates are intended to {\bf{approximate the final look and page length of the articles/papers}}. Therefore, {\bf{they are NOT intended to be the final produced work that is displayed in print or on IEEEXplore\textsuperscript{\textregistered}}}. They will help to give the authors an approximation of the number of pages that will be in the final version. The structure of the \LaTeX files, as designed, enable easy conversion to XML for the composition systems used by the IEEE's outsource vendors. The XML files are used to produce the final print/IEEEXplore\textsuperscript{\textregistered} pdf and then converted to HTML for IEEEXplore\textsuperscript{\textregistered}. Have you looked at your article/paper in the HTML version?
+\section{Related Work}
+\label{sec:related}
 
-\section{\LaTeX \ Distributions: Where to Get Them}
-\noindent IEEE recommends using the distribution from the \TeX User Group at \url{http://www.tug.org}. You can join TUG and obtain a DVD distribution or download for free  from the links provided on their website: \url{http://www.tug.org/texlive/}. The DVD includes distributions for Windows, Mac OS X and Linux operating systems.
- 
-\section{Where to get the IEEEtran Templates}
-\noindent The {\bf{IEEE Template Selector}} will always have the most up-to-date versions of the \LaTeX\ and MSWord templates. Please see: \url{https://template-selector.ieee.org/} and follow the steps to find the correct template for your intended publication. Many publications use the IEEETran LaTeX templates, however, some publications have their own special templates. Many of these are  based on IEEEtran, but may have special instructions that vary slightly from those in this document.
+\subsection{Massive Crowd Management and Control}
 
-\section{Where to get \LaTeX \ help - user groups}
-\noindent The following on-line groups are very helpful to beginning and experienced \LaTeX\ users. A search through their archives can provide many answers to common questions.
-\begin{list}{}{}
-\item{\url{http://www.latex-community.org/}} 
-\item{\url{https://tex.stackexchange.com/} }
-\end{list}
+Crowd management in urban centers has been extensively studied from control-theoretic and optimization perspectives, aiming to enhance safety and efficiency through boundary regulation, facility layout, and intelligent decision-making \cite{al2021preparedness,feng2014network}.
 
-\section{Document Class Options in IEEEtran}
-\noindent At the beginning of your \LaTeX\ file you will need to establish what type of publication style you intend to use. The following list shows appropriate documentclass options for each of the types covered by IEEEtran.
+In control-theoretic approaches, Zhong et al. \cite{zhong2018boundary} designed boundary control strategies for urban traffic flow networks to ensure convergence to uncongested states under disturbances, with stability analysis based on Lyapunov methods \cite{zhao2021lyapunov}. For one-dimensional crowd dynamics, Wadoo and Kachroo \cite{wadoo2010feedback} employed advection and diffusion control to prevent blocking and shock waves during evacuation. Addressing multi-directional disturbance propagation, Qin \cite{qin2020unit} proposed a unit sliding mode controller based on integral barrier Lyapunov functions to ensure boundedness of internal state variables, demonstrating strong disturbance rejection capabilities. For heterogeneous corridor regulation, Zhu et al. \cite{zhu2021optimal} combined policy learning with neural networks to learn optimal feedback controllers that adjust inflow rates and free-flow speeds, achieving balanced density distribution and reduced congestion.
 
-\begin{list}{}{}
-\item{Regular Journal Article}
-\item{{\tt{$\backslash$documentclass[journal]{IEEEtran}}}}\\
-\item{{Conference Paper}}
-\item{{\tt{$\backslash$documentclass[conference]{IEEEtran}}}}\\
-\item{Computer Society Journal Article}
-\item{{\tt{$\backslash$documentclass[10pt,journal,compsoc]{IEEEtran}}}}\\
-\item{Computer Society Conference Paper}
-\item{{\tt{$\backslash$documentclass[conference,compsoc]{IEEEtran}}}}\\
-\item{{Communications Society Journal Article}}
-\item{{\tt{$\backslash$documentclass[journal,comsoc]{IEEEtran}}}}\\
-\item{{Brief, Correspondence or Technote}}
-\item{{\tt{$\backslash$documentclass[9pt,technote]{IEEEtran}}}}
-\end{list}
+Physical infrastructure regulation has also proven effective. Studies have shown that strategically placed obstacles can significantly improve outflow, velocity, and local density in merging areas \cite{yu2025regulating,zhou2025simulation}. Yang et al. \cite{yang2025optimization,yang2025partition} employed Model Predictive Control (MPC) to optimize barrier lengths at subway bottlenecks, later extending control variables to entrance limiters, gates, and escalator directions for dynamic, real-time crowd regulation. For evacuation guidance, Carmona and Paricio-Garcia \cite{carmona2024crowd} proposed dynamic exit-choice recommendations using multinomial Logit models. However, their approach relies on discrete speed instructions (e.g., ``stop,'' ``walk,'' ``run'') transmitted via electronic wristbands \cite{carmona2023linear}, which poses implementation challenges in open urban scenarios.
 
-There are other options available for each of these when submitting for peer review or other special requirements. IEEE recommends to compose your article in the base 2-column format to make sure all your equations, tables and graphics will fit the final 2-column format. Please refer to the document ``IEEEtran\_HOWTO.pdf'' for more information on settings for peer review submission if required by your EIC.
+Recently, intelligent optimization and deep reinforcement learning have emerged as promising alternatives. Liao et al. \cite{liao2023crowd} formulated fence layout as a subset selection problem, while subsequent work \cite{liao2025drift} proposed a dynamic crowd inflow control system using LSTM networks to capture temporal features and Proximal Policy Optimization (PPO) \cite{schulman2017proximal} for real-time entrance flow regulation. Differential Evolution (DE) \cite{price2014differential} has also been applied to optimize guardrail layouts and flow guidance in real-world scenarios such as Chengdu East Railway Station, using average travel time and crowd pressure as multi-objective criteria \cite{liu2024automatic}.
 
-\section{How to Create Common Front Matter}
-\noindent The following sections describe general coding for these common elements. Computer Society publications and Conferences may have their own special variations and will be noted below.
-\subsection{Paper Title}
-\noindent The title of your paper is coded as:
+\subsection{Macroscopic Crowd Modeling}
 
-\begin{verbatim}
-\title{The Title of Your Paper}
-\end{verbatim}
+Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency compared to microscopic approaches. Hughes \cite{hughes2003continuum} pioneered the continuum theory for pedestrian flow, introducing the classical model where pedestrians move in the direction of steepest descent of a potential function representing remaining travel time to exits.
 
-\noindent Please try to avoid the use of math or chemical formulas in your title if possible.
+Extensions of the Hughes framework have incorporated various control and guidance mechanisms. Anisotropic extensions using metric tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}. These models allow for continuous geometric guidance without explicit prohibition, enabling pedestrians to deviate from preferred directions when necessary.
 
-\subsection{Author Names and Affiliations}
-\noindent The author section should be coded as follows:
-\begin{verbatim}
-\author{Masahito Hayashi 
-\IEEEmembership{Fellow, IEEE}, Masaki Owari
-\thanks{M. Hayashi is with Graduate School 
-of Mathematics, Nagoya University, Nagoya, 
-Japan}
-\thanks{M. Owari is with the Faculty of 
-Informatics, Shizuoka University, 
-Hamamatsu, Shizuoka, Japan.}
+Constrained Hamilton-Jacobi-Bellman (HJB) formulations have been employed to model strict directional constraints such as one-way corridors. The Bellman optimality principle provides a natural framework for discrete control decisions, unifying anisotropic geometric guidance with directional constraints within a single computational framework.
+
+Despite these advances, existing approaches often treat control parameters as fixed or manually tuned. The bi-level optimization of discrete channel configurations combined with continuous guidance intensities remains underexplored, particularly for large-scale urban pedestrian zones with multiple stages and route choices.
+
+\section{Macroscopic Crowd Dynamics Model}
+\label{sec:model}
+
+\subsection{Hughes Model Foundation}
+
+We consider a bounded two-dimensional domain $\Omega \subset \mathbb{R}^2$ representing the pedestrian walkway. Let $\rho(x,t)$ denote the crowd density at position $x$ and time $t$, $\phi(x,t)$ the minimal remaining time to reach an exit, and $\mathbf{v}(x,t)$ the mean velocity field. The continuity equation governing mass conservation reads:
+\begin{equation}
+\frac{\partial \rho}{\partial t} + \nabla \cdot (\rho \mathbf{v}) = 0.
+\label{eq:continuity}
+\end{equation}
+
+In the classical Hughes model \cite{hughes2003}, pedestrians move in the direction of steepest descent of the potential function:
+\begin{equation}
+\mathbf{v} = f(\rho) \frac{-\nabla \phi}{|\nabla \phi|},
+\label{eq:velocity}
+\end{equation}
+where $f(\rho)$ is the speed-density relationship. We adopt the Greenshields form:
+\begin{equation}
+f(\rho) = v_{\max}\left(1 - \frac{\rho}{\rho_{\max}}\right),
+\label{eq:greenshields}
+\end{equation}
+with $v_{\max}$ the free-flow speed and $\rho_{\max}$ the jam density.
+
+The potential function satisfies the eikonal equation:
+\begin{equation}
+|\nabla \phi| = \frac{1}{f(\rho)}.
+\label{eq:eikonal}
+\end{equation}
+
+While this model captures basic congestion effects, it assumes isotropic movement and cannot represent channel geometries or directional controls. We address these limitations in the following sections.
+
+\section{Channel Geometric Guidance via Metric Tensor}
+\label{sec:guidance}
+
+To represent anisotropic channel geometries such as corridors and barriers, we introduce a spatially varying symmetric positive-definite metric tensor $\mathbf{M}(x)$ that generalizes the classical eikonal equation to anisotropic form \cite{cristiani2016}:
+\begin{equation}
+\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi} = \frac{1}{f(\rho)}.
+\label{eq:anisotropic_eikonal}
+\end{equation}
+
+Under this metric, the optimal direction is determined by the tensor-induced steepest descent:
+\begin{equation}
+\mathbf{v} = f(\rho) \frac{-\mathbf{M}(x) \nabla \phi}{\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi}}.
+\label{eq:anisotropic_velocity}
+\end{equation}
+
+For a channel region $\Omega_c$ with unit tangent $\tau(x)$ and unit normal $n(x)$, we construct the metric tensor as:
+\begin{equation}
+\mathbf{M}(x) = \alpha(x) \tau \tau^{\top} + \beta(x) n n^{\top}, \quad x \in \Omega_c,
+\label{eq:metric_tensor}
+\end{equation}
+where $\alpha(x)$ and $\beta(x)$ control the traversal weights in tangential and normal directions, respectively. Setting $\alpha(x) \gg \beta(x)$ encourages movement along the channel axis while suppressing lateral crossing, achieving continuous geometric guidance without explicit prohibition. Outside channels, $\mathbf{M}(x) = \mathbf{I}$ recovers the isotropic case.
+
+\textit{Remark}: The metric tensor approach represents directional preferences rather than hard constraints. As long as costs remain finite, the model allows individuals to deviate from preferred directions when facing congestion or detour requirements. This motivates the introduction of constrained HJB framework for strict directional controls.
+
+\section{Channel Control via Constrained HJB}
+\label{sec:hjb}
+
+Many crowd management measures directly restrict available movement directions rather than merely adjusting traversal costs. Examples include one-way corridors and temporary closures. Such rules are naturally modeled via constrained optimal control.
+
+Let $U(x)$ denote the set of admissible unit directions at position $x$. The velocity satisfies:
+\begin{equation}
+\mathbf{v} = f(\rho) \mathbf{u}, \quad \mathbf{u}(x) \in U(x), \quad |\mathbf{u}| = 1.
+\label{eq:constrained_velocity}
+\end{equation}
+
+By the Bellman optimality principle, the potential function satisfies the constrained HJB equation:
+\begin{equation}
+\max_{\mathbf{u} \in U(x)} \left\{-f(\rho) \mathbf{u} \cdot \nabla \phi\right\} = 1.
+\label{eq:constrained_hjb}
+\end{equation}
+
+When $U(x)$ is the full unit circle, \eqref{eq:constrained_hjb} reduces to the classical Hughes model. For restricted control sets, various channel rules can be expressed naturally. For a strict one-way channel with allowed direction $\tau(x)$:
+\begin{equation}
+U(x) = \{\tau(x)\}, \quad x \in \Omega_c,
+\label{eq:oneway_constraint}
+\end{equation}
+and the HJB equation becomes:
+\begin{equation}
+-f(\rho) \tau(x) \cdot \nabla \phi = 1,
+\label{eq:oneway_hjb}
+\end{equation}
+encoding one-way movement as a signed directional constraint.
+
+\subsection{Unified Discrete Bellman Formulation}
+
+To unify anisotropic geometry with discrete constraints, we employ a discrete Bellman formulation. For grid point $x$ and admissible direction $\mathbf{u} \in U(x)$, define the step cost:
+\begin{equation}
+\text{Cost}(x, \mathbf{u}) = \frac{\Delta x}{f(\rho(x))} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}(x) \mathbf{u}}},
+\label{eq:step_cost}
+\end{equation}
+
+The potential satisfies:
+\begin{equation}
+\phi(x) = \min_{\mathbf{u} \in U(x)} \left[\phi(x + \Delta x \, \mathbf{u}) + \text{Cost}(x, \mathbf{u})\right].
+\label{eq:bellman}
+\end{equation}
+
+This formulation couples metric tensor $\mathbf{M}(x)$ for geometric guidance with control set $U(x)$ for directional constraints within a unified Bellman framework. The optimal direction is:
+\begin{equation}
+\mathbf{u}^*(x) = \arg\min_{\mathbf{u} \in U(x)} \left[\phi(x + \Delta x \, \mathbf{u}) + \text{Cost}(x, \mathbf{u})\right],
+\label{eq:optimal_direction}
+\end{equation}
+with velocity $\mathbf{v}(x) = f(\rho) \mathbf{u}^*(x)$.
+
+\section{Multi-Stage Multi-Route Model}
+\label{sec:multistage}
+
+Real-world scenarios often involve complex itineraries with multiple stages and route choices. We extend the density field to include stage and route indices, with fixed-probability splitting at decision boundaries.
+
+\subsection{Stage-Route Decomposition}
+
+Let the complete behavior chain consist of $S$ stages, where stage $s$ has $R_s$ alternative routes. The total density decomposes as:
+\begin{equation}
+\rho(x,t) = \sum_{s=1}^{S} \sum_{r=1}^{R_s} \rho_{s,r}(x,t),
+\label{eq:density_decomp}
+\end{equation}
+where $\rho_{s,r}(x,t)$ is the density of sub-population in stage $s$ following route $r$.
+
+All sub-populations share the same speed function $f(\rho)$ determined by total density, ensuring collective congestion effects. Sub-populations differ in their potential functions, optimal directions, and exit targets.
+
+\subsection{Sub-Population Potentials and Velocities}
+
+For each sub-population $(s,r)$, define admissible direction set $U_{s,r}(x)$, metric tensor $\mathbf{M}_{s,r}(x)$, and target regions. The potential $\phi_{s,r}(x)$ satisfies:
+\begin{equation}
+\begin{aligned}
+\phi_{s,r}(x) = \min_{\mathbf{u} \in U_{s,r}(x)} \Bigl[\,&\phi_{s,r}(x + \Delta x \, \mathbf{u}) \\
+&+ \frac{\Delta x}{f(\rho)} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}_{s,r}(x) \mathbf{u}}}\Bigr].
+\end{aligned}
+\label{eq:subpop_bellman}
+\end{equation}
+
+The optimal direction is:
+\begin{equation}
+\begin{aligned}
+\mathbf{u}_{s,r}^*(x) = \arg\min_{\mathbf{u} \in U_{s,r}(x)} \Bigl[\,&\phi_{s,r}(x + \Delta x \, \mathbf{u}) \\
+&+ \frac{\Delta x}{f(\rho)} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}_{s,r}(x) \mathbf{u}}}\Bigr],
+\end{aligned}
+\label{eq:subpop_optimal}
+\end{equation}
+with velocity $\mathbf{v}_{s,r}(x) = f(\rho) \, \mathbf{u}_{s,r}^*(x)$.
+
+\subsection{Stage Transitions and Fixed-Probability Splitting}
+
+Sub-populations couple through stage transitions. Let $G_{s,r} \subset \Omega$ be the completion goal region for stage $(s,r)$ with indicator $\chi_{G_{s,r}}(x)$. Upon reaching this region, pedestrians switch to next-stage routes with fixed probabilities.
+
+Let $p_{(s,r) \to q}$ be the fixed probability of switching from $(s,r)$ to $(s+1,q)$, satisfying:
+\begin{equation}
+p_{(s,r) \to q} \geq 0, \quad \sum_{q=1}^{R_{s+1}} p_{(s,r) \to q} = 1.
+\label{eq:prob_constraints}
+\end{equation}
+
+The transition term is:
+\begin{equation}
+Q_{(s,r) \to (s+1,q)}(x,t) = p_{(s,r) \to q} \, \kappa_{s,r} \, \chi_{G_{s,r}}(x) \, \rho_{s,r}(x,t),
+\label{eq:transition}
+\end{equation}
+where $\kappa_{s,r} > 0$ is the stage switching rate.
+
+The density evolution for each sub-population includes advection and transition source terms:
+\begin{equation}
+\frac{\partial \rho_{s,r}}{\partial t} + \nabla \cdot (\rho_{s,r} \mathbf{v}_{s,r}) = Q^{\text{in}}_{s,r} - Q^{\text{out}}_{s,r},
+\label{eq:subpop_continuity}
+\end{equation}
+where $Q^{\text{in}}_{s,r}$ is inflow from the previous stage and $Q^{\text{out}}_{s,r}$ is outflow to the next stage.
+
+\section{Numerical Solution}
+\label{sec:numerical}
+
+We discretize the domain using a uniform two-dimensional grid, with the control direction set represented as an 8-neighborhood basis with masking for regional restrictions.
+
+\textbf{Unified Bellman Solver.} Rather than separate eikonal and HJB solvers, we use a unified discrete Bellman shortest-path update. For candidate direction $\mathbf{u}$, precompute geometric step factors from the local tensor, then combine with the speed function to form the complete step cost. A priority queue propagates potential values outward from exits until convergence. When the control set is unrestricted, this procedure is equivalent to monotone solution of the anisotropic eikonal equation; when controls are restricted, it naturally reduces to constrained HJB solution, covering all required scenarios within a unified framework.
+
+\textbf{Density Update.} After obtaining converged potentials, recover velocity fields using \eqref{eq:subpop_optimal}, substitute into the continuity equation, and advance density explicitly using an upwind flux scheme:
+\begin{equation}
+\rho^{n+1} = \rho^n - \Delta t \, \nabla \cdot (\rho^n \mathbf{v}^n).
+\label{eq:density_update}
+\end{equation}
+The time step satisfies the CFL stability condition.
+
+\textbf{Evaluation Oracle.} For any given control configuration $z = (s, \eta)$, the simulation workflow constitutes a lower-level evaluation operator:
+\begin{equation}
+(\rho, \phi, \mathbf{v}) = \mathcal{S}(z; \hat{p}),
+\label{eq:simulation_oracle}
+\end{equation}
+where $\hat{p}$ represents fixed route preference parameters identified from historical data. This operator provides the foundation for subsequent control optimization.
+
+\section{Control Evaluation Metrics}
+\label{sec:metrics}
+
+We distinguish between behavior validation metrics (for verifying model mechanisms) and control evaluation metrics (for assessing policy impacts). This section focuses on the latter.
+
+\subsection{Efficiency Metric: Total Travel Time}
+
+For simulation horizon $[0,T]$, the total travel time metric is:
+\begin{equation}
+J_1(z \mid \hat{p}) = \int_0^T \int_{\Omega} \rho(x,t) \, dx \, dt.
+\label{eq:j1}
+\end{equation}
+
+This measures aggregate dwell time of the crowd, providing a stable basis for comparing different control strategies.
+
+\subsection{Safety Metric: High-Density Exposure Time}
+
+Let $\rho_{\text{safe}}$ be the safe density threshold. The exposure time metric is:
+\begin{equation}
+J_2(z \mid \hat{p}) = \int_0^T \int_{\Omega} \mathbf{1}_{\rho(x,t) > \rho_{\text{safe}}} \, dx \, dt.
+\label{eq:j2}
+\end{equation}
+
+This captures cumulative space-time exposure to dangerous crowding conditions, reflecting management concerns about sustained congestion risks.
+
+\subsection{Balance Metric: Channel Flow Variance}
+
+Let $q_c(t)$ be the flux through channel $c$ at time $t$, with cumulative flow $F_c = \int_0^T q_c(t) \, dt$. The load balancing metric is:
+\begin{equation}
+J_3(z \mid \hat{p}) = \text{Var}(F_1, \dots, F_m).
+\label{eq:j5}
+\end{equation}
+
+Lower variance indicates more even distribution of traffic across channels, reducing risk concentration and improving facility utilization.
+
+\subsection{Scalarized Optimization Objective}
+
+Given weights $(\lambda_1, \lambda_2, \lambda_3)$, the scalarized objective is:
+\begin{equation}
+J(z \mid \hat{p}) = \lambda_1 J_1(z \mid \hat{p}) + \lambda_2 J_2(z \mid \hat{p}) + \lambda_3 J_3(z \mid \hat{p}),
+\label{eq:scalarized}
+\end{equation}
+
+with the optimization problem:
+\begin{equation}
+\min_{z \in \mathcal{Z}} J(z \mid \hat{p}).
+\label{eq:optimization}
+\end{equation}
+
+Our algorithm solves this scalarized problem for fixed weights, rather than directly generating the full Pareto frontier. Approximate Pareto sets can be obtained by running with different weight combinations.
+
+\section{Optimization Method}
+\label{sec:optimization}
+
+\subsection{Control Variable Definition}
+
+We distinguish controllable variables from exogenous behavioral parameters:
+
+\textbf{Controllable variables}:
+\begin{enumerate}
+\item \textit{Channel direction configuration} $s = (s_1, \dots, s_C)$, where $s_c \in \{-1, 0, +1\}$ indicates reverse one-way, bidirectional, or forward one-way for channel $c$.
+\item \textit{Geometric guidance intensity} $\eta = (\eta_1, \dots, \eta_C)$, where $\eta_c = \alpha_c / \beta_c \geq 1$ is the anisotropy ratio.
+\end{enumerate}
+
+Thus the optimization variable is $z = (s, \eta)$.
+
+\textbf{Exogenous parameters}: Route preference parameters $\hat{p}$ are identified from historical data and fixed during optimization. Decision region locations are reserved for future extension.
+
+\subsection{Structure-Aware Hybrid Block Optimization}
+
+Treating this as a black-box optimization ignores three key structures: mixed discrete-continuous variables, local Bellman response characteristics, and the expensive multi-group simulation structure.
+
+We propose Structure-Aware Hybrid Block Optimization (SA-HBO), with four core components:
+\begin{enumerate}
+\item Discrete block neighborhood search for channel directions;
+\item Surrogate pre-screening to reduce full simulations;
+\item Bellman warm-start with local re-solving for efficient evaluation;
+\item Continuous block projected stochastic approximation for guidance intensities.
+\end{enumerate}
+
+\subsection{Discrete Block Update}
+
+Fixing continuous variables $\eta^k$, the discrete subproblem at iteration $k$ is:
+\begin{equation}
+s^{k+1/2} \approx \arg\min_{s \in \mathcal{S}} J(s, \eta^k \mid \hat{p}).
+\label{eq:discrete_subproblem}
+\end{equation}
+
+Define the neighborhood of current configuration $s^k$ as:
+\begin{equation}
+\mathcal{N}(s^k) = \left\{s : \|s - s^k\|_0 \leq \nu\right\},
+\label{eq:neighborhood}
+\end{equation}
+where $\nu$ is the maximum number of simultaneously flipped channels (typically 1 or 2).
+
+\textit{Surrogate pre-screening}: To reduce full simulations, construct a local surrogate for each candidate $s' \in \mathcal{N}(s^k)$:
+\begin{equation}
+\widehat{J}(s', \eta^k) = \mu_1 \widehat{J}_1^{\text{local}} + \mu_2 \widehat{J}_2^{\text{local}} + \mu_3 \widehat{J}_3^{\text{flow}},
+\label{eq:surrogate}
+\end{equation}
+where the local metrics approximate density changes, exposure changes, and flow redistribution. Select top $K$ candidates by surrogate value for full PDE simulation.
+
+\subsection{Continuous Block Update}
+
+Fixing discrete variables $s^{k+1/2}$, solve for $\eta$:
+\begin{equation}
+\eta^{k+1} \approx \arg\min_{\eta \in \mathcal{H}} J(s^{k+1/2}, \eta \mid \hat{p}),
+\label{eq:continuous_subproblem}
+\end{equation}
+with feasible set $\mathcal{H} = \{\eta : \eta_c \geq 1\}$.
+
+Since gradients are unavailable analytically, we use projected stochastic approximation. Generate Rademacher perturbation $\Delta_{\eta}^k \in \{-1, +1\}^C$, construct two-sided perturbations $\eta_{\pm}^k = \eta^k \pm c_k \Delta_{\eta}^k$, and project to feasible set. The stochastic gradient estimate is:
+\begin{equation}
+\widehat{g}_{\eta}^k = \frac{J(s^{k+1/2}, \tilde{\eta}_+^k \mid \hat{p}) - J(s^{k+1/2}, \tilde{\eta}_-^k \mid \hat{p})}{2c_k} \odot (\Delta_{\eta}^k)^{-1}.
+\label{eq:stochastic_gradient}
+\end{equation}
+
+The candidate update is:
+\begin{equation}
+\eta_{\text{cand}}^{k+1} = \Pi_{\mathcal{H}}\left(\eta^k - \alpha_k D_{\eta}^{-1} \widehat{g}_{\eta}^k\right),
+\label{eq:eta_candidate}
+\end{equation}
+with diagonal preconditioner $D_{\eta}$.
+
+\textit{Acceptance/Rejection}: Compare candidate objective $J_{\text{cand}}$ with current $J_{\text{cur}}$. Accept if $J_{\text{cand}} \leq J_{\text{cur}} - \varepsilon_{\text{acc}}$; otherwise reject and optionally backtrack. Maintain best solution $z_{\text{best}}$ throughout.
+
+\subsection{Bellman Warm-Start and Local Re-solving}
+
+Control changes typically affect only local regions. We identify the affected region $\Omega_{\text{chg}}^k$ where $U_{s,r}(x; \tilde{z}) \neq U_{s,r}(x; z^k)$ or $\mathbf{M}_{s,r}(x; \tilde{z}) \neq \mathbf{M}_{s,r}(x; z^k)$. Using the old potential as initialization, iterate only within an expanded neighborhood $\Omega_{\text{chg}}^{k,\delta}$ until convergence.
+
+This accelerates candidate evaluation. Periodic global corrections prevent error accumulation.
+
+\subsection{Algorithm Summary}
+
+\begin{enumerate}
+\item Initialize potentials and density, compute $J(z^0 \mid \hat{p})$, set $z_{\text{best}} = z^0$.
+\item For each iteration:
+  \begin{itemize}
+  \item \textit{Discrete update}: Generate neighborhood, screen with surrogate, evaluate top candidates with Bellman warm-start, select $s^{k+1/2}$.
+  \item \textit{Continuous update}: Generate perturbations, compute stochastic gradient, generate candidate, accept/reject to obtain $\eta^{k+1}$.
+  \item \textit{State update}: Set $z^{k+1} = (s^{k+1/2}, \eta^{k+1})$, compute objective, update $z_{\text{best}}$ if improved.
+  \end{itemize}
+\item Return $z^{\star} = z_{\text{best}}$.
+\end{enumerate}
+
+Stopping criteria include: small objective change, no discrete variable change for consecutive iterations, or maximum iteration/simulation/time limits.
+
+\section{Numerical Experiments}
+\label{sec:experiments}
+
+This section presents numerical experiments to validate the model mechanisms, evaluate control strategies, and demonstrate the optimization framework. The experimental design follows a two-layer validation logic: first verifying whether the model mechanisms authentically alter local crowd behaviors, then comparing different channel control strategies in terms of efficiency, safety, and load balancing.
+
+\subsection{Experimental Setup}
+\label{sec:setup}
+
+\subsubsection{Three-Channel Scenario}
+
+The experiments employ a three-channel scenario as the primary testbed for mechanism validation and strategy comparison. The geometry consists of an initial crowd region on the left, an exit region on the right, and three passages (upper, middle, lower) through a central wall separating the two regions.
+
+Numerical parameters are set as follows: grid resolution $96\times72$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, maximum simulation steps $600$, and time horizon $T=40$.
+
+\subsubsection{Evaluation Metrics}
+
+The experiments employ three primary metrics:
+\begin{itemize}
+\item \textit{Efficiency metric} $J_1$: total travel time (integral of density over space-time);
+\item \textit{Safety metric} $J_2$: high-density exposure time (duration above safety threshold $\rho_{\text{safe}}$);
+\item \textit{Balance metric} $J_3$: channel flow variance (load distribution across channels).
+\end{itemize}
+
+Behavioral indicators include channel capture domain ratios, flow distribution ratios, direction consistency indices, and approach angle distributions.
+
+\subsection{Mechanism Validation}
+\label{sec:mechanism}
+
+The mechanism validation experiments address two fundamental questions: (1) Do geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local decision-making and flow patterns? (2) Does the model produce sufficiently sensitive and interpretable responses to configuration changes?
+
+\subsubsection{Effect of Geometric Guidance $M(x)$}
+
+To verify whether geometric guidance alters approach patterns and attraction domains, we compare the baseline configuration (neither $M$ nor $U$) against the $M$-only configuration (anisotropic guidance applied to the middle channel).
+
+\textbf{Results:} Under the baseline configuration, the three channels exhibit approximately balanced capture domains: upper $33.73\%$, middle $30.00\%$, lower $34.98\%$. Flow distributions are similarly balanced: upper $33.82\%$, middle $32.35\%$, lower $33.83\%$.
+
+Under the $M$-only configuration, the middle channel capture domain expands significantly to $63.41\%$, and its flow share jumps to $99.32\%$. This demonstrates that geometric guidance $M(x)$ reshapes local attraction domains and fundamentally alters approach patterns.
+
+\subsubsection{Effect of Directional Constraints $U(x)$}
+
+To verify whether directional constraints alter local optimal directions and channel selection, we compare the baseline against the $U$-only configuration (middle channel restricted to eastward-only flow).
+
+\textbf{Results:} Under the $U$-only configuration, the middle channel capture domain drops to $0$, and its flow share drops to $0$, with upper and lower channels splitting traffic approximately $50/50$. This confirms that $U(x)$ significantly rewrites feasible path choices.
+
+To further verify the suppression of counter-flow and head-on conflicts, we conduct a bidirectional flow sub-experiment. Two configurations are tested: bidirectional baseline (westbound and eastbound crowds simultaneously) and bidirectional with middle channel one-way rule.
+
+\begin{table}[!t]
+\caption{Bidirectional $U(x)$ Validation Results}
+\label{tab:bidirectional}
+\centering
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.05}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Configuration} & \textbf{Westbound Share} & \textbf{Counter-flow Mass} & \textbf{Head-on Exposure} \\
+\hline
+Bidirectional baseline & $73.19\%$ & $152.15$ & $1055.74$ \\
+Middle channel one-way & $0$ & $0$ & $0$ \\
+\hline
+\end{tabular}
 }
-\end{verbatim}
-Be sure to use the $\backslash$IEEEmembership command to identify IEEE membership status.
-Please see the ``IEEEtran\_HOWTO.pdf'' for specific information on coding authors for Conferences and Computer Society publications. Note that the closing curly brace for the author group comes at the end of the thanks group. This will prevent you from creating a blank first page.
-
-\subsection{Running Heads}
-\noindent The running heads are declared by using the $\backslash${\tt{markboth}} command. There are two arguments to this command: the first contains the journal name information and the second contains the author names and paper title.
-\begin{verbatim}
-\markboth{Journal of Quantum Electronics, 
-Vol. 1, No. 1, January 2021}
-{Author1, Author2, 
-\MakeLowercase{\textit{(et al.)}: 
-Paper Title}
-\end{verbatim}
-
-\subsection{Copyright Line}
-\noindent For Transactions and Journals papers, this is not necessary to use at the submission stage of your paper. The IEEE production process will add the appropriate copyright line. If you are writing a conference paper, please see the ``IEEEtran\_HOWTO.pdf'' for specific information on how to code "Publication ID Marks".
-
-\subsection{Abstracts}
-\noindent The abstract is the first element of a paper after the $\backslash${\tt{maketitle}} macro is invoked.  The coding is simply:
-\begin{verbatim}
-\begin{abstract}
-Text of your abstract.
-\end{abstract}
-\end{verbatim}
-Please try to avoid mathematical and chemical formulas in the abstract.
-
-\subsection{Index Terms}
-\noindent The index terms are used to help other researchers discover your paper. Each society may have it's own keyword set. Contact the EIC of your intended publication for this list.
-\begin{verbatim}
-\begin{IEEEkeywords}
-Broad band networks, quality of service
-\end{IEEEkeywords}
-\end{verbatim}
-\section{How to Create Common Body Elements}
-\noindent The following sections describe common body text elements and how to code them.
-
-\subsection{Initial Drop Cap Letter}
-\noindent The first text paragraph uses a ``drop cap'' followed by the first word in ALL CAPS. This is accomplished by using the $\backslash${\tt{IEEEPARstart}} command as follows:
-\begin{verbatim}
-\IEEEPARstart{T}{his} is the first paragraph 
-of your paper. . .
-\end{verbatim}
-
-\subsection{Sections and Subsections}
-\noindent Section headings use standard \LaTeX\ commands: $\backslash${\tt{section}}, $\backslash${\tt{subsection}} and $\backslash${\tt{subsubsection}}. Numbering is handled automatically for you and varies according to type of publication. It is common to not indent the first paragraph following a section head by using $\backslash${\tt{noindent}} as follows:
-\begin{verbatim}
-\section{Section Head}
-\noindent The text of your paragraph . . .
-\end{verbatim}
-
-\subsection{Citations to the Bibliography}
-\noindent The coding for the citations are made with the \LaTeX\ $\backslash${\tt{cite}} command. This will produce individual bracketed reference numbers in the IEEE style. At the top of your \LaTeX\ file you should include:
-\begin{verbatim}
-\usepackage{cite}
-\end{verbatim}
-For a single citation code as follows:
-\begin{verbatim}
-see \cite{ams}
-\end{verbatim}
-This will display as: see \cite{ams}\\
-
-For multiple citations code as follows:
-\begin{verbatim}
-\cite{ams,oxford,lacomp}
-\end{verbatim}
-
-This will display as \cite{ams,oxford,lacomp}
-
-\subsection{Figures}
-\noindent Figures are coded with the standard \LaTeX\ commands as follows:
-\begin{verbatim}
-\begin{figure}[!t]
-\centering
-\includegraphics[width=2.5in]{fig1}
-\caption{This is the caption for one fig.}
-\label{fig1}
-\end{figure}
-\end{verbatim}
-The [!t] argument enables floats to the top of the page to follow IEEE style. Make sure you include:
-\begin{verbatim}
-\usepackage{graphicx}
-\end{verbatim}
- 
-\noindent at the top of your \LaTeX file with the other package declarations. 
-
-To cross-reference your figures in the text use the following code example:
-\begin{verbatim}
-See figure \ref{fig1} ...
-\end{verbatim}
-This will produce:\\
-See figure \ref{fig1} . . .
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=2.5in]{fig1}
-\caption{This is the caption for one fig.}
-\label{fig1}
-\end{figure}
-
-\subsection{Tables}
-\noindent Tables should be coded with the standard \LaTeX\ coding. The following example shows a simple table.
-
-
-\begin{verbatim}
-\begin{table}
-\begin{center}
-\caption{Filter design equations  ...}
-\label{tab1}
-\begin{tabular}{| c | c | c |}
-\hline
-Order & Arbitrary coefficients & 
-coefficients\\
-of filter & $e_m$ &   $b_{ij}$ \\
-\hline
-1& $b_{ij}=\hat{e}.\hat{\beta_{ij}}$, 
-& $b_{00}=0$\\
-\hline
-2&$\beta_{22}=(~1,-1,-1,~~1,~~1,~~1)$ &\\ 
-\hline
-3& $b_{ij}=\hat{e}.\hat{\beta_{ij}}$, 
-& $b_{00}=0$,\\
-\hline 
-\end{tabular}
-\end{center}
-\end{table}
-\end{verbatim}
-To reference the table in the text, code as follows:
-\begin{verbatim}Table~\ref{tab1} lists the closed-form...\end{verbatim}
-to produce:
-
-Table~\ref{tab1} lists the closed-form . . .
-
-
-%moved here for pagination purposes
-\begin{table}
-\begin{center}
-\caption{A Simple Table Example.}
-\label{tab1}
-\begin{tabular}{| c | c | c |}
-\hline
-Order & Arbitrary coefficients & coefficients\\
-of filter & $e_m$ &   $b_{ij}$ \\
-\hline
-1& $b_{ij}=\hat{e}.\hat{\beta_{ij}}$, & $b_{00}=0$\\
-\hline
-2&$\beta_{22}=(~1,-1,-1,~~1,~~1,~~1)$ &\\ 
-\hline
-3& $b_{ij}=\hat{e}.\hat{\beta_{ij}}$, & $b_{00}=0$,\\
-\hline 
-\end{tabular}
-\end{center}
 \end{table}
 
+The results in Table \ref{tab:bidirectional} show that when the middle channel enforces a one-way rule, westbound crowds are completely excluded, and counter-flow mass time and head-on cell exposure are both driven to zero. This confirms that $U(x)$ not only changes path selection but effectively suppresses counter-flow and head-on conflicts under bidirectional demand.
 
-\subsection{Lists}
-\noindent In this section, we will consider three types of lists: simple unnumbered, numbered and bulleted. There have been numerous options added to IEEEtran to enhance the creation of lists. If your lists are more complex than those shown below, please refer to the  ``IEEEtran\_HOWTO.pdf'' for additional options.\\
+\subsubsection{Combined $U+M$ Effects and Configuration Sensitivity}
 
-\noindent{\bf A plain  unnumbered list}
+To verify whether the combined $U+M$ model produces distinguishable responses to different channel configurations, we test three setups: middle-channel-controlled ($U+M$-middle), upper-channel-controlled ($U+M$-top), and lower-channel-controlled ($U+M$-bottom).
 
-\begin{list}{}{}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
-\end{list}
+\begin{table}[!t]
+\caption{Configuration Sensitivity Results}
+\label{tab:sensitivity}
+\centering
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.05}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{Config} & \textbf{Dominant Capture} & \textbf{Dominant Flow} & \textbf{Upper} & \textbf{Middle} & \textbf{Lower} \\
+\hline
+middle & middle & middle & $\sim$1/3 & dominant & $\sim$1/3 \\
+top & top & top & dominant & $\sim$1/3 & $\sim$1/3 \\
+bottom & bottom & bottom & $\sim$1/3 & $\sim$1/3 & dominant \\
+\hline
+\end{tabular}
+}
+\end{table}
 
-\noindent coded as:
-\begin{verbatim}
-\begin{list}{}{}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
-\end{list}
-\end{verbatim}
-\noindent{\bf A simple numbered list}
+Table \ref{tab:sensitivity} demonstrates that the $U+M$ model exhibits stable and interpretable responses to configuration changes: when the middle channel is controlled, it becomes the dominant capture and flow channel; when the upper or lower channel is controlled, the corresponding channel becomes dominant. This sensitivity validates the model as a foundation for subsequent strategy comparison and optimization.
 
+\subsubsection{Mechanism Validation Conclusions}
+
+The experimental results support four key conclusions:
 \begin{enumerate}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
+\item Geometric guidance $M(x)$ significantly alters local approach patterns and channel attraction domains, enabling earlier alignment with channel axes and smoother convergence.
+\item Directional constraints $U(x)$ reshape feasible paths and directional organization, effectively suppressing counter-flow and head-on conflicts under bidirectional demand.
+\item The combined $U+M$ model produces configuration-sensitive responses that are both rule-compliant and behaviorally realistic.
+\item Either $U$ or $M$ alone yields incomplete or behaviorally unrealistic responses; the full model is necessary for reliable optimization.
 \end{enumerate}
-\noindent coded as: 
-\begin{verbatim}
-\begin{enumerate}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
-\end{enumerate}
-\end{verbatim}
 
-\noindent{\bf A simple bulleted list}
+\subsection{Control Strategy Comparison}
+\label{sec:strategy}
 
+This subsection compares different channel control strategies in terms of efficiency ($J_1$), safety ($J_2$), and load balancing ($J_3$). The strategies under comparison include:
 \begin{itemize}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
+\item Baseline (no control);
+\item Upper-channel-guided;
+\item Middle-channel-guided;
+\item Lower-channel-guided.
 \end{itemize}
 
-\noindent coded as:
+Detailed results and analysis will be presented in the full version of this paper.
 
-\begin{verbatim}
-\begin{itemize}
-\item{bare\_jrnl.tex}
-\item{bare\_conf.tex}
-\item{bare\_jrnl\_compsoc.tex}
-\item{bare\_conf\_compsoc.tex}
-\item{bare\_jrnl\_comsoc.tex}
-\end{itemize}
-\end{verbatim}
+\subsection{Multi-Stage Flow Validation Experiments}
+\label{sec:multistage_exp}
 
+This subsection validates the multi-stage behavior chain and probabilistic splitting mechanism. The experiments compare single-stage approximations against full multi-stage models to demonstrate how stage transitions and fixed-probability splitting alter density evolution and exit load distribution.
 
-\subsection{Other Elements}
-\noindent For other less common elements such as Algorithms, Theorems and Proofs, and Floating Structures such as page-wide tables, figures or equations, please refer to the ``IEEEtran\_HOWTO.pdf'' section on ``Double Column Floats.''
+Detailed results and analysis will be presented in the full version of this paper.
 
+\subsection{Optimal Control Parameter Search}
+\label{sec:optimal}
 
-\section{How to Create Common Back Matter Elements}
-\noindent The following sections demonstrate common back matter elements such as Acknowledgments, Bibliographies, Appendicies and Author Biographies.
+This subsection presents the first-version automated parameter search results. The search enumerates discrete strategy variables, performs coarse grid search on guidance intensity $\eta$, and searches over fixed splitting probability candidates to identify optimal control configurations under different objective weight combinations $(\lambda_1, \lambda_2, \lambda_3)$.
 
-\subsection{Acknowledgments}
-\noindent This should be a simple paragraph before the bibliography to thank those individuals and institutions who have supported your work on this article.
+Detailed results and analysis will be presented in the full version of this paper.
 
-\begin{verbatim}
-\section{Acknowledgments}
-\noindent Text describing those who 
-supported your paper.
-\end{verbatim}
+\section{Conclusion}
+\label{sec:conclusion}
 
-\subsection{Bibliographies}
-\noindent {\bf{References Simplified:}} A simple way of composing references is to use the $\backslash${\tt{bibitem}} macro to define the beginning of a reference as in the following examples:\\
+This paper presents a bi-level optimization framework for crowd channel management that combines anisotropic geometric guidance with discrete directional constraints. The proposed SA-HBO algorithm exploits problem structure through surrogate pre-screening, Bellman warm-start, and block coordinate updates to handle the expensive simulation-based optimization efficiently.
 
+The numerical experiments validate that: (1) geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local crowd behaviors; (2) the combined model exhibits stable sensitivity to configuration changes; (3) directional constraints effectively suppress counter-flow and head-on conflicts under bidirectional demand. These findings establish the foundation for subsequent strategy optimization studies.
 
-\noindent [6] H. Sira-Ramirez. ``On the sliding mode control of nonlinear systems,'' \textit{Systems \& Control Letters}, vol. 19, pp. 303--312, 1992.
-
-\noindent coded as:
-\begin{verbatim}
-\bibitem{Sira3}
-H. Sira-Ramirez. ``On the sliding mode 
-control of nonlinear systems,'' 
-\textit{Systems \& Control Letters}, 
-vol. 19, pp. 303--312, 1992.
-\end{verbatim}
-
-\noindent [7] A. Levant.``Exact differentiation of signals with unbounded higher derivatives,''  in \textit{Proceedings of the 45th IEEE Conference on Decision and Control}, San Diego, California, USA, pp. 5585--5590, 2006.
-
-\noindent coded as:
-\begin{verbatim}\bibitem{Levant}
-A. Levant. ``Exact differentiation of 
-signals with unbounded higher 
-derivatives,''  in \textit{Proceedings 
-of the 45th IEEE Conference on 
-Decision and Control}, San Diego, 
-California, USA, pp. 5585--5590, 2006.
-\end{verbatim}
-
-
-\noindent [8] M. Fliess, C. Join, and H. Sira-Ramirez. ``Non-linear estimation is easy,'' \textit{International Journal of Modelling, Identification and Control}, vol. 4, no. 1, pp. 12--27, 2008.
-
-\noindent coded as:
-\begin{verbatim}
-\bibitem{Cedric}
-M. Fliess, C. Join, and H. Sira-Ramirez. 
-``Non-linear estimation is easy,'' 
-\textit{International Journal of Modelling, 
-Identification and Control}, vol. 4, 
-no. 1, pp. 12--27, 2008.
-\end{verbatim}
-
-\noindent [9] R. Ortega, A. Astolfi, G. Bastin, and H. Rodriguez. ``Stabilization of food-chain systems using a port-controlled Hamiltonian description,'' in \textit{Proceedings of the American Control Conference}, Chicago, Illinois, USA, pp. 2245--2249, 2000.
-
-\noindent coded as:
-\begin{verbatim}
-\bibitem{Ortega}
-R. Ortega, A. Astolfi, G. Bastin, and H. 
-Rodriguez. ``Stabilization of food-chain 
-systems using a port-controlled Hamiltonian 
-description,'' in \textit{Proceedings of the 
-American Control Conference}, Chicago, 
-Illinois, USA, pp. 2245--2249, 2000.
-\end{verbatim}
-
-\subsection{Accented Characters in References}
-\noindent When using accented characters in references, please use the standard LaTeX coding for accents. {\bf{Do not use math coding for character accents}}. For example:
-\begin{verbatim}
-\'e, \"o, \`a, \~e 
-\end{verbatim}
-will produce: \'e, \"o, \`a, \~e 
-
-
-\subsection{Use of BibTeX}
-\noindent If you wish to use BibTeX, please see the documentation that accompanies the IEEEtran Bibliography package.
-
-\subsection{Biographies and Author Photos}
-\noindent Authors may have options to include their photo or not. Photos should be a bit-map graphic (.tif or .jpg) and sized to fit in the space allowed. Please see the coding samples below:
-\begin{verbatim}
-\begin{IEEEbiographynophoto}{Jane Doe}
-Biography text here without a photo.
-\end{IEEEbiographynophoto}
-\end{verbatim}
-or a biography with a photo
-
-\begin{verbatim}
-\begin{IEEEbiography}[{\includegraphics
-[width=1in,height=1.25in,clip,
-keepaspectratio]{fig1.png}}]
-{IEEE Publications Technology Team} 
-In this paragraph you can place 
-your educational, professional background 
-and research and other interests.
-\end{IEEEbiography}
-\end{verbatim}
-
-Please see the end of this document to see the output of these coding examples.
-
-
-
-\section{Mathematical Typography \\ and Why It Matters}
-
-\noindent Typographical conventions for mathematical formulas have been developed to {\bf provide uniformity and clarity of presentation across mathematical texts}. This enables the readers of those texts to both understand the author's ideas and to grasp new concepts quickly. While software such as \LaTeX \ and MathType\textsuperscript{\textregistered} can produce aesthetically pleasing math when used properly, it is also very easy to misuse the software, potentially resulting in incorrect math display.
-
-IEEE aims to provide authors with the proper guidance on mathematical typesetting style and assist them in writing the best possible article.
-
-As such, IEEE has assembled a set of examples of good and bad mathematical typesetting. You will see how various issues are dealt with. The following publications have been referenced in preparing this material:
-
-\begin{list}{}{}
-\item{\emph{Mathematics into Type}, published by the American Mathematical Society}
-\item{\emph{The Printing of Mathematics}, published by Oxford University Press}
-\item{\emph{The \LaTeX Companion}, by F. Mittelbach and M. Goossens}
-\item{\emph{More Math into LaTeX}, by G. Gr\"atzer}
-\item{AMS-StyleGuide-online.pdf, published by the American Mathematical Society}
-\end{list}
-
-Further examples can be seen at \url{http://journals.ieeeauthorcenter.ieee.org/wp-content/uploads/sites/7/IEEE-Math-Typesetting-Guide.pdf}
-
-\subsection{Display Equations}
-\noindent A simple display equation example shown below uses the ``equation'' environment. To number the equations, use the $\backslash${\tt{label}} macro to create an identifier for the equation. LaTeX will automatically number the equation for you.
-\begin{equation}
-\label{deqn_ex1}
-x = \sum_{i=0}^{n} 2{i} Q.
-\end{equation}
-
-\noindent is coded as follows:
-\begin{verbatim}
-\begin{equation}
-\label{deqn_ex1}
-x = \sum_{i=0}^{n} 2{i} Q.
-\end{equation}
-\end{verbatim}
-
-To reference this equation in the text use the $\backslash${\tt{ref}} macro. 
-Please see (\ref{deqn_ex1})\\
-\noindent is coded as follows:
-\begin{verbatim}
-Please see (\ref{deqn_ex1})\end{verbatim}
-
-\subsection{Equation Numbering}
-\noindent {\bf{Consecutive Numbering:}} Equations within an article are numbered consecutively from the beginning of the
-article to the end, i.e., (1), (2), (3), (4), (5), etc. Do not use roman numerals or section numbers for equation numbering.\\
-
-\noindent {\bf{Appendix Equations:}} The continuation of consecutively numbered equations is best in the Appendix, but numbering
- as (A1), (A2), etc., is permissible.\\
-
-\noindent {\bf{Hyphens and Periods}}: Hyphens and periods should not be used in equation numbers, i.e., use (1a) rather than
-(1-a) and (2a) rather than (2.a) for sub-equations. This should be consistent throughout the article.
-
-\subsection{Multi-line equations and alignment}
-\noindent Here we show several examples of multi-line equations and proper alignments.
-
-\noindent {\bf{A single equation that must break over multiple lines due to length with no specific alignment.}}
-\begin{multline}
-\text{The first line of this example}\\
-\text{The second line of this example}\\
-\text{The third line of this example}
-\end{multline}
-
-\noindent is coded as:
-\begin{verbatim}
-\begin{multline}
-\text{The first line of this example}\\
-\text{The second line of this example}\\
-\text{The third line of this example}
-\end{multline}
-\end{verbatim}
-
-\noindent {\bf{A single equation with multiple lines aligned at the = signs}}
-\begin{align}
-a &= c+d \\
-b &= e+f
-\end{align}
-\noindent is coded as:
-\begin{verbatim}
-\begin{align}
-a &= c+d \\
-b &= e+f
-\end{align}
-\end{verbatim}
-
-The {\tt{align}} environment can align on multiple  points as shown in the following example:
-\begin{align}
-x &= y & X & =Y & a &=bc\\
-x' &= y' & X' &=Y' &a' &=bz
-\end{align}
-\noindent is coded as:
-\begin{verbatim}
-\begin{align}
-x &= y & X & =Y & a &=bc\\
-x' &= y' & X' &=Y' &a' &=bz
-\end{align}
-\end{verbatim}
-
-
-
-
-
-\subsection{Subnumbering}
-\noindent The amsmath package provides a {\tt{subequations}} environment to facilitate subnumbering. An example:
-
-\begin{subequations}\label{eq:2}
-\begin{align}
-f&=g \label{eq:2A}\\
-f' &=g' \label{eq:2B}\\
-\mathcal{L}f &= \mathcal{L}g \label{eq:2c}
-\end{align}
-\end{subequations}
-
-\noindent is coded as:
-\begin{verbatim}
-\begin{subequations}\label{eq:2}
-\begin{align}
-f&=g \label{eq:2A}\\
-f' &=g' \label{eq:2B}\\
-\mathcal{L}f &= \mathcal{L}g \label{eq:2c}
-\end{align}
-\end{subequations}
-
-\end{verbatim}
-
-\subsection{Matrices}
-\noindent There are several useful matrix environments that can save you some keystrokes. See the example coding below and the output.
-
-\noindent {\bf{A simple matrix:}}
-\begin{equation}
-\begin{matrix}  0 &  1 \\ 
-1 &  0 \end{matrix}
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\begin{matrix}  0 &  1 \\ 
-1 &  0 \end{matrix}
-\end{equation}
-\end{verbatim}
-
-\noindent {\bf{A matrix with parenthesis}}
-\begin{equation}
-\begin{pmatrix} 0 & -i \\
- i &  0 \end{pmatrix}
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\begin{pmatrix} 0 & -i \\
- i &  0 \end{pmatrix}
-\end{equation}
-\end{verbatim}
-
-\noindent {\bf{A matrix with square brackets}}
-\begin{equation}
-\begin{bmatrix} 0 & -1 \\ 
-1 &  0 \end{bmatrix}
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\begin{bmatrix} 0 & -1 \\ 
-1 &  0 \end{bmatrix}
-\end{equation}
-\end{verbatim}
-
-\noindent {\bf{A matrix with curly braces}}
-\begin{equation}
-\begin{Bmatrix} 1 &  0 \\ 
-0 & -1 \end{Bmatrix}
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\begin{Bmatrix} 1 &  0 \\ 
-0 & -1 \end{Bmatrix}
-\end{equation}\end{verbatim}
-
-\noindent {\bf{A matrix with single verticals}}
-\begin{equation}
-\begin{vmatrix} a &  b \\ 
-c &  d \end{vmatrix}
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\begin{vmatrix} a &  b \\ 
-c &  d \end{vmatrix}
-\end{equation}\end{verbatim}
-
-\noindent {\bf{A matrix with double verticals}}
-\begin{equation}
-\begin{Vmatrix} i &  0 \\ 
-0 & -i \end{Vmatrix}
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\begin{Vmatrix} i &  0 \\ 
-0 & -i \end{Vmatrix}
-\end{equation}\end{verbatim}
-
-\subsection{Arrays}
-\noindent The {\tt{array}} environment allows you some options for matrix-like equations. You will have to manually key the fences, but you'll have options for alignment of the columns and for setting horizontal and vertical rules. The argument to {\tt{array}} controls alignment and placement of vertical rules.
-
-A simple array
-\begin{equation}
-\left(
-\begin{array}{cccc}
-a+b+c & uv & x-y & 27\\
-a+b & u+v & z & 134
-\end{array}\right)
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\left(
-\begin{array}{cccc}
-a+b+c & uv & x-y & 27\\
-a+b & u+v & z & 134
-\end{array} \right)
-\end{equation}
-\end{verbatim}
-
-A slight variation on this to better align the numbers in the last column
-\begin{equation}
-\left(
-\begin{array}{cccr}
-a+b+c & uv & x-y & 27\\
-a+b & u+v & z & 134
-\end{array}\right)
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\left(
-\begin{array}{cccr}
-a+b+c & uv & x-y & 27\\
-a+b & u+v & z & 134
-\end{array} \right)
-\end{equation}
-\end{verbatim}
-
-An array with vertical and horizontal rules
-\begin{equation}
-\left( \begin{array}{c|c|c|r}
-a+b+c & uv & x-y & 27\\ \hline
-a+b & u+v & z & 134
-\end{array}\right)
-\end{equation}
-is coded as:
-\begin{verbatim}
-\begin{equation}
-\left(
-\begin{array}{c|c|c|r}
-a+b+c & uv & x-y & 27\\
-a+b & u+v & z & 134
-\end{array} \right)
-\end{equation}
-\end{verbatim}
-Note the argument now has the pipe "$\vert$" included to indicate the placement of the vertical rules.
-
-
-\subsection{Cases Structures}
-\noindent Many times we find cases coded using the wrong environment, i.e., {\tt{array}}. Using the {\tt{cases}} environment will save keystrokes (from not having to type the $\backslash${\tt{left}}$\backslash${\tt{lbrace}}) and automatically provide the correct column alignment.
-\begin{equation*}
-{z_m(t)} = \begin{cases}
-1,&{\text{if}}\ {\beta }_m(t) \\ 
-{0,}&{\text{otherwise.}} 
-\end{cases}
-\end{equation*}
-\noindent is coded as follows:
-\begin{verbatim}
-\begin{equation*}
-{z_m(t)} = 
-\begin{cases}
-1,&{\text{if}}\ {\beta }_m(t),\\ 
-{0,}&{\text{otherwise.}} 
-\end{cases}
-\end{equation*}
-\end{verbatim}
-\noindent Note that the ``\&'' is used to mark the tabular alignment. This is important to get  proper column alignment. Do not use $\backslash${\tt{quad}} or other fixed spaces to try and align the columns. Also, note the use of the $\backslash${\tt{text}} macro for text elements such as ``if'' and ``otherwise''.
-
-\subsection{Function Formatting in Equations}
-In many cases there is an easy way to properly format most common functions. Use of the $\backslash$ in front of the function name will in most cases, provide the correct formatting. When this does not work, the following example provides a solution using the $\backslash${\tt{text}} macro.
-
-\begin{equation*} 
-  d_{R}^{KM} = \underset {d_{l}^{KM}} {\text{arg min}} \{ d_{1}^{KM},\ldots,d_{6}^{KM}\}.
-\end{equation*}
-
-\noindent is coded as follows:
-\begin{verbatim}
-\begin{equation*} 
- d_{R}^{KM} = \underset {d_{l}^{KM}} 
- {\text{arg min}} \{ d_{1}^{KM},
- \ldots,d_{6}^{KM}\}.
-\end{equation*}
-\end{verbatim}
-
-\subsection{ Text Acronyms inside equations}
-\noindent This example shows where the acronym ``MSE" is coded using $\backslash${\tt{text\{\}}} to match how it appears in the text.
-
-\begin{equation*}
- \text{MSE} = \frac {1}{n}\sum _{i=1}^{n}(Y_{i} - \hat {Y_{i}})^{2}
-\end{equation*}
-
-\begin{verbatim}
-\begin{equation*}
- \text{MSE} = \frac {1}{n}\sum _{i=1}^{n}
-(Y_{i} - \hat {Y_{i}})^{2}
-\end{equation*}
-\end{verbatim}
-
-\subsection{Obsolete Coding}
-\noindent Avoid the use of outdated environments, such as {\tt{eqnarray}} and \$\$ math delimiters, for display equations. The \$\$ display math delimiters are left over from PlainTeX and should not be used in \LaTeX, ever. Poor vertical spacing will result.
-\subsection{Use Appropriate Delimiters for Display Equations}
-\noindent Some improper mathematical coding advice has been given in various YouTube\textsuperscript{TM} videos on how to write scholarly articles, so please follow these good examples:\\
-
-For {\bf{single-line unnumbered display equations}}, please use the following delimiters: 
-\begin{verbatim}\[ . . . \] or \end{verbatim} 
-\begin{verbatim}\begin{equation*} . . . \end{equation*}\end{verbatim}
-Note that the * in the environment name turns off equation numbering.\\
-
-For {\bf{multiline unnumbered display equations}} that have alignment requirements, please use the following delimiters: 
-\begin{verbatim}
-\begin{align*} . . . \end{align*}
-\end{verbatim}
-
-For {\bf{single-line numbered display equations}}, please use the following delimiters: 
-\begin{verbatim}
-\begin{equation} . . . \end{equation}
-\end{verbatim}
-
-For {\bf{multiline numbered display equations}}, please use the following delimiters: 
-\begin{verbatim}
-\begin{align} . . . \end{align}
-\end{verbatim}
-
-\section{LaTeX Package Suggestions}
-\noindent Immediately after your documenttype declaration at the top of your \LaTeX\ file is the place where you should declare any packages that are being used. The following packages were used in the production of this document.
-\begin{verbatim}
-\usepackage{amsmath,amsfonts}
-\usepackage{algorithmic}
-\usepackage{array}
-\usepackage[caption=false,font=normalsize,
-   labelfont=sf,textfont=sf]{subfig}
-\u00sepackage{textcomp}
-\usepackage{stfloats}
-\usepackage{url}
-\usepackage{verbatim}
-\usepackage{graphicx}
-\usepackage{balance}
-\end{verbatim}
-
-\section{Additional Advice}
-
-Please use ``soft'' (e.g., \verb|\eqref{Eq}|) or \verb|(\ref{Eq})|
-cross references instead of ``hard'' references (e.g., \verb|(1)|).
-That will make it possible to combine sections, add equations, or
-change the order of figures or citations without having to go through
-the file line by line.
-
-Please note that the \verb|{subequations}| environment in {\LaTeX}
-will increment the main equation counter even when there are no
-equation numbers displayed. If you forget that, you might write an
-article in which the equation numbers skip from (17) to (20), causing
-the copy editors to wonder if you've discovered a new method of
-counting.
-
-{\BibTeX} does not work by magic. It doesn't get the bibliographic
-data from thin air but from .bib files. If you use {\BibTeX} to produce a
-bibliography you must send the .bib files. 
-
-{\LaTeX} can't read your mind. If you assign the same label to a
-subsubsection and a table, you might find that Table I has been cross
-referenced as Table IV-B3. 
-
-{\LaTeX} does not have precognitive abilities. If you put a
-\verb|\label| command before the command that updates the counter it's
-supposed to be using, the label will pick up the last counter to be
-cross referenced instead. In particular, a \verb|\label| command
-should not go before the caption of a figure or a table.
-
-Please do not use \verb|\nonumber| or \verb|\notag| inside the
-\verb|{array}| environment. It will not stop equation numbers inside
-\verb|{array}| (there won't be any anyway) and it might stop a wanted
-equation number in the surrounding equation.
+Future work will extend to full multi-objective optimization, sensitivity analysis under demand perturbations, and calibration against real-world observation data.
 
 \balance
 
-\section{A Final Checklist}
-\begin{enumerate}{}{}
-\item{Make sure that your equations are numbered sequentially and there are no equation numbers missing or duplicated. Avoid hyphens and periods in your equation numbering. Stay with IEEE style, i.e., (1), (2), (3) or for sub-equations (1a), (1b). For equations in the appendix (A1), (A2), etc.}. 
-\item{Are your equations properly formatted? Text, functions, alignment points in cases and arrays, etc. }
-\item{Make sure all graphics are included.}
-\item{Make sure your references are included either in your main LaTeX file or a separate .bib file if calling the external file.}
-\end{enumerate}
-
 \begin{thebibliography}{1}
 
-\bibitem{ams}
-{\it{Mathematics into Type}}, American Mathematical Society. Online available: 
+\bibitem{hughes2003}
+R.~L. Hughes, ``A continuum theory for the flow of pedestrians,'' \textit{Transportation Research Part B: Methodological}, vol.~36, no.~6, pp. 507--535, 2002.
 
-\bibitem{oxford}
-T.W. Chaundy, P.R. Barrett and C. Batey, {\it{The Printing of Mathematics}}, Oxford University Press. London, 1954.
+\bibitem{hughes2003continuum}
+R.~L. Hughes, ``A continuum theory for the flow of pedestrians,'' \textit{Transportation Research Part B: Methodological}, vol.~36, no.~6, pp. 507--535, 2002.
 
-\bibitem{lacomp}{\it{The \LaTeX Companion}}, by F. Mittelbach and M. Goossens
+\bibitem{cristiani2016}
+E.~Cristiani, F.~S. Priuli, and A.~Tosin, ``Modeling rationality to control self-organization of crowds: An environmental approach,'' \textit{SIAM Journal on Applied Mathematics}, vol.~75, no.~2, pp. 605--629, 2015.
 
-\bibitem{mmt}{\it{More Math into LaTeX}}, by G. Gr\"atzer
+\bibitem{priuli2015control}
+F.~Priuli, A.~Tosin, and E.~Cristiani, ``On the control of self-organized systems: The case of pedestrian flows,'' in \textit{Proceedings of the 5th International Conference on Pedestrian and Evacuation Dynamics}, 2015.
 
-\bibitem{amstyle}{\it{AMS-StyleGuide-online.pdf,}} published by the American Mathematical Society
+\bibitem{al2021preparedness}
+H.~M. Al-Ahmadi \textit{et al.}, ``Preparedness for mass gatherings: A simulation-based framework for flow control and management using crowd monitoring data,'' \textit{Arabian Journal for Science and Engineering}, vol.~46, no.~5, pp. 4985--4997, 2021.
 
-\bibitem{Sira3}
-H. Sira-Ramirez. ``On the sliding mode control of nonlinear systems,'' \textit{Systems \& Control Letters}, vol. 19, pp. 303--312, 1992.
+\bibitem{feng2014network}
+L.~Feng and E.~Miller-Hooks, ``A network optimization-based approach for crowd management in large public gatherings,'' \textit{Transportation Research Part C: Emerging Technologies}, vol.~42, pp. 182--199, 2014.
 
-\bibitem{Levant}
-A. Levant. ``Exact differentiation of signals with unbounded higher derivatives,''  in \textit{Proceedings of the 45th IEEE Conference on Decision and Control}, San Diego, California, USA, pp. 5585--5590, 2006.
+\bibitem{zhong2018boundary}
+R.~X. Zhong \textit{et al.}, ``Boundary conditions and behavior of the macroscopic fundamental diagram based network traffic dynamics: A control systems perspective,'' \textit{Transportation Research Part B: Methodological}, vol.~111, pp. 327--355, 2018.
 
-\bibitem{Cedric}
-M. Fliess, C. Join, and H. Sira-Ramirez. ``Non-linear estimation is easy,'' \textit{International Journal of Modelling, Identification and Control}, vol. 4, no. 1, pp. 12--27, 2008.
+\bibitem{zhao2021lyapunov}
+R.~Zhao \textit{et al.}, ``Lyapunov-based crowd stability analysis for asymmetric pedestrian merging layout at T-shaped street junction,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~22, no.~11, pp. 6833--6842, 2021.
 
-\bibitem{Ortega}
-R. Ortega, A. Astolfi, G. Bastin, and H. Rodriguez. ``Stabilization of food-chain systems using a port-controlled Hamiltonian description,'' in \textit{Proceedings of the American Control Conference}, Chicago, Illinois, USA, pp. 2245--2249, 2000.
+\bibitem{wadoo2010feedback}
+S.~A. Wadoo and P.~Kachroo, ``Feedback control of crowd evacuation in one dimension,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~11, no.~1, pp. 182--193, 2010.
+
+\bibitem{qin2020unit}
+W.~Qin, ``Unit sliding mode control for disturbed crowd dynamics system based on integral barrier Lyapunov function,'' \textit{IEEE Access}, vol.~8, pp. 91\,257--91\,264, 2020.
+
+\bibitem{zhu2021optimal}
+Y.~Zhu, D.~Zhao, and H.~He, ``Optimal feedback control of pedestrian flow in heterogeneous corridors,'' \textit{IEEE Transactions on Automation Science and Engineering}, vol.~18, no.~3, pp. 1097--1108, 2021.
+
+\bibitem{yu2025regulating}
+H.~Yu \textit{et al.}, ``Regulating multi-directional passenger flow: Impact of obstacle position and flow level on pedestrian merging process,'' \textit{Tunnelling and Underground Space Technology}, vol.~157, p.~106\,336, 2025.
+
+\bibitem{zhou2025simulation}
+Y.~Zhou \textit{et al.}, ``Simulation-based adaptive optimization for passenger flow control measures at metro stations,'' \textit{Simulation Modelling Practice and Theory}, vol.~138, p.~103\,021, 2025.
+
+\bibitem{yang2025optimization}
+X.~Yang \textit{et al.}, ``Optimization modeling of automatic crowd regulation at bottlenecks of subway system: A model predictive control approach,'' \textit{Physics Letters A}, vol.~531, p.~130\,180, 2025.
+
+\bibitem{yang2025partition}
+X.~Yang \textit{et al.}, ``Partition independent control and collaborative optimization of high-density crowd in subway stations,'' \textit{Chaos, Solitons \& Fractals}, vol.~200, p.~117\,108, 2025.
+
+\bibitem{carmona2024crowd}
+M.~A. Lopez-Carmona and A.~Paricio-Garcia, ``Crowd evacuation management with optimal time-multiplexed exit-choice recommendations through simulation optimization,'' \textit{Advanced Theory and Simulations}, vol.~7, no.~7, p.~2\,400\,265, 2024.
+
+\bibitem{carmona2023linear}
+M.~A. Lopez-Carmona and A.~Paricio Garcia, ``Linear and nonlinear model predictive control (MPC) for regulating pedestrian flows with discrete speed instructions,'' \textit{Physica A: Statistical Mechanics and its Applications}, vol.~625, p.~128\,996, 2023.
+
+\bibitem{liao2023crowd}
+X.~Liao \textit{et al.}, ``Crowd management through optimal layout of fences: An ant colony approach based on crowd simulation,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~24, no.~9, pp. 9137--9149, 2023.
+
+\bibitem{liao2025drift}
+X.~Liao \textit{et al.}, ``DRIFT: A dynamic crowd inflow control system using LSTM-based deep reinforcement learning,'' \textit{IEEE Transactions on Systems, Man, and Cybernetics: Systems}, vol.~55, no.~6, pp. 4202--4215, 2025.
+
+\bibitem{schulman2017proximal}
+J.~Schulman \textit{et al.}, ``Proximal policy optimization algorithms,'' \textit{arXiv preprint arXiv:1707.06347}, 2017.
+
+\bibitem{price2014differential}
+K.~Price, R.~M. Storn, and J.~A. Lampinen, \textit{Differential Evolution: A Practical Approach to Global Optimization}.\hskip 1em plus 0.5em minus 0.4em\relax Springer Publishing Company, 2014.
+
+\bibitem{liu2024automatic}
+W.~Liu \textit{et al.}, ``Automatic optimization of guidance guardrail layout based on multi-objective evolutionary algorithm,'' \textit{Complex System Modeling and Simulation}, vol.~4, no.~4, pp. 353--367, 2024.
 
 \end{thebibliography}
 
-\begin{IEEEbiographynophoto}{Jane Doe}
-Biography text here without a photo.
-\end{IEEEbiographynophoto}
-
-\begin{IEEEbiography}[{\includegraphics[width=1in,height=1.25in,clip,keepaspectratio]{fig1.png}}]{IEEE Publications Technology Team}
-In this paragraph you can place your educational, professional background and research and other interests.\end{IEEEbiography}
-
-
 \end{document}
-
-
