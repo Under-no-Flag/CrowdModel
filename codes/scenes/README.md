@@ -16,6 +16,7 @@ python codes/simulate_from_config.py --config codes/scenes/examples/single_stage
 可直接参考的样例：
 
 - `codes/scenes/examples/bund_simplified/`: 南京东路-外滩简化场景，`5/6` 号通道进场，平台向南游览，再分流为 `9/10` 号通道离场或 `5/6` 原路返回
+- `codes/scenes/examples/g2_multistage_directional/`: G2 多阶段浏览场景，基线偏好经中通道进场、南向游览、再经中通道回流，可在批量实验里扫描三条通道的方向设置
 - `codes/scenes/examples/single_stage/`: 最小单阶段例子
 - `codes/scenes/examples/multi_stage/`: 多阶段与固定概率分流例子
 - `codes/scenes/examples/three_channel_hardcoded/`: 三通道主场景例子
