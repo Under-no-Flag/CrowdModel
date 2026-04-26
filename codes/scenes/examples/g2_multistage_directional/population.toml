@@ -1,0 +1,5 @@
+[[initial_groups]]
+group_id = "g2_browse_crowd"
+stage_id = "enter_platform"
+region = "spawn_left"
+density = 2.0

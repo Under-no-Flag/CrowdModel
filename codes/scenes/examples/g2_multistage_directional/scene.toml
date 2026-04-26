@@ -1,0 +1,124 @@
+block_boundaries = true
+obstacles = [
+  "wall_seg_1",
+  "wall_seg_2",
+  "wall_seg_3",
+  "wall_seg_4",
+]
+
+[[regions]]
+name = "spawn_left"
+x0 = 1
+x1 = 34
+y0 = 24
+y1 = 72
+
+[[regions]]
+name = "left_street"
+x0 = 1
+x1 = 58
+y0 = 8
+y1 = 88
+
+[[regions]]
+name = "feeder_band"
+x0 = 24
+x1 = 58
+y0 = 8
+y1 = 88
+
+[[regions]]
+name = "left_sink"
+x0 = 1
+x1 = 4
+y0 = 38
+y1 = 58
+
+[[regions]]
+name = "right_platform"
+x0 = 64
+x1 = 126
+y0 = 8
+y1 = 88
+
+[[regions]]
+name = "platform_entry_mid"
+x0 = 74
+x1 = 92
+y0 = 44
+y1 = 56
+
+[[regions]]
+name = "platform_south_view"
+x0 = 88
+x1 = 118
+y0 = 12
+y1 = 28
+
+[[regions]]
+name = "top_channel"
+x0 = 56
+x1 = 68
+y0 = 18
+y1 = 30
+
+[[regions]]
+name = "middle_channel"
+x0 = 56
+x1 = 68
+y0 = 44
+y1 = 56
+
+[[regions]]
+name = "bottom_channel"
+x0 = 56
+x1 = 68
+y0 = 70
+y1 = 82
+
+[[regions]]
+name = "wall_seg_1"
+x0 = 58
+x1 = 64
+y0 = 1
+y1 = 18
+
+[[regions]]
+name = "wall_seg_2"
+x0 = 58
+x1 = 64
+y0 = 30
+y1 = 44
+
+[[regions]]
+name = "wall_seg_3"
+x0 = 58
+x1 = 64
+y0 = 56
+y1 = 70
+
+[[regions]]
+name = "wall_seg_4"
+x0 = 58
+x1 = 64
+y0 = 82
+y1 = 96
+
+[[exits]]
+name = "left_sink"
+region = "left_sink"
+
+[[channels]]
+name = "top"
+region = "top_channel"
+probe_x = 61
+
+[[channels]]
+name = "middle"
+region = "middle_channel"
+probe_x = 61
+
+[[channels]]
+name = "bottom"
+region = "bottom_channel"
+probe_x = 61

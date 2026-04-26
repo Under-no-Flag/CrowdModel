@@ -14,7 +14,7 @@
 - `python codes/g1_runner.py`
   Runs the reframed G1 mechanism-validation batch, covering the three-channel `baseline / M-only / U-only / middle / top / bottom` cases, one multi-stage bridge case, and one bidirectional `U(x)` counterflow-validation pair. It writes per-case behavior plots, `g1_behavior_metrics.csv`, `g1_u_bidirectional_metrics.csv`, branch comparison figures, and one shared `g1_mechanism_summary.json`.
 - `python codes/g2_runner.py`
-  Runs the G2 `strategy × eta` sweep. It keeps one `baseline` reference point, scans `middle / top / bottom` over a candidate `eta` grid, and writes response-surface, Pareto, channel-load, hotspot-migration, and summary outputs.
+  Runs the G2 multistage directional-setting scan. It keeps one unrestricted `baseline` with middle-channel route preference, then scans six channel-direction configurations and writes Pareto, objective-comparison, channel-load, hotspot-migration, and summary outputs.
 - `python codes/g3_runner.py`
   Runs the G3 behavior-layer batch for `single-stage approximation / multi-stage uniform preference / full multi-stage preference`, then writes behavior-layer comparison tables and plots.
 - `python codes/verify_unidirectional_hjb.py`
@@ -42,6 +42,8 @@ Phase 1 examples:
   Three-channel counterflow variant with west-to-east and east-to-west groups, used to validate whether `U(x)` suppresses reverse motion and head-on conflicts inside the middle channel.
 - `codes/scenes/examples/tour_hardcoded/`
   Migrated TOML version of the old multi-stage sightseeing scene.
+- `codes/scenes/examples/g2_multistage_directional/`
+  G2-specific multistage browsing scene: middle-preference entry to the right platform, southward tour, and return-to-left baseline used for channel-direction scans.
 - `codes/scenes/examples/tour_hardcoded/run_single_stage_approx.toml`
   G3 single-stage approximation baseline.
 - `codes/scenes/examples/tour_hardcoded/run_uniform_preference.toml`

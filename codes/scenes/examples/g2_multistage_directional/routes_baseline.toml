@@ -1,0 +1,60 @@
+[case]
+case_id = "case1_baseline"
+title = "Case 1: baseline multistage middle-preference browsing"
+
+[[stages]]
+stage_id = "enter_platform"
+group_key = [1, 1]
+goal_region = "platform_entry_mid"
+decision_region = "platform_entry_mid"
+next_stage = "tour_south"
+kappa = 2.0
+
+[[stages.controls]]
+mode = "target_point"
+region = "left_street"
+target_point = [61, 50]
+alpha = 8.5
+beta = 0.35
+
+[[stages.controls]]
+mode = "target_region"
+region = "right_platform"
+target_region = "platform_entry_mid"
+alpha = 7.0
+beta = 0.35
+
+[[stages]]
+stage_id = "tour_south"
+group_key = [2, 1]
+goal_region = "platform_south_view"
+decision_region = "platform_south_view"
+next_stage = "return_left"
+kappa = 1.8
+
+[[stages.controls]]
+mode = "target_region"
+region = "right_platform"
+target_region = "platform_south_view"
+alpha = 8.0
+beta = 0.3
+
+[[stages]]
+stage_id = "return_left"
+group_key = [3, 1]
+goal_region = "left_sink"
+sink_region = "left_sink"
+
+[[stages.controls]]
+mode = "target_point"
+region = "right_platform"
+target_point = [61, 50]
+alpha = 8.5
+beta = 0.35
+
+[[stages.controls]]
+mode = "target_region"
+region = "left_street"
+target_region = "left_sink"
+alpha = 8.0
+beta = 0.3
