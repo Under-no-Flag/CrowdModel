@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from ..core import DIRECTIONS, TransitionRule, default_allowed_mask, tensor_from_tau
-from ..scenes import BaseScene, CaseModel, GroupModel, SimulationConfig
+from ..scenes import BaseScene, CaseModel, GroupModel, InflowModel, SimulationConfig
 from ..spec.population_spec import PopulationSpec
 from ..spec.route_spec import CaseRouteSpec, ControlSpec, StageSpec
 from ..spec.scene_spec import SceneSpec
@@ -358,6 +358,32 @@ def compile_case(
         initial_group_density[stage.group_key] += contribution
         total_initial += contribution
 
+    inflows: list[InflowModel] = []
+    for inflow_group in population_spec.inflow_groups:
+        stage = stage_by_id.get(inflow_group.stage_id)
+        if stage is None:
+            raise ValueError(f"Inflow references unknown stage: {inflow_group.stage_id}")
+        region_mask = _selector_mask((inflow_group.region,), region_masks, walkable)
+        if not np.any(region_mask):
+            raise ValueError(f"Inflow region is empty: {inflow_group.region}")
+        if inflow_group.rate < 0.0:
+            raise ValueError(f"Inflow rate must be non-negative: {inflow_group.group_id}")
+        if inflow_group.time_end is not None and inflow_group.time_end <= inflow_group.time_start:
+            raise ValueError(f"Inflow time_end must be greater than time_start: {inflow_group.group_id}")
+        if inflow_group.rho_cap is not None and inflow_group.rho_cap <= 0.0:
+            raise ValueError(f"Inflow rho_cap must be positive: {inflow_group.group_id}")
+        inflows.append(
+            InflowModel(
+                key=stage.group_key,
+                name=inflow_group.group_id,
+                region_mask=region_mask,
+                rate=float(inflow_group.rate),
+                time_start=float(inflow_group.time_start),
+                time_end=None if inflow_group.time_end is None else float(inflow_group.time_end),
+                rho_cap=None if inflow_group.rho_cap is None else float(inflow_group.rho_cap),
+            )
+        )
+
     transitions: list[TransitionRule] = []
     for stage in route_spec.stages:
         has_next = stage.next_stage is not None
@@ -421,5 +447,6 @@ def compile_case(
         groups=groups,
         transitions=tuple(transitions),
         initial_group_density=initial_group_density,
+        inflows=tuple(inflows),
     )
     return scene, case

@@ -22,6 +22,7 @@ class CaseStats:
     dt: list[float] = field(default_factory=list)
     travel_time_cumulative: list[float] = field(default_factory=list)
     high_density_exposure_cumulative: list[float] = field(default_factory=list)
+    inflow_cumulative: list[float] = field(default_factory=list)
     channel_density: dict[str, list[float]] = field(default_factory=dict)
     channel_flux_cumulative: dict[str, float] = field(default_factory=dict)
 
@@ -192,6 +193,7 @@ def record_step(
     rho_safe: float,
     channel_masks: dict[str, np.ndarray],
     probe_x: dict[str, int],
+    inflow_total: float,
 ) -> None:
     cell_area = dx * dx
     walkable_rho = rho[walkable]
@@ -203,6 +205,7 @@ def record_step(
     stats.velocity_discontinuity.append(velocity_discontinuity_metric(walkable, vx, vy))
     stats.density_gradient_intensity.append(density_gradient_metric(walkable, rho, dx))
     stats.dt.append(dt)
+    stats.inflow_cumulative.append(inflow_total)
 
     travel_increment = float(np.sum(walkable_rho) * cell_area * dt)
     exposure_increment = float(np.sum(walkable_rho > rho_safe) * cell_area * dt)
@@ -248,6 +251,7 @@ def build_summary(
         "title": title,
         "final_time": float(stats.times[-1]) if stats.times else 0.0,
         "final_sink_cumulative": float(stats.sink_cumulative[-1]) if stats.sink_cumulative else 0.0,
+        "final_inflow_cumulative": float(stats.inflow_cumulative[-1]) if stats.inflow_cumulative else 0.0,
         "mean_density_avg": float(np.mean(stats.mean_density)) if stats.mean_density else 0.0,
         "peak_density_max": float(np.max(stats.peak_density)) if stats.peak_density else 0.0,
         "velocity_discontinuity_avg": float(np.mean(stats.velocity_discontinuity)) if stats.velocity_discontinuity else 0.0,
@@ -277,6 +281,7 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
         "density_gradient_intensity",
         "travel_time_cumulative",
         "high_density_exposure_cumulative",
+        "inflow_cumulative",
     ] + [f"channel_density_{name}" for name in stats.channel_density]
 
     with path.open("w", newline="", encoding="utf-8") as handle:
@@ -293,6 +298,7 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
                 "density_gradient_intensity": stats.density_gradient_intensity[idx],
                 "travel_time_cumulative": stats.travel_time_cumulative[idx],
                 "high_density_exposure_cumulative": stats.high_density_exposure_cumulative[idx],
+                "inflow_cumulative": stats.inflow_cumulative[idx],
             }
             for name, series in stats.channel_density.items():
                 row[f"channel_density_{name}"] = series[idx]

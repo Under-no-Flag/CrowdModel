@@ -3,3 +3,12 @@ group_id = "g2_browse_crowd"
 stage_id = "enter_platform"
 region = "spawn_left"
 density = 2.0
+
+[[inflow_groups]]
+group_id = "g2_late_arrivals"
+stage_id = "enter_platform"
+region = "spawn_left"
+rate = 1.0
+time_start = 2.0
+time_end = 160.0
+rho_cap = 2.4

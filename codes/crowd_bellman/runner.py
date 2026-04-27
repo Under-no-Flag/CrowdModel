@@ -26,6 +26,7 @@ from .scenes import (
     BaseScene,
     CaseModel,
     GroupModel,
+    InflowModel,
     SimulationConfig,
 )
 
@@ -78,6 +79,55 @@ def _build_initial_group_density(
     return rho_by_group
 
 
+def _apply_inflows(
+    *,
+    rho_by_group: dict[GroupKey, np.ndarray],
+    inflows: tuple[InflowModel, ...],
+    time_value: float,
+    dt: float,
+    dx: float,
+    rho_max: float,
+) -> float:
+    if not inflows or dt <= 0.0:
+        return 0.0
+
+    cell_area = dx * dx
+    window_start = time_value
+    window_end = time_value + dt
+    added_mass_total = 0.0
+
+    for inflow in inflows:
+        if inflow.rate <= 0.0:
+            continue
+        active_start = max(window_start, inflow.time_start)
+        active_end = min(window_end, inflow.time_end) if inflow.time_end is not None else window_end
+        active_dt = active_end - active_start
+        if active_dt <= 1.0e-12:
+            continue
+
+        mask = inflow.region_mask
+        cell_count = int(np.count_nonzero(mask))
+        if cell_count == 0:
+            continue
+
+        area = float(cell_count) * cell_area
+        rho_increment = float(inflow.rate * active_dt / area)
+        if rho_increment <= 0.0:
+            continue
+
+        rho_limit = rho_max if inflow.rho_cap is None else min(float(inflow.rho_cap), rho_max)
+        rho_total = compute_total_density(rho_by_group)
+        remaining_capacity = np.maximum(rho_limit - rho_total[mask], 0.0)
+        applied_increment = np.minimum(remaining_capacity, rho_increment)
+        if not np.any(applied_increment > 0.0):
+            continue
+
+        rho_by_group[inflow.key][mask] += applied_increment
+        added_mass_total += float(np.sum(applied_increment) * cell_area)
+
+    return added_mass_total
+
+
 def simulate_case(
     cfg: SimulationConfig,
     scene: BaseScene,
@@ -109,6 +159,7 @@ def simulate_case(
 
     stats = init_case_stats(list(scene.channel_masks))
     sink_total = 0.0
+    inflow_total = 0.0
     time_value = 0.0
 
     phi_by_group = {key: np.full_like(scene.initial_rho, np.inf) for key in groups}
@@ -205,6 +256,15 @@ def simulate_case(
             for key in groups:
                 rho_by_group[key] = np.clip(rho_by_group[key], 0.0, cfg.rho_max)
 
+        inflow_total += _apply_inflows(
+            rho_by_group=rho_by_group,
+            inflows=case.inflows,
+            time_value=time_value,
+            dt=dt,
+            dx=cfg.dx,
+            rho_max=cfg.rho_max,
+        )
+
         rho_tot = compute_total_density(rho_by_group)
         rho_safe = np.maximum(rho_tot, 1.0e-8)
         vx_total = vx_weighted / rho_safe
@@ -228,6 +288,7 @@ def simulate_case(
             rho_safe=objective_cfg.rho_safe,
             channel_masks=case.channel_masks,
             probe_x=case.probe_x,
+            inflow_total=inflow_total,
         )
 
         if step_observer is not None:

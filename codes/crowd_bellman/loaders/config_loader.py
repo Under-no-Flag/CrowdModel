@@ -6,7 +6,7 @@ import tomllib
 from ..config import ObjectiveConfig
 from ..scenes import SimulationConfig
 from ..spec.experiment_spec import RunConfigSpec
-from ..spec.population_spec import InitialGroupSpec, PopulationSpec
+from ..spec.population_spec import InflowGroupSpec, InitialGroupSpec, PopulationSpec
 from ..spec.route_spec import CaseRouteSpec, ControlSpec, StageSpec, TransitionTargetSpec
 from ..spec.scene_spec import ChannelSpec, NamedRegionSelectionSpec, RectRegionSpec, SceneSpec
 
@@ -175,7 +175,25 @@ def load_population_spec(path: Path) -> PopulationSpec:
                 density=float(item["density"]),
             )
         )
-    return PopulationSpec(initial_groups=tuple(groups))
+
+    inflow_groups: list[InflowGroupSpec] = []
+    for item in raw.get("inflow_groups", []):
+        if not isinstance(item, dict):
+            raise ValueError("population.inflow_groups entries must be tables")
+        time_end = item.get("time_end")
+        rho_cap = item.get("rho_cap")
+        inflow_groups.append(
+            InflowGroupSpec(
+                group_id=str(item["group_id"]),
+                stage_id=str(item["stage_id"]),
+                region=str(item["region"]),
+                rate=float(item["rate"]),
+                time_start=float(item.get("time_start", 0.0)),
+                time_end=float(time_end) if time_end is not None else None,
+                rho_cap=float(rho_cap) if rho_cap is not None else None,
+            )
+        )
+    return PopulationSpec(initial_groups=tuple(groups), inflow_groups=tuple(inflow_groups))
 
 
 def load_route_spec(path: Path) -> CaseRouteSpec:

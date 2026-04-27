@@ -155,6 +155,15 @@ group_id = "main_crowd"
 stage_id = "main_exit"
 region = "spawn_left"
 density = 2.2
+
+[[inflow_groups]]
+group_id = "late_arrivals"
+stage_id = "main_exit"
+region = "spawn_left"
+rate = 0.8
+time_start = 5.0
+time_end = 40.0
+rho_cap = 2.5
 ```
 
 字段说明：
@@ -169,10 +178,25 @@ density = 2.2
 - `density`
   - 初始密度值，会在对应区域内均匀赋值。
 
+`[[inflow_groups]]` 用于持续入流源。
+
+- `group_id`
+  - 仅用于可读性和输出标识。
+- `stage_id`
+  - 必须指向已有阶段；入流质量会直接注入该阶段群体。
+- `region`
+  - 入流作用区域，必须是 `scene.toml` 中已定义区域。
+- `rate`
+  - 总入流质量速率，单位是“每单位时间注入到整个区域的总质量”。
+- `time_start` / `time_end`
+  - 入流生效时间窗；`time_end` 可省略，表示一直持续到仿真结束。
+- `rho_cap`
+  - 源区总密度上限；达到该上限后该步不再继续注入。
+
 注意：
 
 - 同一个 `stage_id` 可以有多个 `[[initial_groups]]` 条目，它们会叠加。
-- 当前这套配置只负责初始密度，不支持持续入流。
+- `[[initial_groups]]` 和 `[[inflow_groups]]` 可以同时存在。
 
 ## 4. routes.toml
 

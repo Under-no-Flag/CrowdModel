@@ -56,6 +56,19 @@ class GroupModel:
 
 
 @dataclass(frozen=True)
+class InflowModel:
+    """Per-stage inflow source applied during simulation."""
+
+    key: GroupKey
+    name: str
+    region_mask: np.ndarray
+    rate: float
+    time_start: float = 0.0
+    time_end: float | None = None
+    rho_cap: float | None = None
+
+
+@dataclass(frozen=True)
 class CaseModel:
     """Simulation-ready case configuration.
 
@@ -75,3 +88,4 @@ class CaseModel:
     groups: dict[GroupKey, GroupModel] | None = None
     transitions: tuple[TransitionRule, ...] = ()
     initial_group_density: dict[GroupKey, np.ndarray] | None = None
+    inflows: tuple[InflowModel, ...] = ()
