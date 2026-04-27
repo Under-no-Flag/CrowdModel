@@ -41,21 +41,6 @@ T.~Bosse, M.~Hoogendoorn, M.~C.~A. Klein, J.~Treur, C.~N. van~der Wal, and A.~va
 \bibitem{RN2059}
 H.~Liang, L.~Yang, J.~Du, C.-W. Shu, and S.~C. Wong, ``Modelling crowd pressure and turbulence through a mixed-type continuum approach,'' \emph{Transportmetrica B: Transport Dynamics}, vol.~12, no.~1, p. 2328774, 2024.
 
-\bibitem{RN761}
-X.~Yang, R.~Zhang, F.~Pan, Y.~Yang, Y.~Li, and X.~Yang, ``Stochastic user equilibrium path planning for crowd evacuation at subway station based on social force model,'' \emph{Physica A: Statistical Mechanics and its Applications}, vol. 594, p. 127033, 2022.
-
-\bibitem{RN2194}
-J.~Zhong, T.~Cheng, W.~L. Liu, P.~Yang, Y.~Lin, and J.~Zhang, ``An evolutionary guardrail layout design framework for crowd control in subway stations,'' \emph{IEEE Transactions on Computational Social Systems}, vol.~10, no.~1, pp. 297--310, 2023.
-
-\bibitem{RN2304}
-J.~C. Li, X.~C. Guo, R.~Y. Lu, and Y.~B. Zhang, ``Analysing urban tourism accessibility using real-time travel data: A case study in nanjing, china,'' \emph{Sustainability}, vol.~14, no.~19, 2022.
-
-\bibitem{RN2301}
-P.~X. Liu, X.~Xiao, J.~Zhang, R.~H. Wu, and H.~L. Zhang, ``Spatial configuration and online attention: A space syntax perspective,'' \emph{Sustainability}, vol.~10, no.~1, 2018.
-
-\bibitem{RN2303}
-A.~M. Caldeira and E.~Kastenholz, ``Spatiotemporal tourist behaviour in urban destinations: a framework of analysis,'' \emph{Tourism Geographies}, vol.~22, no.~1, pp. 22--50, 2020.
-
 \bibitem{RN1100}
 Z.~Shahhoseini and M.~Sarvi, ``Pedestrian crowd flows in shared spaces: Investigating the impact of geometry based on micro and macro scale measures,'' \emph{Transportation Research Part B: Methodological}, vol. 122, pp. 57--87, 2019.
 
@@ -70,6 +55,18 @@ C.-Z.~T. Xie, J.~Xu, B.~Zhu, T.-Q. Tang, S.~Lo, B.~Zhang, and Y.~Tian, ``Advanci
 
 \bibitem{RN2302}
 L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns within free-roaming scenic architectural complexes: Considering impacts of temporal, spatial, and environmental factors,'' \emph{Frontiers of Architectural Research}, vol.~13, no.~5, pp. 990--1008, 2024.
+
+\bibitem{RN761}
+X.~Yang, R.~Zhang, F.~Pan, Y.~Yang, Y.~Li, and X.~Yang, ``Stochastic user equilibrium path planning for crowd evacuation at subway station based on social force model,'' \emph{Physica A: Statistical Mechanics and its Applications}, vol. 594, p. 127033, 2022.
+
+\bibitem{RN2194}
+J.~Zhong, T.~Cheng, W.~L. Liu, P.~Yang, Y.~Lin, and J.~Zhang, ``An evolutionary guardrail layout design framework for crowd control in subway stations,'' \emph{IEEE Transactions on Computational Social Systems}, vol.~10, no.~1, pp. 297--310, 2023.
+
+\bibitem{RN2301}
+P.~X. Liu, X.~Xiao, J.~Zhang, R.~H. Wu, and H.~L. Zhang, ``Spatial configuration and online attention: A space syntax perspective,'' \emph{Sustainability}, vol.~10, no.~1, 2018.
+
+\bibitem{RN2303}
+A.~M. Caldeira and E.~Kastenholz, ``Spatiotemporal tourist behaviour in urban destinations: a framework of analysis,'' \emph{Tourism Geographies}, vol.~22, no.~1, pp. 22--50, 2020.
 
 \bibitem{RN2176}
 M.~Haghani, M.~Coughlan, B.~Crabb, A.~Dierickx, C.~Feliciani, R.~van Gelder, P.~Geoerg, N.~Hocaoglu, S.~Laws, R.~Lovreglio, Z.~Miles, A.~Nicolas, W.~J. O'Toole, S.~Schaap, T.~Semmens, Z.~Shahhoseini, R.~Spaaij, A.~Tatrai, J.~Webster, and A.~Wilson, ``A roadmap for the future of crowd safety research and practice: Introducing the swiss cheese model of crowd safety and the imperative of a vision zero target,'' \emph{Safety Science}, vol. 168, p. 106292, 2023.
@@ -149,8 +146,35 @@ K.~Price, R.~M. Storn, and J.~A. Lampinen, \emph{Differential Evolution: A Pract
 \bibitem{RN2123}
 W.~L. Liu, Y.~Chen, X.~Li, J.~Zhong, R.~Chen, and H.~Jin, ``Automatic optimization of guidance guardrail layout based on multi-objective evolutionary algorithm,'' \emph{Complex System Modeling and Simulation}, vol.~4, no.~4, pp. 353--367, 2024.
 
+\bibitem{RN282}
+L.~F. Henderson, ``The statistics of crowd fluids,'' \emph{Nature}, vol. 229, no. 5284, p. 381–383, 1971.
+
 \bibitem{hughes2003}
 R.~L. Hughes, ``A continuum theory for the flow of pedestrians,'' \emph{Transportation Research Part B: Methodological}, vol.~36, no.~6, pp. 507--535, 2002.
+
+\bibitem{RN2078}
+L.~Huang, S.~C. Wong, M.~Zhang, C.-W. Shu, and W.~H.~K. Lam, ``Revisiting hughes’ dynamic continuum model for pedestrian flow and the development of an efficient solution algorithm,'' \emph{Transportation Research Part B: Methodological}, vol.~43, no.~1, p. 127–141, 2009.
+
+\bibitem{RN2097}
+R.~M. COLOMBO, M.~GARAVELLO, and M.~LÉCUREUX-MERCIER, ``A class of nonlocal models for pedestrian traffic,'' \emph{Mathematical Models and Methods in Applied Sciences}, vol.~22, no.~04, p. 1150023, 2012.
+
+\bibitem{RN2080}
+B.~Raimund, G.~Paola, I.~Daniel, and V.~Luis~Miguel, ``A non-local pedestrian flow model accounting for anisotropic interactions and domain boundaries,'' \emph{Mathematical Biosciences and Engineering}, vol.~17, no.~5, p. 5883–5906, 2020.
+
+\bibitem{RN2099}
+B.~Maury and J.~Venel, ``A mathematical framework for a crowd motion model,'' \emph{Comptes Rendus Mathematique}, vol. 346, no.~23, p. 1245–1250, 2008.
+
+\bibitem{RN2081}
+B.~Maury, A.~Roudneff-Chupin, F.~Santambrogio, and J.~Venel, ``Handling congestion in crowd motion modeling,'' \emph{Networks and Heterogeneous Media}, vol.~6, no.~3, p. 485–519, 2011.
+
+\bibitem{RN2188}
+R.~Jordan, D.~Kinderlehrer, and F.~Otto, ``The variational formulation of the fokker--planck equation,'' \emph{SIAM Journal on Mathematical Analysis}, vol.~29, no.~1, p. 1–17, 1998.
+
+\bibitem{RN2103}
+A.~Aw and M.~Rascle, ``Resurrection of "second order" models of traffic flow,'' \emph{SIAM Journal on Applied Mathematics}, vol.~60, no.~3, p. 916–938, 2000.
+
+\bibitem{RN2104}
+J.-P. Lebacque, S.~Mammar, and H.~Haj-Salem, ``The aw–rascle and zhang’s model: Vacuum problems, existence and regularity of the solutions of the riemann problem,'' \emph{Transportation Research Part B: Methodological}, vol.~41, no.~7, p. 710–721, 2007.
 
 \bibitem{cristiani2016}
 E.~Cristiani, F.~S. Priuli, and A.~Tosin, ``Modeling rationality to control self-organization of crowds: An environmental approach,'' \emph{SIAM Journal on Applied Mathematics}, vol.~75, no.~2, pp. 605--629, 2015.
