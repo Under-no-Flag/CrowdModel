@@ -100,9 +100,9 @@ The potential function satisfies the eikonal equation:
 \label{eq:eikonal}
 \end{equation}
 
-While this model captures basic congestion effects, it assumes isotropic movement and cannot represent channel geometries or directional controls. We address these limitations in the following sections.
+While this model captures basic congestion effects, it assumes isotropic movement and cannot represent channel geometries or directional controls. We address these limitations in the following subsections.
 
-\section{Channel Geometric Guidance via Metric Tensor}
+\subsection{Channel Geometric Guidance via Metric Tensor}
 \label{sec:guidance}
 
 To represent anisotropic channel geometries such as corridors and barriers, we introduce a spatially varying symmetric positive-definite metric tensor $\mathbf{M}(x)$ that generalizes the classical eikonal equation to anisotropic form \cite{cristiani2016}:
@@ -126,7 +126,7 @@ where $\alpha(x)$ and $\beta(x)$ control the traversal weights in tangential and
 
 \textit{Remark}: The metric tensor approach represents directional preferences rather than hard constraints. As long as costs remain finite, the model allows individuals to deviate from preferred directions when facing congestion or detour requirements. This motivates the introduction of constrained HJB framework for strict directional controls.
 
-\section{Channel Control via Constrained HJB}
+\subsection{Channel Control via Constrained HJB}
 \label{sec:hjb}
 
 Many crowd management measures directly restrict available movement directions rather than merely adjusting traversal costs. Examples include one-way corridors and temporary closures. Such rules are naturally modeled via constrained optimal control.
@@ -176,12 +176,12 @@ This formulation couples metric tensor $\mathbf{M}(x)$ for geometric guidance wi
 \end{equation}
 with velocity $\mathbf{v}(x) = f(\rho) \mathbf{u}^*(x)$.
 
-\section{Multi-Stage Multi-Route Model}
+\subsection{Multi-Stage Multi-Route Model}
 \label{sec:multistage}
 
 Real-world scenarios often involve complex itineraries with multiple stages and route choices. We extend the density field to include stage and route indices, with fixed-probability splitting at decision boundaries.
 
-\subsection{Stage-Route Decomposition}
+\subsubsection{Stage-Route Decomposition}
 
 Let the complete behavior chain consist of $S$ stages, where stage $s$ has $R_s$ alternative routes. The total density decomposes as:
 \begin{equation}
@@ -192,7 +192,7 @@ where $\rho_{s,r}(x,t)$ is the density of sub-population in stage $s$ following 
 
 All sub-populations share the same speed function $f(\rho)$ determined by total density, ensuring collective congestion effects. Sub-populations differ in their potential functions, optimal directions, and exit targets.
 
-\subsection{Sub-Population Potentials and Velocities}
+\subsubsection{Sub-Population Potentials and Velocities}
 
 For each sub-population $(s,r)$, define admissible direction set $U_{s,r}(x)$, metric tensor $\mathbf{M}_{s,r}(x)$, and target regions. The potential $\phi_{s,r}(x)$ satisfies:
 \begin{equation}
@@ -213,7 +213,7 @@ The optimal direction is:
 \end{equation}
 with velocity $\mathbf{v}_{s,r}(x) = f(\rho) \, \mathbf{u}_{s,r}^*(x)$.
 
-\subsection{Stage Transitions and Fixed-Probability Splitting}
+\subsubsection{Stage Transitions and Fixed-Probability Splitting}
 
 Sub-populations couple through stage transitions. Let $G_{s,r} \subset \Omega$ be the completion goal region for stage $(s,r)$ with indicator $\chi_{G_{s,r}}(x)$. Upon reaching this region, pedestrians switch to next-stage routes with fixed probabilities.
 
