@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ObjectiveConfig:
-    """Objective-function settings for J1/J2/J5 aggregation."""
+    """Objective-function settings for raw or normalized J1/J2/J5 aggregation."""
 
     lambda_j1: float = 1.0
     lambda_j2: float = 1.0

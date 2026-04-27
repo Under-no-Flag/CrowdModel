@@ -50,7 +50,7 @@ lambda_j1 = 1.0
 lambda_j2 = 1.0
 lambda_j5 = 1.0
 rho_safe = 3.5
-use_normalized_terms = false
+use_normalized_terms = true
 j1_scale = 1.0
 j2_scale = 1.0
 j5_scale = 1.0
@@ -76,7 +76,11 @@ output_root = "../../../results/my_case"
 - `[objective]`
   - 定义 `J = lambda_j1 * J1 + lambda_j2 * J2 + lambda_j5 * J5`。
   - `rho_safe` 是高密暴露阈值。
-  - `use_normalized_terms = true` 时，会先除以 `j1_scale/j2_scale/j5_scale` 再加权。
+  - `use_normalized_terms = true` 时，会先将三项指标转换为无量纲形式再加权：
+    - `~J1 = J1 / (M_tot * T)`，其中 `M_tot` 为初始总质量与累计入流质量之和；
+    - `~J2 = J2 / (|Omega_w| * T)`，对应高密暴露时空占比；
+    - `~J5 = Var(F1,...,Fm) / (F^2 * (m - 1) / m^2)`，对应通道负载不均衡指数。
+  - `j1_scale/j2_scale/j5_scale` 仅在 `use_normalized_terms = true` 时生效，用于对无量纲指标再做附加缩放；默认取 `1.0`。
 - `[scene] / [population] / [routes]`
   - `file` 填相对路径或绝对路径都可以。
   - 相对路径是相对于当前 `run.toml` 所在目录解析。

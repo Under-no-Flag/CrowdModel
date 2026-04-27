@@ -50,12 +50,12 @@ $$
 $$
 \min_{z\in\mathcal Z} J(z\mid \hat p)
 =
-\lambda_1 J_1(z\mid \hat p)+\lambda_2 J_2(z\mid \hat p)+\lambda_5 J_5(z\mid \hat p),
+\lambda_1 \tilde J_1(z\mid \hat p)+\lambda_2 \tilde J_2(z\mid \hat p)+\lambda_5 \tilde J_5(z\mid \hat p),
 $$
 其中：
-- $J_1$：总旅行时间；
-- $J_2$：高密度暴露时间；
-- $J_5$：通道累计流量方差。
+- $\tilde J_1$：标准化总旅行时间；
+- $\tilde J_2$：标准化高密度暴露时间；
+- $\tilde J_5$：标准化通道负载不均衡指标。
 
 需要强调的是，本文算法针对的是**多目标管控问题在一组给定权重下的标量化求解**，而不是直接输出完整 Pareto 前沿的多目标算法。若需要近似 Pareto 集，可在不同权重组合 $(\lambda_1,\lambda_2,\lambda_5)$ 下重复运行本文算法。
 
@@ -477,7 +477,7 @@ $$
 ### 10.5 面向标量化多目标管控优化的求解器
 本文算法针对固定权重下的标量化目标
 $$
-\lambda_1J_1+\lambda_2J_2+\lambda_5J_5
+\lambda_1\tilde J_1+\lambda_2\tilde J_2+\lambda_5\tilde J_5
 $$
 求解，在效率、安全与均衡三类指标之间提供可调权衡。若需要近似 Pareto 前沿，可通过多组权重重复运行该框架实现。
 

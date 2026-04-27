@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating anisotropic geometric guidance with discrete directional constraints. The lower level employs a Hughes-type macroscopic crowd model enhanced with metric tensor fields for channel guidance and constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way channel control. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three evaluation metrics are introduced: total travel time for efficiency, high-density exposure time for safety, and channel flow variance for load balancing. The proposed method exploits the local response characteristics of Bellman potential fields and employs surrogate pre-screening with Bellman warm-start strategies to reduce computational cost. Numerical experiments demonstrate the effectiveness of the proposed approach.
+This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating anisotropic geometric guidance with discrete directional constraints. The lower level employs a Hughes-type macroscopic crowd model enhanced with metric tensor fields for channel guidance and constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way channel control. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three raw physical metrics are introduced for efficiency, safety, and load balancing, and are further converted into dimensionless indicators for cross-scheme comparison and scalarization. The proposed method exploits the local response characteristics of Bellman potential fields and employs surrogate pre-screening with Bellman warm-start strategies to reduce computational cost. Numerical experiments demonstrate the effectiveness of the proposed approach.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -287,17 +287,38 @@ This captures cumulative space-time exposure to dangerous crowding conditions, r
 
 Let $q_c(t)$ be the flux through channel $c$ at time $t$, with cumulative flow $F_c = \int_0^T q_c(t) \, dt$. The load balancing metric is:
 \begin{equation}
-J_3(z \mid \hat{p}) = \text{Var}(F_1, \dots, F_m).
+J_5(z \mid \hat{p}) = \text{Var}(F_1, \dots, F_m).
 \label{eq:j5}
 \end{equation}
 
 Lower variance indicates more even distribution of traffic across channels, reducing risk concentration and improving facility utilization.
 
+\subsection{Dimensionless Normalization}
+
+Because $J_1$, $J_2$, and $J_5$ have different physical units and numerical scales, we further define normalized indicators for policy comparison and optimization. Let $M_{\text{tot}} = M_{\text{init}} + M_{\text{in}}$ denote the total evaluated crowd mass, let $|\Omega_w|$ be the walkable area, and let $F = \sum_{c=1}^m F_c$ be the total cumulative channel flow. We define
+\begin{equation}
+\tilde{J}_1(z \mid \hat{p}) = \frac{J_1(z \mid \hat{p})}{M_{\text{tot}} T},
+\label{eq:j1_norm}
+\end{equation}
+\begin{equation}
+\tilde{J}_2(z \mid \hat{p}) = \frac{J_2(z \mid \hat{p})}{|\Omega_w| T},
+\label{eq:j2_norm}
+\end{equation}
+and
+\begin{equation}
+\tilde{J}_5(z \mid \hat{p}) =
+\frac{\text{Var}(F_1, \dots, F_m)}{F^2 (m-1)/m^2}
+=
+\frac{m^2}{m-1}\text{Var}(p_1, \dots, p_m),
+\label{eq:j5_norm}
+\end{equation}
+where $p_c = F_c/F$. The normalized metrics are dimensionless, with $\tilde{J}_2 \in [0,1]$ and $\tilde{J}_5 \in [0,1]$.
+
 \subsection{Scalarized Optimization Objective}
 
-Given weights $(\lambda_1, \lambda_2, \lambda_3)$, the scalarized objective is:
+Given weights $(\lambda_1, \lambda_2, \lambda_5)$, the scalarized objective is:
 \begin{equation}
-J(z \mid \hat{p}) = \lambda_1 J_1(z \mid \hat{p}) + \lambda_2 J_2(z \mid \hat{p}) + \lambda_3 J_3(z \mid \hat{p}),
+J(z \mid \hat{p}) = \lambda_1 \tilde{J}_1(z \mid \hat{p}) + \lambda_2 \tilde{J}_2(z \mid \hat{p}) + \lambda_5 \tilde{J}_5(z \mid \hat{p}),
 \label{eq:scalarized}
 \end{equation}
 
@@ -421,11 +442,11 @@ Numerical parameters are set as follows: grid resolution $96\times72$, spatial s
 
 \subsubsection{Evaluation Metrics}
 
-The experiments employ three primary metrics:
+The experiments employ three primary raw metrics and their normalized counterparts:
 \begin{itemize}
-\item \textit{Efficiency metric} $J_1$: total travel time (integral of density over space-time);
-\item \textit{Safety metric} $J_2$: high-density exposure time (duration above safety threshold $\rho_{\text{safe}}$);
-\item \textit{Balance metric} $J_3$: channel flow variance (load distribution across channels).
+\item \textit{Efficiency metric} $J_1$ and $\tilde{J}_1$: total travel time and its mass-time normalized form;
+\item \textit{Safety metric} $J_2$ and $\tilde{J}_2$: high-density exposure time and its space-time normalized form;
+\item \textit{Balance metric} $J_5$ and $\tilde{J}_5$: channel flow variance and its normalized imbalance index.
 \end{itemize}
 
 Behavioral indicators include channel capture domain ratios, flow distribution ratios, direction consistency indices, and approach angle distributions.
@@ -509,7 +530,7 @@ The experimental results support four key conclusions:
 \subsection{Control Strategy Comparison}
 \label{sec:strategy}
 
-This subsection compares different channel control strategies in terms of efficiency ($J_1$), safety ($J_2$), and load balancing ($J_3$). The strategies under comparison include:
+This subsection compares different channel control strategies in terms of normalized efficiency ($\tilde{J}_1$), normalized safety ($\tilde{J}_2$), and normalized load balancing ($\tilde{J}_5$). The strategies under comparison include:
 \begin{itemize}
 \item Baseline (no control);
 \item Upper-channel-guided;
@@ -529,7 +550,7 @@ Detailed results and analysis will be presented in the full version of this pape
 \subsection{Optimal Control Parameter Search}
 \label{sec:optimal}
 
-This subsection presents the first-version automated parameter search results. The search enumerates discrete strategy variables, performs coarse grid search on guidance intensity $\eta$, and searches over fixed splitting probability candidates to identify optimal control configurations under different objective weight combinations $(\lambda_1, \lambda_2, \lambda_3)$.
+This subsection presents the first-version automated parameter search results. The search enumerates discrete strategy variables, performs coarse grid search on guidance intensity $\eta$, and searches over fixed splitting probability candidates to identify optimal control configurations under different objective weight combinations $(\lambda_1, \lambda_2, \lambda_5)$.
 
 Detailed results and analysis will be presented in the full version of this paper.
 

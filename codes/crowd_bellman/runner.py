@@ -158,7 +158,14 @@ def simulate_case(
     transitions = tuple(case.transitions)
     transition_rates = build_transition_out_rate_maps(transitions=transitions, shape=case.walkable.shape)
 
-    stats = init_case_stats(list(scene.channel_masks))
+    cell_area = float(cfg.dx * cfg.dx)
+    initial_total_mass = float(np.sum(scene.initial_rho[case.walkable]) * cell_area)
+    walkable_area = float(np.count_nonzero(case.walkable) * cell_area)
+    stats = init_case_stats(
+        list(scene.channel_masks),
+        initial_total_mass=initial_total_mass,
+        walkable_area=walkable_area,
+    )
     sink_total = 0.0
     inflow_total = 0.0
     time_value = 0.0

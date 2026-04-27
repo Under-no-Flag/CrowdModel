@@ -156,6 +156,11 @@ class CoreBackendTests(unittest.TestCase):
             "j1_total_travel_time",
             "j2_high_density_exposure",
             "j5_channel_flux_variance",
+            "j1_normalized",
+            "j2_normalized",
+            "j5_normalized",
+            "initial_total_mass",
+            "walkable_area",
             "objective_value",
         ]
         for key in scalar_keys:
@@ -165,6 +170,10 @@ class CoreBackendTests(unittest.TestCase):
             self.assertEqual(summary_baseline[key], summary_optimized[key])
 
         for mapping_key in ("channel_flux_cumulative", "channel_flux_share", "channel_time_mean_density"):
+            for name, value in summary_baseline[mapping_key].items():
+                self.assertAlmostEqual(value, summary_optimized[mapping_key][name], places=12)
+
+        for mapping_key in ("objective_terms", "objective_terms_normalized", "normalization_context"):
             for name, value in summary_baseline[mapping_key].items():
                 self.assertAlmostEqual(value, summary_optimized[mapping_key][name], places=12)
 

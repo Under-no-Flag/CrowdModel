@@ -115,9 +115,12 @@ def build_g2_strategy_report(
             "direction_bottom": directions.get("bottom"),
             "entry_channels": ",".join(scan.get("entry_channels", [])),
             "return_channels": ",".join(scan.get("return_channels", [])),
-            "j1": summary.get("j1_total_travel_time"),
-            "j2": summary.get("j2_high_density_exposure"),
-            "j5": summary.get("j5_channel_flux_variance"),
+            "j1": summary.get("j1_normalized", summary.get("j1_total_travel_time")),
+            "j2": summary.get("j2_normalized", summary.get("j2_high_density_exposure")),
+            "j5": summary.get("j5_normalized", summary.get("j5_channel_flux_variance")),
+            "j1_raw": summary.get("j1_total_travel_time"),
+            "j2_raw": summary.get("j2_high_density_exposure"),
+            "j5_raw": summary.get("j5_channel_flux_variance"),
             "objective_value": summary.get("objective_value"),
             "sink_cumulative": summary.get("final_sink_cumulative"),
             "peak_density": summary.get("peak_density_max"),
@@ -221,9 +224,9 @@ def _save_pareto_plot(path: Path, rows: list[dict[str, object]]) -> None:
             linewidths=0.8,
         )
         ax.annotate(_label(row), (float(row["j1"]), float(row["j2"])), xytext=(4, 4), textcoords="offset points", fontsize=7)
-    ax.set_xlabel("J1")
-    ax.set_ylabel("J2")
-    ax.set_title("G2 Pareto view under channel-direction scan")
+    ax.set_xlabel("~J1")
+    ax.set_ylabel("~J2")
+    ax.set_title("G2 Pareto view under normalized objective terms")
     ax.grid(alpha=0.2)
     fig.tight_layout()
     fig.savefig(path)
@@ -237,12 +240,12 @@ def _save_metric_bar_plot(path: Path, rows: list[dict[str, object]]) -> None:
     x = np.arange(len(rows))
     width = 0.25
     fig, ax = plt.subplots(1, 1, figsize=(12.5, 5.2), dpi=150)
-    ax.bar(x - width, [float(row["j1"]) for row in rows], width=width, label="J1")
-    ax.bar(x, [float(row["j2"]) for row in rows], width=width, label="J2")
-    ax.bar(x + width, [float(row["j5"]) for row in rows], width=width, label="J5")
+    ax.bar(x - width, [float(row["j1"]) for row in rows], width=width, label="~J1")
+    ax.bar(x, [float(row["j2"]) for row in rows], width=width, label="~J2")
+    ax.bar(x + width, [float(row["j5"]) for row in rows], width=width, label="~J5")
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=20, ha="right")
-    ax.set_title("G2 objective terms by direction setting")
+    ax.set_title("G2 normalized objective terms by direction setting")
     ax.grid(axis="y", alpha=0.2)
     ax.legend()
     fig.tight_layout()

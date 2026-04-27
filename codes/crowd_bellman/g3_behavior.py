@@ -87,9 +87,12 @@ def build_g3_behavior_report(
         row = {
             "case_id": case_id,
             "title": summary.get("title"),
-            "j1": summary.get("j1_total_travel_time"),
-            "j2": summary.get("j2_high_density_exposure"),
-            "j5": summary.get("j5_channel_flux_variance"),
+            "j1": summary.get("j1_normalized", summary.get("j1_total_travel_time")),
+            "j2": summary.get("j2_normalized", summary.get("j2_high_density_exposure")),
+            "j5": summary.get("j5_normalized", summary.get("j5_channel_flux_variance")),
+            "j1_raw": summary.get("j1_total_travel_time"),
+            "j2_raw": summary.get("j2_high_density_exposure"),
+            "j5_raw": summary.get("j5_channel_flux_variance"),
             "sink_cumulative": summary.get("final_sink_cumulative"),
             "peak_density": summary.get("peak_density_max"),
             "entry_1_2_flux_share": summary.get("channel_flux_share", {}).get("entry_1_2"),
@@ -171,11 +174,15 @@ def _save_behavior_terms_plot(path: Path, rows: list[dict[str, object]]) -> None
     x = np.arange(len(labels))
     width = 0.25
     fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.8), dpi=150)
-    for offset, field_name in zip((-width, 0.0, width), ("j1", "j2", "j5")):
-        axes[0].bar(x + offset, [float(row[field_name]) for row in rows], width=width, label=field_name)
+    for offset, field_name, label in zip(
+        (-width, 0.0, width),
+        ("j1", "j2", "j5"),
+        ("~J1", "~J2", "~J5"),
+    ):
+        axes[0].bar(x + offset, [float(row[field_name]) for row in rows], width=width, label=label)
     for offset, region_name in zip((-width, 0.0, width), ("stage1_goal_peak_mass", "stage2_goal_peak_mass", "route10_goal_peak_mass")):
         axes[1].bar(x + offset, [float(row.get(region_name) or 0.0) for row in rows], width=width, label=region_name)
-    axes[0].set_title("G3 system terms by behavior layer")
+    axes[0].set_title("G3 normalized system terms by behavior layer")
     axes[1].set_title("G3 retained mass peaks in key regions")
     for ax in axes:
         ax.set_xticks(x)

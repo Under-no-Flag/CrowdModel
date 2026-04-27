@@ -40,6 +40,7 @@ def _evaluate_single(summary: dict[str, object], objective_cfgs: list[ObjectiveC
         "case_id": summary.get("case_id"),
         "title": summary.get("title"),
         "objective_terms": summary.get("objective_terms"),
+        "objective_terms_normalized": summary.get("objective_terms_normalized"),
         "evaluations": evaluate_objective_batch_from_summary(summary, objective_cfgs),
     }
 
