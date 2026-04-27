@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from .core import GroupKey, TransitionRule
+from .core import DirectionHandoffRule, GroupKey, TransitionRule
 
 
 @dataclass(frozen=True)
@@ -87,5 +87,6 @@ class CaseModel:
     allowed_mask: np.ndarray
     groups: dict[GroupKey, GroupModel] | None = None
     transitions: tuple[TransitionRule, ...] = ()
+    handoff_rules: tuple[DirectionHandoffRule, ...] = ()
     initial_group_density: dict[GroupKey, np.ndarray] | None = None
     inflows: tuple[InflowModel, ...] = ()

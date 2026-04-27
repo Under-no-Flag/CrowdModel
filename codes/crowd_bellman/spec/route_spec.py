@@ -34,6 +34,7 @@ class StageSpec:
     next_stage: str | None = None
     kappa: float = 1.0
     targets: tuple[TransitionTargetSpec, ...] = ()
+    transition_direction: str = "stop"
 
 
 @dataclass(frozen=True)

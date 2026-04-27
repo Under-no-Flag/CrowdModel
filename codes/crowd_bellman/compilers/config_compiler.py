@@ -4,7 +4,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
-from ..core import DIRECTIONS, TransitionRule, default_allowed_mask, tensor_from_tau
+from ..core import DIRECTIONS, DirectionHandoffRule, TransitionRule, default_allowed_mask, tensor_from_tau
 from ..scenes import BaseScene, CaseModel, GroupModel, InflowModel, SimulationConfig
 from ..spec.population_spec import PopulationSpec
 from ..spec.route_spec import CaseRouteSpec, ControlSpec, StageSpec
@@ -385,6 +385,7 @@ def compile_case(
         )
 
     transitions: list[TransitionRule] = []
+    handoff_rules: list[DirectionHandoffRule] = []
     for stage in route_spec.stages:
         has_next = stage.next_stage is not None
         has_targets = bool(stage.targets)
@@ -392,6 +393,12 @@ def compile_case(
             raise ValueError(f"Stage {stage.stage_id} cannot define both next_stage and targets")
         if not has_next and not has_targets:
             continue
+
+        transition_direction = stage.transition_direction.lower()
+        if transition_direction not in {"stop", "inherit_target"}:
+            raise ValueError(
+                f"Unsupported transition_direction {stage.transition_direction!r} in stage {stage.stage_id}"
+            )
 
         decision_mask = _selector_mask(stage.decision_regions, region_masks, walkable) if stage.decision_regions is not None else goal_masks[stage.stage_id]
         if not np.any(decision_mask):
@@ -409,7 +416,20 @@ def compile_case(
                     targets={next_stage.group_key: 1.0},
                 )
             )
+            if transition_direction == "inherit_target":
+                handoff_rules.append(
+                    DirectionHandoffRule(
+                        source=stage.group_key,
+                        target=next_stage.group_key,
+                        handoff_mask=decision_mask,
+                    )
+                )
             continue
+
+        if transition_direction != "stop":
+            raise ValueError(
+                f"transition_direction={stage.transition_direction!r} requires a single next_stage in stage {stage.stage_id}"
+            )
 
         target_map: dict[tuple[int, int], float] = {}
         for target in stage.targets:
@@ -446,6 +466,7 @@ def compile_case(
         allowed_mask=groups[first_stage.group_key].allowed_mask,
         groups=groups,
         transitions=tuple(transitions),
+        handoff_rules=tuple(handoff_rules),
         initial_group_density=initial_group_density,
         inflows=tuple(inflows),
     )

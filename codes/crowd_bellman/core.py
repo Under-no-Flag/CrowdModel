@@ -34,6 +34,15 @@ class TransitionRule:
     targets: Mapping[GroupKey, float]
 
 
+@dataclass(frozen=True)
+class DirectionHandoffRule:
+    """Reuse downstream stage headings inside a transition region."""
+
+    source: GroupKey
+    target: GroupKey
+    handoff_mask: np.ndarray
+
+
 def build_eight_directions() -> DirectionLibrary:
     names = ("E", "W", "N", "S", "NE", "NW", "SE", "SW")
     offsets = np.array(
@@ -418,6 +427,32 @@ def compute_total_density(rho_by_group: Mapping[GroupKey, np.ndarray]) -> np.nda
     for rho in iterator:
         rho_tot += rho
     return rho_tot
+
+
+def enforce_total_density_cap(
+    rho_by_group: Mapping[GroupKey, np.ndarray],
+    rho_max: float,
+    walkable: np.ndarray,
+) -> dict[GroupKey, np.ndarray]:
+    """Scale overlapping sub-populations so total density does not exceed rho_max."""
+
+    rho_tot = compute_total_density(rho_by_group)
+    overflow = walkable & (rho_tot > rho_max + 1.0e-12)
+    if not np.any(overflow):
+        return {
+            key: np.where(walkable, np.clip(rho, 0.0, None), 0.0)
+            for key, rho in rho_by_group.items()
+        }
+
+    scale = np.ones_like(rho_tot)
+    scale[overflow] = rho_max / rho_tot[overflow]
+
+    capped: dict[GroupKey, np.ndarray] = {}
+    for key, rho in rho_by_group.items():
+        result = np.clip(rho * scale, 0.0, None)
+        result[~walkable] = 0.0
+        capped[key] = result
+    return capped
 
 
 def compute_cfl_dt(

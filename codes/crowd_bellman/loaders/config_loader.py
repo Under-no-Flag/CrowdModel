@@ -251,6 +251,7 @@ def load_route_spec(path: Path) -> CaseRouteSpec:
                 next_stage=str(item["next_stage"]) if item.get("next_stage") is not None else None,
                 kappa=float(item.get("kappa", 1.0)),
                 targets=tuple(targets),
+                transition_direction=str(item.get("transition_direction", "stop")),
             )
         )
 

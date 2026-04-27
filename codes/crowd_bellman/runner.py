@@ -14,6 +14,7 @@ from .core import (
     compute_cfl_dt,
     compute_cfl_dt_multigroup,
     compute_total_density,
+    enforce_total_density_cap,
     greenshields_speed,
     precompute_step_factors,
     recover_optimal_direction,
@@ -192,6 +193,16 @@ def simulate_case(
                     f_eps=cfg.bellman_f_eps,
                     backend=cfg.direction_recovery_backend,
                 )
+            for handoff_rule in case.handoff_rules:
+                source_ux = ux_by_group.get(handoff_rule.source)
+                source_uy = uy_by_group.get(handoff_rule.source)
+                target_ux = ux_by_group.get(handoff_rule.target)
+                target_uy = uy_by_group.get(handoff_rule.target)
+                if source_ux is None or source_uy is None or target_ux is None or target_uy is None:
+                    continue
+                mask = handoff_rule.handoff_mask & case.walkable
+                source_ux[mask] = target_ux[mask]
+                source_uy[mask] = target_uy[mask]
 
         vx_by_group: dict[GroupKey, np.ndarray] = {}
         vy_by_group: dict[GroupKey, np.ndarray] = {}
@@ -227,8 +238,6 @@ def simulate_case(
             )
 
         fx_sum = np.zeros((scene.initial_rho.shape[0], scene.initial_rho.shape[1] - 1), dtype=float)
-        vy_weighted = np.zeros_like(scene.initial_rho)
-        vx_weighted = np.zeros_like(scene.initial_rho)
 
         for key, group in groups.items():
             rho_next, fx, _, sink_increment = update_density(
@@ -243,8 +252,6 @@ def simulate_case(
             rho_by_group[key] = np.clip(rho_next, 0.0, cfg.rho_max)
             fx_sum += fx
             sink_total += sink_increment
-            vx_weighted += rho_by_group[key] * vx_by_group[key]
-            vy_weighted += rho_by_group[key] * vy_by_group[key]
 
         if transitions:
             rho_by_group = apply_fixed_probability_splitting(
@@ -265,7 +272,18 @@ def simulate_case(
             rho_max=cfg.rho_max,
         )
 
+        rho_by_group = enforce_total_density_cap(
+            rho_by_group=rho_by_group,
+            rho_max=cfg.rho_max,
+            walkable=case.walkable,
+        )
+
         rho_tot = compute_total_density(rho_by_group)
+        vx_weighted = np.zeros_like(scene.initial_rho)
+        vy_weighted = np.zeros_like(scene.initial_rho)
+        for key in groups:
+            vx_weighted += rho_by_group[key] * vx_by_group[key]
+            vy_weighted += rho_by_group[key] * vy_by_group[key]
         rho_safe = np.maximum(rho_tot, 1.0e-8)
         vx_total = vx_weighted / rho_safe
         vy_total = vy_weighted / rho_safe
@@ -322,6 +340,7 @@ def simulate_case(
                 uy=uy_by_group[vis_key],
                 walkable=case.walkable,
                 rho_max=cfg.rho_max,
+                panel_title=f"{groups[vis_key].name} potential and direction",
             )
         step += 1
 

@@ -20,6 +20,7 @@ def save_case_snapshot(
     uy: np.ndarray,
     walkable: np.ndarray,
     rho_max: float,
+    panel_title: str = "Potential and direction",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -36,7 +37,7 @@ def save_case_snapshot(
     fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
 
     im1 = axes[1].imshow(potential, origin="lower", cmap="magma")
-    axes[1].set_title("Potential and direction")
+    axes[1].set_title(panel_title)
     fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
 
     step = 4

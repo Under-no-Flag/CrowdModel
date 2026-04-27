@@ -9,6 +9,7 @@ goal_region = "platform_entry_mid"
 decision_region = "platform_entry_mid"
 next_stage = "tour_south"
 kappa = 2.0
+transition_direction = "inherit_target"
 
 [[stages.controls]]
 mode = "target_point"
@@ -31,6 +32,7 @@ goal_region = "platform_south_view"
 decision_region = "platform_south_view"
 next_stage = "return_left"
 kappa = 1.8
+transition_direction = "inherit_target"
 
 [[stages.controls]]
 mode = "target_region"
