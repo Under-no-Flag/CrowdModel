@@ -79,17 +79,17 @@ The remainder of this paper is organized as follows. Section~\ref{sec:related} r
 
 \subsection{Massive Crowd Management and Control}
 
-Crowd management in urban centers has been extensively studied from control-theoretic and optimization perspectives, aiming to enhance safety and efficiency through boundary regulation, facility layout, and intelligent decision-making \cite{al2021preparedness,feng2014network}.
+Crowd management in urban centers has been extensively studied from control-theoretic and optimization perspectives, aiming to enhance safety and efficiency through boundary regulation, facility layout, and intelligent decision-making \cite{RN2000,RN2193}.
 
-In control-theoretic approaches, Zhong et al. \cite{zhong2018boundary} designed boundary control strategies for urban traffic flow networks to ensure convergence to uncongested states under disturbances, with stability analysis based on Lyapunov methods \cite{zhao2021lyapunov}. For one-dimensional crowd dynamics, Wadoo and Kachroo \cite{wadoo2010feedback} employed advection and diffusion control to prevent blocking and shock waves during evacuation. Addressing multi-directional disturbance propagation, Qin \cite{qin2020unit} proposed a unit sliding mode controller based on integral barrier Lyapunov functions to ensure boundedness of internal state variables, demonstrating strong disturbance rejection capabilities. For heterogeneous corridor regulation, Zhu et al. \cite{zhu2021optimal} combined policy learning with neural networks to learn optimal feedback controllers that adjust inflow rates and free-flow speeds, achieving balanced density distribution and reduced congestion.
+In control-theoretic approaches, Zhong et al. \cite{RN279} designed boundary control strategies for urban traffic flow networks to ensure convergence to uncongested states under disturbances, with stability analysis based on Lyapunov methods \cite{RN1196}. For one-dimensional crowd dynamics, Wadoo and Kachroo \cite{RN280} employed advection and diffusion control to prevent blocking and shock waves during evacuation. Addressing multi-directional disturbance propagation, Qin \cite{RN277} proposed a unit sliding mode controller based on integral barrier Lyapunov functions to ensure boundedness of internal state variables, demonstrating strong disturbance rejection capabilities. For heterogeneous corridor regulation, Zhu et al. \cite{RN286} combined policy learning with neural networks to learn optimal feedback controllers that adjust inflow rates and free-flow speeds, achieving balanced density distribution and reduced congestion.
 
-Physical infrastructure regulation has also proven effective. Studies have shown that strategically placed obstacles can significantly improve outflow, velocity, and local density in merging areas \cite{yu2025regulating,zhou2025simulation}. Yang et al. \cite{yang2025optimization,yang2025partition} employed Model Predictive Control (MPC) to optimize barrier lengths at subway bottlenecks, later extending control variables to entrance limiters, gates, and escalator directions for dynamic, real-time crowd regulation. For evacuation guidance, Carmona and Paricio-Garcia \cite{carmona2024crowd} proposed dynamic exit-choice recommendations using multinomial Logit models. However, their approach relies on discrete speed instructions (e.g., ``stop,'' ``walk,'' ``run'') transmitted via electronic wristbands \cite{carmona2023linear}, which poses implementation challenges in open urban scenarios.
+Physical infrastructure regulation has also proven effective. Studies have shown that strategically placed obstacles can significantly improve outflow, velocity, and local density in merging areas \cite{RN1662,RN2145}. Yang et al. \cite{RN2118,RN2120} employed Model Predictive Control (MPC) to optimize barrier lengths at subway bottlenecks, later extending control variables to entrance limiters, gates, and escalator directions for dynamic, real-time crowd regulation. For evacuation guidance, Carmona and Paricio-Garcia \cite{RN2119} proposed dynamic exit-choice recommendations using multinomial Logit models. However, their approach relies on discrete speed instructions (e.g., ``stop,'' ``walk,'' ``run'') transmitted via electronic wristbands \cite{RN2196}, which poses implementation challenges in open urban scenarios.
 
-Recently, intelligent optimization and deep reinforcement learning have emerged as promising alternatives. Liao et al. \cite{liao2023crowd} formulated fence layout as a subset selection problem, while subsequent work \cite{liao2025drift} proposed a dynamic crowd inflow control system using LSTM networks to capture temporal features and Proximal Policy Optimization (PPO) \cite{schulman2017proximal} for real-time entrance flow regulation. Differential Evolution (DE) \cite{price2014differential} has also been applied to optimize guardrail layouts and flow guidance in real-world scenarios such as Chengdu East Railway Station, using average travel time and crowd pressure as multi-objective criteria \cite{liu2024automatic}.
+Recently, intelligent optimization and deep reinforcement learning have emerged as promising alternatives. Liao et al. \cite{RN2121} formulated fence layout as a subset selection problem, while subsequent work \cite{RN2122} proposed a dynamic crowd inflow control system using LSTM networks to capture temporal features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance flow regulation. Differential Evolution (DE) \cite{RN2190} has also been applied to optimize guardrail layouts and flow guidance in real-world scenarios such as Chengdu East Railway Station, using average travel time and crowd pressure as multi-objective criteria \cite{RN2123}.
 
 \subsection{Macroscopic Crowd Modeling}
 
-Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency compared to microscopic approaches. Hughes \cite{hughes2003continuum} pioneered the continuum theory for pedestrian flow, introducing the classical model where pedestrians move in the direction of steepest descent of a potential function representing remaining travel time to exits.
+Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency compared to microscopic approaches. Hughes \cite{hughes2003} pioneered the continuum theory for pedestrian flow, introducing the classical model where pedestrians move in the direction of steepest descent of a potential function representing remaining travel time to exits.
 
 Extensions of the Hughes framework have incorporated various control and guidance mechanisms. Anisotropic extensions using metric tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}. These models allow for continuous geometric guidance without explicit prohibition, enabling pedestrians to deviate from preferred directions when necessary.
 
@@ -591,155 +591,7 @@ Future work will extend to full multi-objective optimization, sensitivity analys
 
 \balance
 
-\begin{thebibliography}{1}
-
-\bibitem{hughes2003}
-R.~L. Hughes, ``A continuum theory for the flow of pedestrians,'' \textit{Transportation Research Part B: Methodological}, vol.~36, no.~6, pp. 507--535, 2002.
-
-\bibitem{hughes2003continuum}
-R.~L. Hughes, ``A continuum theory for the flow of pedestrians,'' \textit{Transportation Research Part B: Methodological}, vol.~36, no.~6, pp. 507--535, 2002.
-
-\bibitem{cristiani2016}
-E.~Cristiani, F.~S. Priuli, and A.~Tosin, ``Modeling rationality to control self-organization of crowds: An environmental approach,'' \textit{SIAM Journal on Applied Mathematics}, vol.~75, no.~2, pp. 605--629, 2015.
-
-\bibitem{priuli2015control}
-F.~Priuli, A.~Tosin, and E.~Cristiani, ``On the control of self-organized systems: The case of pedestrian flows,'' in \textit{Proceedings of the 5th International Conference on Pedestrian and Evacuation Dynamics}, 2015.
-
-\bibitem{al2021preparedness}
-H.~M. Al-Ahmadi \textit{et al.}, ``Preparedness for mass gatherings: A simulation-based framework for flow control and management using crowd monitoring data,'' \textit{Arabian Journal for Science and Engineering}, vol.~46, no.~5, pp. 4985--4997, 2021.
-
-\bibitem{feng2014network}
-L.~Feng and E.~Miller-Hooks, ``A network optimization-based approach for crowd management in large public gatherings,'' \textit{Transportation Research Part C: Emerging Technologies}, vol.~42, pp. 182--199, 2014.
-
-\bibitem{zhong2018boundary}
-R.~X. Zhong \textit{et al.}, ``Boundary conditions and behavior of the macroscopic fundamental diagram based network traffic dynamics: A control systems perspective,'' \textit{Transportation Research Part B: Methodological}, vol.~111, pp. 327--355, 2018.
-
-\bibitem{zhao2021lyapunov}
-R.~Zhao \textit{et al.}, ``Lyapunov-based crowd stability analysis for asymmetric pedestrian merging layout at T-shaped street junction,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~22, no.~11, pp. 6833--6842, 2021.
-
-\bibitem{wadoo2010feedback}
-S.~A. Wadoo and P.~Kachroo, ``Feedback control of crowd evacuation in one dimension,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~11, no.~1, pp. 182--193, 2010.
-
-\bibitem{qin2020unit}
-W.~Qin, ``Unit sliding mode control for disturbed crowd dynamics system based on integral barrier Lyapunov function,'' \textit{IEEE Access}, vol.~8, pp. 91\,257--91\,264, 2020.
-
-\bibitem{zhu2021optimal}
-Y.~Zhu, D.~Zhao, and H.~He, ``Optimal feedback control of pedestrian flow in heterogeneous corridors,'' \textit{IEEE Transactions on Automation Science and Engineering}, vol.~18, no.~3, pp. 1097--1108, 2021.
-
-\bibitem{yu2025regulating}
-H.~Yu \textit{et al.}, ``Regulating multi-directional passenger flow: Impact of obstacle position and flow level on pedestrian merging process,'' \textit{Tunnelling and Underground Space Technology}, vol.~157, p.~106\,336, 2025.
-
-\bibitem{zhou2025simulation}
-Y.~Zhou \textit{et al.}, ``Simulation-based adaptive optimization for passenger flow control measures at metro stations,'' \textit{Simulation Modelling Practice and Theory}, vol.~138, p.~103\,021, 2025.
-
-\bibitem{yang2025optimization}
-X.~Yang \textit{et al.}, ``Optimization modeling of automatic crowd regulation at bottlenecks of subway system: A model predictive control approach,'' \textit{Physics Letters A}, vol.~531, p.~130\,180, 2025.
-
-\bibitem{yang2025partition}
-X.~Yang \textit{et al.}, ``Partition independent control and collaborative optimization of high-density crowd in subway stations,'' \textit{Chaos, Solitons \& Fractals}, vol.~200, p.~117\,108, 2025.
-
-\bibitem{carmona2024crowd}
-M.~A. Lopez-Carmona and A.~Paricio-Garcia, ``Crowd evacuation management with optimal time-multiplexed exit-choice recommendations through simulation optimization,'' \textit{Advanced Theory and Simulations}, vol.~7, no.~7, p.~2\,400\,265, 2024.
-
-\bibitem{carmona2023linear}
-M.~A. Lopez-Carmona and A.~Paricio Garcia, ``Linear and nonlinear model predictive control (MPC) for regulating pedestrian flows with discrete speed instructions,'' \textit{Physica A: Statistical Mechanics and its Applications}, vol.~625, p.~128\,996, 2023.
-
-\bibitem{liao2023crowd}
-X.~Liao \textit{et al.}, ``Crowd management through optimal layout of fences: An ant colony approach based on crowd simulation,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~24, no.~9, pp. 9137--9149, 2023.
-
-\bibitem{liao2025drift}
-X.~Liao \textit{et al.}, ``DRIFT: A dynamic crowd inflow control system using LSTM-based deep reinforcement learning,'' \textit{IEEE Transactions on Systems, Man, and Cybernetics: Systems}, vol.~55, no.~6, pp. 4202--4215, 2025.
-
-\bibitem{schulman2017proximal}
-J.~Schulman \textit{et al.}, ``Proximal policy optimization algorithms,'' \textit{arXiv preprint arXiv:1707.06347}, 2017.
-
-\bibitem{price2014differential}
-K.~Price, R.~M. Storn, and J.~A. Lampinen, \textit{Differential Evolution: A Practical Approach to Global Optimization}.\hskip 1em plus 0.5em minus 0.4em\relax Springer Publishing Company, 2014.
-
-\bibitem{liu2024automatic}
-W.~Liu \textit{et al.}, ``Automatic optimization of guidance guardrail layout based on multi-objective evolutionary algorithm,'' \textit{Complex System Modeling and Simulation}, vol.~4, no.~4, pp. 353--367, 2024.
-
-\bibitem{RN2056}
-N.~W.~F. Bode, M.~Chraibi, and S.~Holl, ``The emergence of macroscopic interactions between intersecting pedestrian streams,'' \textit{Transportation Research Part B: Methodological}, vol.~119, pp.~197--210, 2019.
-
-\bibitem{RN1226}
-T.~Bosse, M.~Hoogendoorn, M.~C.~A. Klein, J.~Treur, C.~N.~van der Wal, and A.~van Wissen, ``Modelling collective decision making in groups and crowds: Integrating social contagion and interacting emotions, beliefs and intentions,'' \textit{Autonomous Agents and Multi-Agent Systems}, vol.~27, no.~1, pp.~52--84, 2013.
-
-\bibitem{RN2102}
-F.~Bourdin, ``Splitting scheme for a macroscopic crowd motion model with congestion for a two-typed population,'' \textit{Networks and Heterogeneous Media}, vol.~17, no.~5, pp.~783--801, 2022.
-
-\bibitem{RN2303}
-A.~M. Caldeira and E.~Kastenholz, ``Spatiotemporal tourist behaviour in urban destinations: a framework of analysis,'' \textit{Tourism Geographies}, vol.~22, no.~1, pp.~22--50, 2020.
-
-\bibitem{RN2147}
-P.~Charalambous, J.~Pettre, V.~Vassiliades, Y.~Chrysanthou, and N.~Pelechano, ``GREIL-Crowds: Crowd simulation with deep reinforcement learning and examples,'' \textit{ACM Trans. Graph.}, vol.~42, no.~4, pp.~Article~137, 2023.
-
-\bibitem{RN2181}
-H.~Gu, S.~Kim, and M.~Jung, ``Data-driven urban planning for proactive crowd management: Lessons from the 2022 Seoul Halloween crowd crush,'' \textit{Cities}, vol.~168, pp.~1--14, 2026.
-
-\bibitem{RN2176}
-M.~Haghani \textit{et al.}, ``A roadmap for the future of crowd safety research and practice: Introducing the Swiss Cheese Model of Crowd Safety and the imperative of a Vision Zero target,'' \textit{Safety Science}, vol.~168, pp.~106292, 2023.
-
-\bibitem{RN1998}
-H.~Jiang, X.~Zhang, Y.~Dong, and J.~Wang, ``Data-driven predictive modeling of citywide crowd flow for urban safety management: A case study of Beijing, China,'' \textit{Journal of Forecasting}, vol.~44, no.~2, pp.~730--752, 2025.
-
-\bibitem{RN2304}
-J.~C. Li, X.~C. Guo, R.~Y. Lu, and Y.~B. Zhang, ``Analysing urban tourism accessibility using real-time travel data: A case study in Nanjing, China,'' \textit{Sustainability}, vol.~14, no.~19, 2022.
-
-\bibitem{RN2059}
-H.~Liang, L.~Yang, J.~Du, C.-W. Shu, and S.~C. Wong, ``Modelling crowd pressure and turbulence through a mixed-type continuum approach,'' \textit{Transportmetrica B: Transport Dynamics}, vol.~12, no.~1, pp.~2328774, 2024.
-
-\bibitem{RN2122}
-X.~C. Liao, W.~N. Chen, X.~Q. Guo, J.~Zhong, and D.~J. Wang, ``DRIFT: A dynamic crowd inflow control system using LSTM-based deep reinforcement learning,'' \textit{IEEE Transactions on Systems, Man, and Cybernetics: Systems}, vol.~55, no.~6, pp.~4202--4215, 2025.
-
-\bibitem{RN2301}
-P.~X. Liu, X.~Xiao, J.~Zhang, R.~H. Wu, and H.~L. Zhang, ``Spatial configuration and online attention: A space syntax perspective,'' \textit{Sustainability}, vol.~10, no.~1, 2018.
-
-\bibitem{RN2146}
-N.~Molyneaux and M.~Bierlaire, ``Controlling pedestrian flows with moving walkways,'' \textit{Transportation Research Part C: Emerging Technologies}, vol.~141, pp.~103672, 2022.
-
-\bibitem{RN1978}
-K.~Rezaee, M.~R. Khosravi, H.~Attar, V.~G. Menon, M.~A. Khan, H.~Issa, and L.~Qi, ``IoMT-assisted medical vehicle routing based on UAV-borne human crowd sensing and deep learning in smart cities,'' \textit{IEEE Internet of Things Journal}, vol.~10, no.~21, pp.~18529--18536, 2023.
-
-\bibitem{RN1100}
-Z.~Shahhoseini and M.~Sarvi, ``Pedestrian crowd flows in shared spaces: Investigating the impact of geometry based on micro and macro scale measures,'' \textit{Transportation Research Part B: Methodological}, vol.~122, pp.~57--87, 2019.
-
-\bibitem{RN2154}
-D.~Shi, J.~Li, Q.~Wang, J.~Chen, R.~Lovreglio, J.~T.~Y. Lo, and J.~Ma, ``Modeling and simulation of crowd dynamics at evacuation bottlenecks during flood disasters,'' \textit{Transportation Research Part E: Logistics and Transportation Review}, vol.~198, pp.~104064, 2025.
-
-\bibitem{RN2302}
-L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns within free-roaming scenic architectural complexes: Considering impacts of temporal, spatial, and environmental factors,'' \textit{Frontiers of Architectural Research}, vol.~13, no.~5, pp.~990--1008, 2024.
-
-\bibitem{RN2174}
-C.-Z.~T. Xie, J.~Xu, B.~Zhu, T.-Q. Tang, S.~Lo, B.~Zhang, and Y.~Tian, ``Advancing crowd forecasting with graphs across microscopic trajectory to macroscopic dynamics,'' \textit{Information Fusion}, vol.~106, pp.~102275, 2024.
-
-\bibitem{RN761}
-X.~Yang, R.~Zhang, F.~Pan, Y.~Yang, Y.~Li, and X.~Yang, ``Stochastic user equilibrium path planning for crowd evacuation at subway station based on social force model,'' \textit{Physica A: Statistical Mechanics and its Applications}, vol.~594, pp.~127033, 2022.
-
-\bibitem{RN1662}
-H.~Yu, N.~Jiang, M.~Li, X.~Jia, J.~Shi, E.~W.~M. Lee, and L.~Yang, ``Regulating multi-directional passenger flow: Impact of obstacle position and flow level on pedestrian merging process,'' \textit{Tunnelling and Underground Space Technology}, vol.~157, pp.~106336, 2025.
-
-\bibitem{RN1193}
-R.~Zhao, D.~Wang, Y.~Wang, C.~Han, P.~Jia, C.~Li, and Y.~Ma, ``Macroscopic view: Crowd evacuation dynamics at T-shaped street junctions using a modified Aw-Rascle traffic flow model,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~22, no.~10, pp.~6612--6621, 2021.
-
-\bibitem{RN2194}
-J.~Zhong, T.~Cheng, W.~L. Liu, P.~Yang, Y.~Lin, and J.~Zhang, ``An evolutionary guardrail layout design framework for crowd control in subway stations,'' \textit{IEEE Transactions on Computational Social Systems}, vol.~10, no.~1, pp.~297--310, 2023.
-
-\bibitem{RN1663}
-J.~Zhong, D.~Li, W.~Cai, W.-N. Chen, and Y.~Shi, ``Automatic crowd navigation path planning in public scenes through multiobjective differential evolution,'' \textit{IEEE Transactions on Computational Social Systems}, vol.~11, no.~1, pp.~905--918, 2024.
-
-\bibitem{RN673}
-B.~L. Zhou, X.~O. Tang, and X.~G. Wang, ``Learning collective crowd behaviors with dynamic pedestrian-agents,'' \textit{International Journal of Computer Vision}, vol.~111, no.~1, pp.~50--68, 2015.
-
-\bibitem{RN2129}
-Shanghai Municipal Public Security Bureau Huangpu Branch, ``Notice on the implementation plan for safety management of key areas such as the Bund and Nanjing Road for the 2023 New Year,'' 2022.
-
-\bibitem{RN2124}
-D.~Wu and H.~Diao, ``Optimization of security police deployment and scheduling for large-scale events,'' \textit{Systems Engineering---Theory \& Practice}, vol.~42, no.~3, pp.~789--800, 2022.
-
-\bibitem{RN2130}
-CCTV, ``Beijing Dongcheng police take multiple measures to handle large crowds at Nanluoguxiang,'' 2021.
-
-\end{thebibliography}
+\bibliographystyle{IEEEtran}
+\bibliography{references}
 
 \end{document}

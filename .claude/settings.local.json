@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(ls -la *.txt *.toml *.cfg setup.py pyproject.toml)"
+      "Bash(ls -la *.txt *.toml *.cfg setup.py pyproject.toml)",
+      "Bash(python -c ' *)",
+      "Bash(python _fix_bib.py)",
+      "Bash(grep -oP '\\\\\\\\\\\\\\\\cite\\\\{\\\\K[^}]+' New_IEEEtran_how-to.tex)",
+      "Bash(grep -oh '\\\\\\\\\\\\\\\\cite{[^}]*}' New_IEEEtran_how-to.tex)",
+      "Bash(python _verify.py)",
+      "Bash(grep -n '[^\\\\\\\\]&' references.bib)"
     ]
   }
 }
