@@ -35,18 +35,44 @@ Crowd dynamics, macroscopic modeling, channel optimization, Hamilton-Jacobi-Bell
 \end{IEEEkeywords}
 
 \section{Introduction}
-\IEEEPARstart{L}{arge-scale} pedestrian management in urban areas such as waterfront promenades, stadiums, and transportation hubs presents significant challenges for public safety and operational efficiency. The dynamics of dense crowds involve complex interactions between individual behaviors, geometric constraints, and collective motion patterns that are difficult to predict and control.
+\label{sec:introduction}
 
-Macroscopic crowd models, pioneered by Hughes \cite{hughes2003}, treat pedestrian flows as continuous media described by density and velocity fields. These models offer computational efficiency and analytical tractability compared to microscopic approaches, making them suitable for real-time management applications. However, classical Hughes models assume isotropic movement and cannot adequately represent anisotropic channel geometries or directional control measures such as one-way corridors.
+\IEEEPARstart{L}{arge-scale} crowd gathering risks not only threaten individual safety but may also escalate into stampede incidents that disrupt social order and public security; the effectiveness of crowd management directly tests urban governance capacity and the modernization level of social safety governance systems \cite{RN2147,RN1998}. With the increasing frequency of high-density pedestrian activities such as holiday tourism, urban public events, commercial district promotions, New Year celebrations, and major sports events, core urban areas must accommodate pedestrian demands far exceeding daily levels within short time windows, posing enormous challenges for on-site organization, passage management, risk early warning, and emergency dispatch \cite{RN2154,RN1193,RN673}. Against this backdrop, scientific modeling, numerical simulation, and optimization methods for formulating and evaluating crowd control strategies---improving the efficiency of large-scale event organization, reducing local congestion risks, and safeguarding public safety---have become critical scientific and technological problems demanding urgent breakthroughs in the fields of social safety and urban governance \cite{RN1226,RN2059}.
 
-To address these limitations, this paper develops an enhanced modeling framework that integrates:
-\begin{itemize}
-\item Anisotropic geometric guidance via spatially varying metric tensors to represent channel preferences;
-\item Discrete directional constraints via constrained HJB equations to enforce one-way rules;
-\item A bi-level optimization structure that treats the simulation as an evaluation oracle for control decisions.
-\end{itemize}
+Among various urban crowd gathering scenarios, open scenic areas, waterfront viewing platforms, historic commercial districts, and urban pedestrian corridors are highly representative. Unlike enclosed venues such as stadiums and subway stations with well-defined boundaries \cite{RN761,RN2194}, open urban scenic areas typically feature multiple entrances and exits, multi-stage touring, multi-directional weaving, and diverse route preferences \cite{RN2304}. Visitors do not simply move from one entrance to one exit; rather, they undergo a continuous behavioral chain: entering the scenic area, moving along the main tourist corridor, pausing for sightseeing, choosing passages to leave, and flowing back along external roads \cite{RN2301}. Consequently, crowd movement in such areas is governed not only by destination choice, passage accessibility, and congestion state, but also by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303,RN2301}.
 
-The optimization variables include discrete channel direction configurations and continuous guidance intensity parameters. To handle the mixed discrete-continuous structure and expensive simulation evaluations, we propose a Structure-Aware Hybrid Block Optimization (SA-HBO) framework that exploits problem-specific structures including local Bellman response characteristics and surrogate pre-screening.
+Taking the Shanghai Nanjing East Road--Bund area as an example, visitors typically approach the Bund from Nanjing East Road, ascend to the viewing platform via multiple stepped passages, tour along the waterfront direction, then exit through several southern or adjacent passages and return along lower streets or external roads. This scenario can be abstracted as a typical ``waterfront platform--multi-stepped passage'' crowd flow scenario, and further generalized as an ``open scenic area with a main tourist corridor, multiple lateral connecting passages, and return flow lines.'' In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local passage direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient to capture realistic crowd behavior; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas, thereby affecting overall system safety and efficiency. Fig.~\ref{fig:bund_scene} shows the large-scale crowd at the Shanghai Nanjing East Road--Bund scenario during a holiday period.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/外滩场景/63988092.jpeg}
+\caption{Large-scale crowd at the Shanghai Nanjing East Road--Bund scenario during a holiday period.}
+\label{fig:bund_scene}
+\end{figure}
+
+Crowds in large-scale events constitute typical complex systems. Numerous individuals with heterogeneous desired speeds, destinations, route preferences, and reaction capabilities interact through multi-scale, nonlinear mechanisms in confined spaces, generating spatiotemporal patterns at the collective level \cite{RN1100,RN1193}. Macroscopically, these patterns manifest as destination-oriented flow, passage convergence, bottleneck queuing, local retention, exit competition, route diversion, and directional responses to control regulations \cite{RN2056,RN2102}; microscopically, individuals are influenced by surrounding density, visible paths, obstacle boundaries, guidance facilities, and herding behavior \cite{RN2174}. For open scenic areas, crowd behavior additionally exhibits pronounced phase dependence and stochasticity: visitors may first move toward the viewing platform, then tour along the main viewing direction, and subsequently choose different exit passages based on preferences or guidance \cite{RN2302}. These characteristics of multi-stage, multi-route coexistence with shared congestion mean that traditional static capacity analysis or single shortest-path models cannot adequately support refined management decisions.
+
+In response to the complex characteristics of high-density crowd systems and the spatial organization features of open urban scenic areas, existing large-scale event security management practices typically integrate system dynamics theory, system coupling theory, and system safety theory, combined with the delineation of key high-risk zones, historical crowd behavior patterns, and event factors currently dominating crowd movement, to formulate a series of crowd behavior control measures \cite{RN2176,RN1663}. These measures include scientifically deploying security personnel at critical locations, erecting temporary barriers for effective isolation and diversion, regulating crowd direction and flow speed through manual guidance, implementing one-way passage on key channels, applying batch release in core areas, and promptly guiding visitors away from locally high-density zones, thereby enhancing overall safety assurance effectiveness \cite{RN2181,RN1978}. For instance, during major domestic holidays, the Shanghai Huangpu District Nanjing East Road--Bund area adopts measures such as batch release, passage direction regulation, south-entry north-exit routing, reduction of head-on conflicts, controlling inbound flow speed to the Bund through police deployment, and guiding lingering visitors to disperse \cite{RN2129}. Similarly, during peak periods, especially major holidays, Nanluoguxiang main street in Dongcheng District, Beijing, implements one-way passage measures, with visitors typically entering from the south entrance and exiting from the north \cite{RN2130}. Meanwhile, management deploys security and guidance personnel at key intersections along the main street, using loudspeakers, signage, and on-site guidance to direct visitors along prescribed routes, avoiding head-on conflicts and local congestion \cite{RN2130}. This is consistent in control mechanism with the ``south-entry north-exit'' and passage direction regulation employed in the Shanghai Bund area.
+
+However, current management measures for urban high-pedestrian-flow areas still rely to a considerable extent on manual experience and static contingency plans. Although these measures hold significant value in practical management, deficiencies remain in scientific evaluation and refined optimization \cite{RN1662}. First, many control schemes are primarily formulated based on historical experience, lacking quantitative characterization of the impact of different passage direction configurations, geometric guidance intensities, and phase-dependent behavioral preferences. Second, existing methods tend to focus on single-point pedestrian flow statistics or local density monitoring, making it difficult to describe the dynamic coupling relationships among ``passage direction rules--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}. Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations. Finally, many existing simulation or optimization methods treat the crowd model simply as a black-box evaluator, failing to fully exploit the structural information among passage geometry, one-way rules, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122} and hindering the interpretability of optimization results.
+
+To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating one-way passage constraints, geometric guidance, and multi-stage route behavior, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. Specifically, this paper constructs a Bellman--conservation law coupled crowd continuum model: at the density evolution level, conservation laws describe the spatiotemporal propagation of subpopulations across different stages and routes; at the route choice level, independent potential functions are established for each stage--route subpopulation, with optimal directions computed via the discrete Bellman equation; at the congestion feedback level, subpopulations share the speed--density relationship determined by total density, thereby achieving mutual influence among multi-intent crowds. To represent passage direction control, one-way passage rules are formulated as constraints on the local admissible direction set, enabling the model to characterize how different configurations---such as one-way (forward/reverse) and two-way passage---affect local optimal directions. To represent passage geometric guidance, an anisotropic metric tensor is introduced to describe the cost differences of movement in different directions within traversable regions, thereby simulating pedestrian direction preferences and streamline organization when approaching, entering, and leaving stepped passages.
+
+In terms of management optimization, this paper further distinguishes ``controllable management variables'' from ``exogenous behavioral parameters.'' Passage direction configuration and geometric guidance intensity are variables that managers can regulate or design, while visitor route diversion preferences reflect the crowd's choice tendencies toward different routes or exits during stage transitions and should be identified from historical data, serving as fixed exogenous parameters input to the model during optimization, rather than being treated as variables freely controllable by managers. Based on this boundary, this paper adopts total travel time, high-density exposure time, and channel cumulative flow variance as efficiency, safety, and load balancing indicators, formulating a scalarized optimization problem under fixed weights to search over controllable variables. To improve optimization efficiency and enhance result interpretability, this paper designs a Structure-Aware Hybrid Block Optimization framework (SA-HBO) and implements a simplified instance thereof. This method exploits the discrete neighborhood structure of passage direction variables, the continuous nature of geometric guidance variables, and the response characteristics of Bellman potential fields to local control changes, improving candidate strategy evaluation efficiency through surrogate pre-screening, full simulation confirmation, acceptance/rejection mechanisms, and Bellman warm-start procedures, while avoiding treating the model entirely as an unstructured black box.
+
+The main contributions of this paper are as follows.
+
+\begin{enumerate}
+\item \textbf{A ``waterfront platform--multi-stepped passage'' crowd flow modeling framework for open scenic areas is proposed.} Targeting urban scenic area scenarios featuring a main tourist corridor, multiple lateral connecting passages, and return flow lines, this paper represents visitor behavior as a multi-stage, multi-route continuum flow process. The model allows different stage--route subpopulations to possess independent potential functions and target regions while sharing congestion feedback determined by total density, thereby capturing the coupled crowd evolution process involving destination orientation, route preferences, and local congestion.
+
+\item \textbf{A Bellman--conservation law coupled model integrating one-way passage constraints and geometric guidance is constructed.} Passage direction control is represented as a local admissible direction set, allowing rules such as ``forward,'' ``reverse,'' and ``bidirectional'' to directly affect local optimal direction selection. Simultaneously, an anisotropic metric tensor is introduced to characterize the cost difference between axial and lateral movement within traversable regions, thereby simulating crowd behaviors such as pre-alignment, smooth convergence, and streamline reorganization near passage entrances. This modeling approach provides a mechanistic basis for explaining how control regulations alter local flow patterns.
+
+\item \textbf{An evaluation framework distinguishing mechanism verification from strategy optimization is established.} Experimental indicators are categorized into behavioral mechanism indicators and management optimization indicators. The mechanism verification phase focuses on behavioral indicators such as direction consistency, counter-rule direction proportion, approach angle distribution, pre-alignment distance, and channel capture domain, used to examine whether the model can reproduce reasonable crowd flow behavior. The strategy evaluation and optimization phase employs total travel time, high-density exposure time, and channel cumulative flow variance to respectively measure efficiency, safety, and load balancing. This separation avoids the pitfall of substituting system performance metrics for model mechanism validation.
+
+\item \textbf{A structure-aware optimization framework for controllable passage configuration is designed.} Under the condition of fixed historically identified preference parameters, this paper limits current optimization variables to passage direction configuration and geometric guidance intensity, and proposes a simplified instance of SA-HBO for solving the scalarized management optimization problem under fixed weights. Through discrete neighborhood search for passage direction configuration, continuous variable local search for geometric guidance intensity, combined with surrogate pre-screening, full simulation confirmation, best-so-far preservation, and acceptance/rejection mechanisms, the framework enhances the stability and interpretability of the optimization process.
+\end{enumerate}
+
+The remainder of this paper is organized as follows. Section~\ref{sec:related} reviews related work on massive crowd management and macroscopic crowd modeling. Section~\ref{sec:model} presents the macroscopic crowd dynamics model, including the Bellman--conservation law coupled framework with one-way constraints and anisotropic metric tensor guidance. Section~\ref{sec:multistage} describes the multi-stage, multi-route extension with probabilistic splitting. Section~\ref{sec:metrics} defines the control evaluation metrics and the scalarized optimization objective. Section~\ref{sec:optimization} presents the SA-HBO optimization framework. Section~\ref{sec:experiments} reports numerical experiments covering mechanism validation, strategy comparison, and optimization results. Section~\ref{sec:conclusion} concludes the paper and discusses future work.
 
 \section{Related Work}
 \label{sec:related}
@@ -632,6 +658,87 @@ K.~Price, R.~M. Storn, and J.~A. Lampinen, \textit{Differential Evolution: A Pra
 
 \bibitem{liu2024automatic}
 W.~Liu \textit{et al.}, ``Automatic optimization of guidance guardrail layout based on multi-objective evolutionary algorithm,'' \textit{Complex System Modeling and Simulation}, vol.~4, no.~4, pp. 353--367, 2024.
+
+\bibitem{RN2056}
+N.~W.~F. Bode, M.~Chraibi, and S.~Holl, ``The emergence of macroscopic interactions between intersecting pedestrian streams,'' \textit{Transportation Research Part B: Methodological}, vol.~119, pp.~197--210, 2019.
+
+\bibitem{RN1226}
+T.~Bosse, M.~Hoogendoorn, M.~C.~A. Klein, J.~Treur, C.~N.~van der Wal, and A.~van Wissen, ``Modelling collective decision making in groups and crowds: Integrating social contagion and interacting emotions, beliefs and intentions,'' \textit{Autonomous Agents and Multi-Agent Systems}, vol.~27, no.~1, pp.~52--84, 2013.
+
+\bibitem{RN2102}
+F.~Bourdin, ``Splitting scheme for a macroscopic crowd motion model with congestion for a two-typed population,'' \textit{Networks and Heterogeneous Media}, vol.~17, no.~5, pp.~783--801, 2022.
+
+\bibitem{RN2303}
+A.~M. Caldeira and E.~Kastenholz, ``Spatiotemporal tourist behaviour in urban destinations: a framework of analysis,'' \textit{Tourism Geographies}, vol.~22, no.~1, pp.~22--50, 2020.
+
+\bibitem{RN2147}
+P.~Charalambous, J.~Pettre, V.~Vassiliades, Y.~Chrysanthou, and N.~Pelechano, ``GREIL-Crowds: Crowd simulation with deep reinforcement learning and examples,'' \textit{ACM Trans. Graph.}, vol.~42, no.~4, pp.~Article~137, 2023.
+
+\bibitem{RN2181}
+H.~Gu, S.~Kim, and M.~Jung, ``Data-driven urban planning for proactive crowd management: Lessons from the 2022 Seoul Halloween crowd crush,'' \textit{Cities}, vol.~168, pp.~1--14, 2026.
+
+\bibitem{RN2176}
+M.~Haghani \textit{et al.}, ``A roadmap for the future of crowd safety research and practice: Introducing the Swiss Cheese Model of Crowd Safety and the imperative of a Vision Zero target,'' \textit{Safety Science}, vol.~168, pp.~106292, 2023.
+
+\bibitem{RN1998}
+H.~Jiang, X.~Zhang, Y.~Dong, and J.~Wang, ``Data-driven predictive modeling of citywide crowd flow for urban safety management: A case study of Beijing, China,'' \textit{Journal of Forecasting}, vol.~44, no.~2, pp.~730--752, 2025.
+
+\bibitem{RN2304}
+J.~C. Li, X.~C. Guo, R.~Y. Lu, and Y.~B. Zhang, ``Analysing urban tourism accessibility using real-time travel data: A case study in Nanjing, China,'' \textit{Sustainability}, vol.~14, no.~19, 2022.
+
+\bibitem{RN2059}
+H.~Liang, L.~Yang, J.~Du, C.-W. Shu, and S.~C. Wong, ``Modelling crowd pressure and turbulence through a mixed-type continuum approach,'' \textit{Transportmetrica B: Transport Dynamics}, vol.~12, no.~1, pp.~2328774, 2024.
+
+\bibitem{RN2122}
+X.~C. Liao, W.~N. Chen, X.~Q. Guo, J.~Zhong, and D.~J. Wang, ``DRIFT: A dynamic crowd inflow control system using LSTM-based deep reinforcement learning,'' \textit{IEEE Transactions on Systems, Man, and Cybernetics: Systems}, vol.~55, no.~6, pp.~4202--4215, 2025.
+
+\bibitem{RN2301}
+P.~X. Liu, X.~Xiao, J.~Zhang, R.~H. Wu, and H.~L. Zhang, ``Spatial configuration and online attention: A space syntax perspective,'' \textit{Sustainability}, vol.~10, no.~1, 2018.
+
+\bibitem{RN2146}
+N.~Molyneaux and M.~Bierlaire, ``Controlling pedestrian flows with moving walkways,'' \textit{Transportation Research Part C: Emerging Technologies}, vol.~141, pp.~103672, 2022.
+
+\bibitem{RN1978}
+K.~Rezaee, M.~R. Khosravi, H.~Attar, V.~G. Menon, M.~A. Khan, H.~Issa, and L.~Qi, ``IoMT-assisted medical vehicle routing based on UAV-borne human crowd sensing and deep learning in smart cities,'' \textit{IEEE Internet of Things Journal}, vol.~10, no.~21, pp.~18529--18536, 2023.
+
+\bibitem{RN1100}
+Z.~Shahhoseini and M.~Sarvi, ``Pedestrian crowd flows in shared spaces: Investigating the impact of geometry based on micro and macro scale measures,'' \textit{Transportation Research Part B: Methodological}, vol.~122, pp.~57--87, 2019.
+
+\bibitem{RN2154}
+D.~Shi, J.~Li, Q.~Wang, J.~Chen, R.~Lovreglio, J.~T.~Y. Lo, and J.~Ma, ``Modeling and simulation of crowd dynamics at evacuation bottlenecks during flood disasters,'' \textit{Transportation Research Part E: Logistics and Transportation Review}, vol.~198, pp.~104064, 2025.
+
+\bibitem{RN2302}
+L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns within free-roaming scenic architectural complexes: Considering impacts of temporal, spatial, and environmental factors,'' \textit{Frontiers of Architectural Research}, vol.~13, no.~5, pp.~990--1008, 2024.
+
+\bibitem{RN2174}
+C.-Z.~T. Xie, J.~Xu, B.~Zhu, T.-Q. Tang, S.~Lo, B.~Zhang, and Y.~Tian, ``Advancing crowd forecasting with graphs across microscopic trajectory to macroscopic dynamics,'' \textit{Information Fusion}, vol.~106, pp.~102275, 2024.
+
+\bibitem{RN761}
+X.~Yang, R.~Zhang, F.~Pan, Y.~Yang, Y.~Li, and X.~Yang, ``Stochastic user equilibrium path planning for crowd evacuation at subway station based on social force model,'' \textit{Physica A: Statistical Mechanics and its Applications}, vol.~594, pp.~127033, 2022.
+
+\bibitem{RN1662}
+H.~Yu, N.~Jiang, M.~Li, X.~Jia, J.~Shi, E.~W.~M. Lee, and L.~Yang, ``Regulating multi-directional passenger flow: Impact of obstacle position and flow level on pedestrian merging process,'' \textit{Tunnelling and Underground Space Technology}, vol.~157, pp.~106336, 2025.
+
+\bibitem{RN1193}
+R.~Zhao, D.~Wang, Y.~Wang, C.~Han, P.~Jia, C.~Li, and Y.~Ma, ``Macroscopic view: Crowd evacuation dynamics at T-shaped street junctions using a modified Aw-Rascle traffic flow model,'' \textit{IEEE Transactions on Intelligent Transportation Systems}, vol.~22, no.~10, pp.~6612--6621, 2021.
+
+\bibitem{RN2194}
+J.~Zhong, T.~Cheng, W.~L. Liu, P.~Yang, Y.~Lin, and J.~Zhang, ``An evolutionary guardrail layout design framework for crowd control in subway stations,'' \textit{IEEE Transactions on Computational Social Systems}, vol.~10, no.~1, pp.~297--310, 2023.
+
+\bibitem{RN1663}
+J.~Zhong, D.~Li, W.~Cai, W.-N. Chen, and Y.~Shi, ``Automatic crowd navigation path planning in public scenes through multiobjective differential evolution,'' \textit{IEEE Transactions on Computational Social Systems}, vol.~11, no.~1, pp.~905--918, 2024.
+
+\bibitem{RN673}
+B.~L. Zhou, X.~O. Tang, and X.~G. Wang, ``Learning collective crowd behaviors with dynamic pedestrian-agents,'' \textit{International Journal of Computer Vision}, vol.~111, no.~1, pp.~50--68, 2015.
+
+\bibitem{RN2129}
+Shanghai Municipal Public Security Bureau Huangpu Branch, ``Notice on the implementation plan for safety management of key areas such as the Bund and Nanjing Road for the 2023 New Year,'' 2022.
+
+\bibitem{RN2124}
+D.~Wu and H.~Diao, ``Optimization of security police deployment and scheduling for large-scale events,'' \textit{Systems Engineering---Theory \& Practice}, vol.~42, no.~3, pp.~789--800, 2022.
+
+\bibitem{RN2130}
+CCTV, ``Beijing Dongcheng police take multiple measures to handle large crowds at Nanluoguxiang,'' 2021.
 
 \end{thebibliography}
 
