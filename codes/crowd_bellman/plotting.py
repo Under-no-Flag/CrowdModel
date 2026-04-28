@@ -20,7 +20,7 @@ def save_case_snapshot(
     uy: np.ndarray,
     walkable: np.ndarray,
     rho_max: float,
-    panel_title: str = "Potential and direction",
+    panel_title: str = "Density and direction",
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -29,14 +29,11 @@ def save_case_snapshot(
 
     density = rho.copy()
     density[~walkable] = np.nan
-    potential = phi.copy()
-    potential[~walkable] = np.nan
-
     im0 = axes[0].imshow(density, origin="lower", cmap="viridis", vmin=0.0, vmax=rho_max)
     axes[0].set_title("Density")
     fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
 
-    im1 = axes[1].imshow(potential, origin="lower", cmap="magma")
+    im1 = axes[1].imshow(density, origin="lower", cmap="viridis", vmin=0.0, vmax=rho_max)
     axes[1].set_title(panel_title)
     fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
 

@@ -37,6 +37,7 @@ class BidirectionalUCollector:
             name: {"eastbound": 0.0, "westbound": 0.0}
             for name in self.channel_order
         }
+        self.sample_rows: list[dict[str, float | str]] = []
         self.observed_steps = 0
 
     def observe(self, snapshot: dict[str, object]) -> None:
@@ -60,12 +61,26 @@ class BidirectionalUCollector:
         middle_east = east_mass[self.middle_mask]
         middle_west = west_mass[self.middle_mask]
         middle_total = middle_east + middle_west
+        middle_total_step = float(np.sum(middle_total) * cell_area)
+        middle_west_step = float(np.sum(middle_west) * cell_area)
+        counterflow_step = float(np.sum(np.minimum(middle_east, middle_west)) * cell_area)
+        head_on_step = float(np.sum((middle_east > 1.0e-8) & (middle_west > 1.0e-8)) * cell_area)
 
-        self.middle_total_mass_time += float(np.sum(middle_total) * cell_area * dt)
-        self.middle_westbound_mass_time += float(np.sum(middle_west) * cell_area * dt)
-        self.middle_counterflow_mass_time += float(np.sum(np.minimum(middle_east, middle_west)) * cell_area * dt)
-        self.middle_head_on_cell_time += float(np.sum((middle_east > 1.0e-8) & (middle_west > 1.0e-8)) * cell_area * dt)
+        self.middle_total_mass_time += middle_total_step * dt
+        self.middle_westbound_mass_time += middle_west_step * dt
+        self.middle_counterflow_mass_time += counterflow_step * dt
+        self.middle_head_on_cell_time += head_on_step * dt
         self.total_observed_time += dt
+        self.sample_rows.append(
+            {
+                "case_id": self.case_id,
+                "time": float(time_value),
+                "middle_westbound_share": middle_west_step / middle_total_step if middle_total_step > 1.0e-12 else np.nan,
+                "middle_counterflow_mass": counterflow_step,
+                "middle_head_on_area": head_on_step,
+                "middle_total_mass": middle_total_step,
+            }
+        )
 
         for channel_name, channel_mask in self.channel_masks.items():
             channel_mask = channel_mask & self.walkable
@@ -109,6 +124,8 @@ class BidirectionalUCollector:
             "channel_directional_share": channel_directional_share,
         }
         save_json(output_dir / "u_bidirectional_summary.json", payload)
+        _save_sample_csv(output_dir / "u_bidirectional_samples.csv", self.sample_rows)
+        payload["u_bidirectional_sample_path"] = str(output_dir / "u_bidirectional_samples.csv")
         return payload
 
 
@@ -140,6 +157,8 @@ def build_bidirectional_u_report(
 
     _save_csv(output_root / "g1_u_bidirectional_metrics.csv", rows)
     _save_plot(output_root / "g1_u_bidirectional_validation.png", rows)
+    _save_bidirectional_line_plot(output_root / "g1_bidirectional_dynamics_lines.png", validation_summaries)
+    _save_bidirectional_boxplot(output_root / "g1_bidirectional_reverse_boxplot.png", validation_summaries)
 
     baseline = next((row for row in rows if row["case_id"] == "case_u_bidirectional_baseline"), None)
     ruled = next((row for row in rows if row["case_id"] == "case_u_bidirectional_middle_rule"), None)
@@ -157,6 +176,10 @@ def build_bidirectional_u_report(
             "baseline_middle_head_on_cell_time": None if baseline is None else baseline["middle_head_on_cell_time"],
             "rule_middle_head_on_cell_time": None if ruled is None else ruled["middle_head_on_cell_time"],
         },
+        "journal_outputs": {
+            "bidirectional_dynamics_lines": str(output_root / "g1_bidirectional_dynamics_lines.png"),
+            "bidirectional_reverse_boxplot": str(output_root / "g1_bidirectional_reverse_boxplot.png"),
+        },
     }
     save_json(output_root / "g1_u_bidirectional_summary.json", report)
     return report
@@ -169,6 +192,103 @@ def _save_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _save_sample_csv(path: Path, rows: list[dict[str, float | str]]) -> None:
+    if not rows:
+        return
+    with path.open("w", newline="", encoding="utf-8") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(rows[0].keys()))
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _load_samples(validation_summaries: list[dict[str, object]]) -> dict[str, list[dict[str, float]]]:
+    samples: dict[str, list[dict[str, float]]] = {}
+    for summary in validation_summaries:
+        case_id = str(summary.get("case_id", ""))
+        sample_path = summary.get("u_bidirectional_sample_path")
+        if not case_id or not sample_path:
+            continue
+        path = Path(str(sample_path))
+        if not path.exists():
+            continue
+        rows: list[dict[str, float]] = []
+        with path.open("r", newline="", encoding="utf-8") as handle:
+            reader = csv.DictReader(handle)
+            for raw in reader:
+                row: dict[str, float] = {}
+                for key, value in raw.items():
+                    if key == "case_id":
+                        continue
+                    try:
+                        row[key] = float(value)
+                    except (TypeError, ValueError):
+                        row[key] = np.nan
+                rows.append(row)
+        samples[case_id] = rows
+    return samples
+
+
+def _case_label(case_id: str) -> str:
+    labels = {
+        "case_u_bidirectional_baseline": "Baseline",
+        "case_u_bidirectional_middle_rule": "U-constrained middle",
+    }
+    return labels.get(case_id, case_id)
+
+
+def _sample_series(samples: dict[str, list[dict[str, float]]], case_id: str, metric: str) -> tuple[np.ndarray, np.ndarray]:
+    rows = samples.get(case_id, [])
+    time = np.asarray([row.get("time", np.nan) for row in rows], dtype=float)
+    value = np.asarray([row.get(metric, np.nan) for row in rows], dtype=float)
+    valid = np.isfinite(time) & np.isfinite(value)
+    return time[valid], value[valid]
+
+
+def _save_bidirectional_line_plot(path: Path, validation_summaries: list[dict[str, object]]) -> None:
+    samples = _load_samples(validation_summaries)
+    focus_ids = ["case_u_bidirectional_baseline", "case_u_bidirectional_middle_rule"]
+    if not any(case_id in samples for case_id in focus_ids):
+        return
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.6), dpi=150, sharex=False)
+    for case_id in focus_ids:
+        if case_id not in samples:
+            continue
+        time_west, west_share = _sample_series(samples, case_id, "middle_westbound_share")
+        time_counter, counterflow = _sample_series(samples, case_id, "middle_counterflow_mass")
+        axes[0].plot(time_west, west_share, linewidth=1.8, label=_case_label(case_id))
+        axes[1].plot(time_counter, counterflow, linewidth=1.8, label=_case_label(case_id))
+    axes[0].set_title("Middle-Channel Reverse-Flow Ratio")
+    axes[0].set_ylabel("westbound mass share")
+    axes[1].set_title("Middle-Channel Counterflow Intensity")
+    axes[1].set_ylabel("min(east, west) mass")
+    for ax in axes:
+        ax.set_xlabel("time")
+        ax.grid(alpha=0.25)
+        ax.legend(frameon=False)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def _save_bidirectional_boxplot(path: Path, validation_summaries: list[dict[str, object]]) -> None:
+    samples = _load_samples(validation_summaries)
+    focus_ids = [case_id for case_id in ("case_u_bidirectional_baseline", "case_u_bidirectional_middle_rule") if case_id in samples]
+    if not focus_ids:
+        return
+    data = []
+    for case_id in focus_ids:
+        _, values = _sample_series(samples, case_id, "middle_westbound_share")
+        data.append(values if values.size else np.asarray([np.nan]))
+    fig, ax = plt.subplots(1, 1, figsize=(6.8, 4.6), dpi=150)
+    ax.boxplot(data, labels=[_case_label(case_id) for case_id in focus_ids], showfliers=False, patch_artist=True)
+    ax.set_title("Distribution of Middle-Channel Reverse Flow")
+    ax.set_ylabel("westbound mass share")
+    ax.grid(axis="y", alpha=0.25)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
 
 
 def _save_plot(path: Path, rows: list[dict[str, object]]) -> None:

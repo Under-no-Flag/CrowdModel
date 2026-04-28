@@ -347,7 +347,7 @@ def simulate_case(
                 uy=uy_by_group[vis_key],
                 walkable=case.walkable,
                 rho_max=cfg.rho_max,
-                panel_title=f"{groups[vis_key].name} potential and direction",
+                panel_title=f"{groups[vis_key].name} density and direction",
             )
         step += 1
 

@@ -112,6 +112,7 @@ class CaseBehaviorCollector:
         self.channel_mass = {name: 0.0 for name in self.channel_order}
         self.channel_reverse_mass = {name: 0.0 for name in self.channel_order}
         self.channel_consistency_sum = {name: 0.0 for name in self.channel_order}
+        self.sample_rows: list[dict[str, float | str]] = []
         self.observed_steps = 0
         self._cache: dict[str, object] | None = None
 
@@ -159,14 +160,40 @@ class CaseBehaviorCollector:
                 self.alignment_x_sum += float(np.sum(xx[alignment_valid] * alignment_weights))
                 self.alignment_weight += float(np.sum(alignment_weights))
 
+        sample_row: dict[str, float | str] = {
+            "case_id": self.case_id,
+            "time": float(time_value),
+        }
         for channel_name, channel_mask in self.channel_masks.items():
             channel_valid = valid & channel_mask
             if not np.any(channel_valid):
+                sample_row[f"{channel_name}_reverse_share"] = np.nan
+                sample_row[f"{channel_name}_consistency"] = np.nan
+                sample_row[f"{channel_name}_mass"] = 0.0
                 continue
             channel_weights = rho[channel_valid]
+            channel_mass = float(np.sum(channel_weights))
+            reverse_mass = float(np.sum(channel_weights[vx[channel_valid] < 0.0]))
+            consistency_sum = float(np.sum(channel_weights * dir_x[channel_valid]))
             self.channel_mass[channel_name] += float(np.sum(channel_weights))
-            self.channel_reverse_mass[channel_name] += float(np.sum(channel_weights[vx[channel_valid] < 0.0]))
-            self.channel_consistency_sum[channel_name] += float(np.sum(channel_weights * dir_x[channel_valid]))
+            self.channel_reverse_mass[channel_name] += reverse_mass
+            self.channel_consistency_sum[channel_name] += consistency_sum
+            sample_row[f"{channel_name}_reverse_share"] = reverse_mass / channel_mass if channel_mass > 1.0e-8 else np.nan
+            sample_row[f"{channel_name}_consistency"] = consistency_sum / channel_mass if channel_mass > 1.0e-8 else np.nan
+            sample_row[f"{channel_name}_mass"] = channel_mass
+
+        if np.any(feeder_valid):
+            sample_angles = np.degrees(np.arctan2(vy[feeder_valid], vx[feeder_valid]))
+            sample_weights = rho[feeder_valid]
+            sample_mean = float(np.sum(sample_weights * sample_angles) / np.sum(sample_weights))
+            sample_var = float(np.sum(sample_weights * (sample_angles - sample_mean) ** 2) / np.sum(sample_weights))
+            sample_row["approach_angle_mean_deg"] = sample_mean
+            sample_row["approach_angle_std_deg"] = float(np.sqrt(max(sample_var, 0.0)))
+        else:
+            sample_row["approach_angle_mean_deg"] = np.nan
+            sample_row["approach_angle_std_deg"] = np.nan
+        sample_row["mean_density_analysis"] = float(np.mean(rho[self.analysis_mask])) if np.any(self.analysis_mask) else np.nan
+        self.sample_rows.append(sample_row)
 
         self.observed_steps += 1
 
@@ -257,6 +284,18 @@ class CaseBehaviorCollector:
         payload = self._finalize()
         output_dir.mkdir(parents=True, exist_ok=True)
         save_json(output_dir / "behavior_summary.json", payload["summary"])
+        field_path = output_dir / "behavior_fields.npz"
+        np.savez_compressed(
+            field_path,
+            mean_density=np.asarray(payload["mean_density"], dtype=float),
+            mean_dir_x=np.asarray(payload["mean_dir_x"], dtype=float),
+            mean_dir_y=np.asarray(payload["mean_dir_y"], dtype=float),
+            capture_map=np.asarray(payload["capture_map"], dtype=int),
+            walkable=self.walkable.astype(bool),
+            analysis_mask=self.analysis_mask.astype(bool),
+            feeder_mask=self.feeder_mask.astype(bool),
+        )
+        _save_sample_csv(output_dir / "behavior_samples.csv", self.sample_rows)
         self._save_direction_plot(
             path=output_dir / "behavior_direction.png",
             mean_density=np.asarray(payload["mean_density"], dtype=float),
@@ -267,7 +306,10 @@ class CaseBehaviorCollector:
             path=output_dir / "capture_domains.png",
             capture_map=np.asarray(payload["capture_map"], dtype=int),
         )
-        return payload["summary"]
+        summary = dict(payload["summary"])
+        summary["behavior_field_path"] = str(field_path)
+        summary["behavior_sample_path"] = str(output_dir / "behavior_samples.csv")
+        return summary
 
     def _save_direction_plot(
         self,
@@ -345,6 +387,18 @@ def _guided_channel(case_id: str) -> str | None:
     return mapping.get(case_id)
 
 
+def _display_case_id(case_id: str) -> str:
+    labels = {
+        "case1_baseline": "Baseline",
+        "case_u_only_middle": "U-only",
+        "case_m_only_middle": "M-only",
+        "case2_middle_guided": "U+M",
+        "case3_top_guided": "U+M top",
+        "case4_bottom_guided": "U+M bottom",
+    }
+    return labels.get(case_id, case_id)
+
+
 def build_g1_mechanism_report(
     *,
     output_root: Path,
@@ -365,6 +419,7 @@ def build_g1_mechanism_report(
             "objective_value": summary.get("objective_value"),
             "sink_cumulative": summary.get("final_sink_cumulative"),
             "peak_density": summary.get("peak_density_max"),
+            "j2_normalized": summary.get("j2_normalized"),
             "approach_angle_std_deg": behavior.get("approach_angle_std_deg"),
             "alignment_x_mean": behavior.get("alignment_x_mean"),
             "top_capture_share": capture_share.get("top", 0.0),
@@ -383,6 +438,15 @@ def build_g1_mechanism_report(
     _save_u_validation_plot(output_root / "g1_u_validation.png", table_rows)
     _save_m_validation_plot(output_root / "g1_m_validation.png", behavior_by_case)
     _save_configuration_plot(output_root / "g1_configuration_sensitivity.png", table_rows)
+    _save_direction_consistency_radar(output_root / "g1_direction_consistency_radar.png", table_rows)
+    _save_flow_metric_boxplots(output_root / "g1_flow_metric_boxplots.png", behavior_summaries)
+    _save_attraction_contour_panel(output_root / "g1_channel_attraction_contours.png", behavior_summaries)
+    _save_vector_field_panel(output_root / "g1_vector_field_comparison.png", behavior_summaries)
+    comparison_rows = _save_mechanism_comparison_table(
+        output_root=output_root,
+        table_rows=table_rows,
+        behavior_summaries=behavior_summaries,
+    )
 
     report = {
         "experiment_group": "G1",
@@ -425,6 +489,15 @@ def build_g1_mechanism_report(
                 if _guided_channel(str(row["case_id"])) is not None
             ],
         },
+        "journal_outputs": {
+            "direction_consistency_radar": str(output_root / "g1_direction_consistency_radar.png"),
+            "flow_metric_boxplots": str(output_root / "g1_flow_metric_boxplots.png"),
+            "channel_attraction_contours": str(output_root / "g1_channel_attraction_contours.png"),
+            "vector_field_comparison": str(output_root / "g1_vector_field_comparison.png"),
+            "mechanism_comparison_table_csv": str(output_root / "g1_mechanism_comparison_table.csv"),
+            "mechanism_comparison_table_md": str(output_root / "g1_mechanism_comparison_table.md"),
+            "mechanism_comparison_rows": comparison_rows,
+        },
     }
     if bridge_summary is not None:
         report["behavior_layer_bridge"] = bridge_summary
@@ -441,6 +514,318 @@ def _save_behavior_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
+
+
+def _save_sample_csv(path: Path, rows: list[dict[str, float | str]]) -> None:
+    if not rows:
+        return
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = list(rows[0].keys())
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+def _load_behavior_samples(behavior_summaries: list[dict[str, object]]) -> dict[str, list[dict[str, float]]]:
+    samples: dict[str, list[dict[str, float]]] = {}
+    for behavior in behavior_summaries:
+        case_id = str(behavior.get("case_id", ""))
+        sample_path = behavior.get("behavior_sample_path")
+        if not case_id or not sample_path:
+            continue
+        path = Path(str(sample_path))
+        if not path.exists():
+            continue
+        rows: list[dict[str, float]] = []
+        with path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            for raw in reader:
+                row: dict[str, float] = {}
+                for key, value in raw.items():
+                    if key == "case_id":
+                        continue
+                    try:
+                        row[key] = float(value)
+                    except (TypeError, ValueError):
+                        row[key] = np.nan
+                rows.append(row)
+        samples[case_id] = rows
+    return samples
+
+
+def _series(samples: dict[str, list[dict[str, float]]], case_id: str, metric: str) -> np.ndarray:
+    values = [row.get(metric, np.nan) for row in samples.get(case_id, [])]
+    arr = np.asarray(values, dtype=float)
+    return arr[np.isfinite(arr)]
+
+
+def _bootstrap_difference(
+    baseline: np.ndarray,
+    candidate: np.ndarray,
+    *,
+    iterations: int = 2000,
+) -> dict[str, float | None]:
+    baseline = baseline[np.isfinite(baseline)]
+    candidate = candidate[np.isfinite(candidate)]
+    if baseline.size < 3 or candidate.size < 3:
+        return {"delta": None, "ci_low": None, "ci_high": None, "p_bootstrap": None}
+    rng = np.random.default_rng(20260417)
+    diffs = np.empty(iterations, dtype=float)
+    for idx in range(iterations):
+        b = rng.choice(baseline, size=baseline.size, replace=True)
+        c = rng.choice(candidate, size=candidate.size, replace=True)
+        diffs[idx] = float(np.mean(c) - np.mean(b))
+    delta = float(np.mean(candidate) - np.mean(baseline))
+    ci_low, ci_high = np.percentile(diffs, [2.5, 97.5])
+    left = float(np.mean(diffs <= 0.0))
+    right = float(np.mean(diffs >= 0.0))
+    p_bootstrap = min(1.0, 2.0 * min(left, right))
+    return {
+        "delta": delta,
+        "ci_low": float(ci_low),
+        "ci_high": float(ci_high),
+        "p_bootstrap": float(p_bootstrap),
+    }
+
+
+def _focus_rows(rows: list[dict[str, object]], include_guided_variants: bool = False) -> list[dict[str, object]]:
+    focus_ids = ["case1_baseline", "case_u_only_middle", "case_m_only_middle", "case2_middle_guided"]
+    if include_guided_variants:
+        focus_ids.extend(["case3_top_guided", "case4_bottom_guided"])
+    by_case = {str(row["case_id"]): row for row in rows}
+    return [by_case[case_id] for case_id in focus_ids if case_id in by_case]
+
+
+def _save_direction_consistency_radar(path: Path, rows: list[dict[str, object]]) -> None:
+    focus = _focus_rows(rows)
+    if not focus:
+        return
+    channels = ("top", "middle", "bottom")
+    angles = np.linspace(0, 2 * np.pi, len(channels), endpoint=False)
+    closed_angles = np.concatenate([angles, angles[:1]])
+
+    fig, ax = plt.subplots(1, 1, figsize=(6.4, 6.0), dpi=150, subplot_kw={"projection": "polar"})
+    for row in focus:
+        values = []
+        for channel in channels:
+            raw = float(row.get(f"{channel}_consistency") or 0.0)
+            values.append(float(np.clip((raw + 1.0) / 2.0, 0.0, 1.0)))
+        closed = np.asarray(values + values[:1], dtype=float)
+        ax.plot(closed_angles, closed, linewidth=1.8, label=_display_case_id(str(row["case_id"])))
+        ax.fill(closed_angles, closed, alpha=0.10)
+    ax.set_xticks(angles)
+    ax.set_xticklabels([channel.title() for channel in channels])
+    ax.set_ylim(0.0, 1.0)
+    ax.set_title("Local Direction Consistency Index")
+    ax.grid(alpha=0.25)
+    ax.legend(loc="center left", bbox_to_anchor=(1.02, 0.5), frameon=False)
+    fig.tight_layout()
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _save_flow_metric_boxplots(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+    samples = _load_behavior_samples(behavior_summaries)
+    focus_ids = ["case1_baseline", "case_u_only_middle", "case_m_only_middle", "case2_middle_guided"]
+    labels = [_display_case_id(case_id) for case_id in focus_ids if case_id in samples]
+    if not labels:
+        return
+    reverse_data = [_series(samples, case_id, "middle_reverse_share") for case_id in focus_ids if case_id in samples]
+    angle_data = [_series(samples, case_id, "approach_angle_std_deg") for case_id in focus_ids if case_id in samples]
+    reverse_data = [arr if arr.size else np.asarray([np.nan]) for arr in reverse_data]
+    angle_data = [arr if arr.size else np.asarray([np.nan]) for arr in angle_data]
+
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 4.8), dpi=150)
+    axes[0].boxplot(reverse_data, labels=labels, showfliers=False, patch_artist=True)
+    axes[0].set_title("Middle-Channel Reverse-Flow Ratio")
+    axes[0].set_ylabel("density-weighted ratio")
+    axes[1].boxplot(angle_data, labels=labels, showfliers=False, patch_artist=True)
+    axes[1].set_title("Approach-Angle Dispersion")
+    axes[1].set_ylabel("degree")
+    for ax in axes:
+        ax.grid(axis="y", alpha=0.25)
+        ax.tick_params(axis="x", rotation=10)
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def _load_fields(behavior_summaries: list[dict[str, object]]) -> dict[str, dict[str, np.ndarray]]:
+    fields: dict[str, dict[str, np.ndarray]] = {}
+    for behavior in behavior_summaries:
+        case_id = str(behavior.get("case_id", ""))
+        field_path = behavior.get("behavior_field_path")
+        if not case_id or not field_path:
+            continue
+        path = Path(str(field_path))
+        if not path.exists():
+            continue
+        with np.load(path) as data:
+            fields[case_id] = {key: np.asarray(data[key]) for key in data.files}
+    return fields
+
+
+def _panel_cases(fields: dict[str, dict[str, np.ndarray]]) -> list[str]:
+    preferred = [
+        "case1_baseline",
+        "case_m_only_middle",
+        "case_u_only_middle",
+        "case2_middle_guided",
+        "case3_top_guided",
+        "case4_bottom_guided",
+    ]
+    return [case_id for case_id in preferred if case_id in fields]
+
+
+def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+    fields = _load_fields(behavior_summaries)
+    cases = _panel_cases(fields)
+    if not cases:
+        return
+    fig, axes = plt.subplots(2, 3, figsize=(12.5, 7.4), dpi=150)
+    axes_flat = list(axes.flat)
+    contour_colors = ["#4C78A8", "#F58518", "#54A24B"]
+    channel_labels = ("Top capture boundary", "Middle capture boundary", "Bottom capture boundary")
+    for ax, case_id in zip(axes_flat, cases):
+        field = fields[case_id]
+        density = np.asarray(field["mean_density"], dtype=float)
+        walkable = np.asarray(field["walkable"], dtype=bool)
+        capture_map = np.asarray(field["capture_map"], dtype=int)
+        density_plot = density.copy()
+        density_plot[~walkable] = np.nan
+        ax.imshow(density_plot, origin="lower", cmap="Greys", alpha=0.85)
+        finite = density_plot[np.isfinite(density_plot)]
+        if finite.size > 0 and float(np.nanmax(finite)) > float(np.nanmin(finite)):
+            ax.contour(density_plot, levels=6, colors="black", linewidths=0.45, alpha=0.45)
+        for channel_index, color in enumerate(contour_colors):
+            binary = (capture_map == channel_index).astype(float)
+            if np.any(binary > 0.0) and np.any(binary < 1.0):
+                ax.contour(binary, levels=[0.5], colors=[color], linewidths=1.4)
+        oy, ox = np.where(~walkable)
+        ax.scatter(ox, oy, s=1.6, c="black", marker="s", linewidths=0)
+        ax.set_title(_display_case_id(case_id))
+        ax.set_xticks([])
+        ax.set_yticks([])
+    for ax in axes_flat[len(cases) :]:
+        ax.axis("off")
+    legend_handles = [
+        Line2D([0], [0], color=color, lw=2.0, label=label)
+        for color, label in zip(contour_colors, channel_labels)
+    ]
+    legend_handles.append(Line2D([0], [0], color="black", lw=0.8, alpha=0.6, label="Mean-density contour"))
+    fig.legend(handles=legend_handles, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 0.01))
+    fig.suptitle("Channel Attraction Domains and Mean-Density Contours")
+    fig.tight_layout(rect=(0.0, 0.06, 1.0, 0.95))
+    fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _save_vector_field_panel(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+    fields = _load_fields(behavior_summaries)
+    cases = _panel_cases(fields)
+    if not cases:
+        return
+    fig, axes = plt.subplots(2, 3, figsize=(12.5, 7.4), dpi=150)
+    axes_flat = list(axes.flat)
+    for ax, case_id in zip(axes_flat, cases):
+        field = fields[case_id]
+        density = np.asarray(field["mean_density"], dtype=float)
+        ux = np.asarray(field["mean_dir_x"], dtype=float)
+        uy = np.asarray(field["mean_dir_y"], dtype=float)
+        walkable = np.asarray(field["walkable"], dtype=bool)
+        analysis_mask = np.asarray(field["analysis_mask"], dtype=bool)
+        density_plot = density.copy()
+        density_plot[~walkable] = np.nan
+        ax.imshow(density_plot, origin="lower", cmap="viridis")
+        step = 5
+        yy, xx = np.mgrid[0:density.shape[0]:step, 0:density.shape[1]:step]
+        ux_d = ux[0:density.shape[0]:step, 0:density.shape[1]:step]
+        uy_d = uy[0:density.shape[0]:step, 0:density.shape[1]:step]
+        valid = analysis_mask[0:density.shape[0]:step, 0:density.shape[1]:step] & (np.hypot(ux_d, uy_d) > 1.0e-8)
+        ax.quiver(xx[valid], yy[valid], ux_d[valid], uy_d[valid], color="white", scale=22, width=0.003)
+        oy, ox = np.where(~walkable)
+        ax.scatter(ox, oy, s=1.6, c="black", marker="s", linewidths=0)
+        ax.set_title(_display_case_id(case_id))
+        ax.set_xticks([])
+        ax.set_yticks([])
+    for ax in axes_flat[len(cases) :]:
+        ax.axis("off")
+    fig.suptitle("Mean Flow-Field Comparison")
+    fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def _save_mechanism_comparison_table(
+    *,
+    output_root: Path,
+    table_rows: list[dict[str, object]],
+    behavior_summaries: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    samples = _load_behavior_samples(behavior_summaries)
+    rows_by_case = {str(row["case_id"]): row for row in table_rows}
+    baseline = rows_by_case.get("case1_baseline", {})
+    baseline_j2 = float(baseline.get("j2_normalized") or 0.0)
+    comparison_rows: list[dict[str, object]] = []
+    for case_id in ("case1_baseline", "case_u_only_middle", "case_m_only_middle", "case2_middle_guided"):
+        row = rows_by_case.get(case_id)
+        if row is None:
+            continue
+        j2 = float(row.get("j2_normalized") or 0.0)
+        reverse_stats = _bootstrap_difference(
+            _series(samples, "case1_baseline", "middle_reverse_share"),
+            _series(samples, case_id, "middle_reverse_share"),
+        )
+        angle_stats = _bootstrap_difference(
+            _series(samples, "case1_baseline", "approach_angle_std_deg"),
+            _series(samples, case_id, "approach_angle_std_deg"),
+        )
+        comparison_rows.append(
+            {
+                "case_id": case_id,
+                "mechanism": _display_case_id(case_id),
+                "middle_direction_consistency": row.get("middle_consistency"),
+                "middle_reverse_share": row.get("middle_reverse_share"),
+                "approach_angle_std_deg": row.get("approach_angle_std_deg"),
+                "middle_capture_share": row.get("middle_capture_share"),
+                "j2_normalized": j2,
+                "congestion_reduction_vs_baseline_pct": (
+                    100.0 * (baseline_j2 - j2) / baseline_j2 if baseline_j2 > 1.0e-12 else None
+                ),
+                "p_middle_reverse_vs_baseline_bootstrap": reverse_stats["p_bootstrap"],
+                "p_approach_std_vs_baseline_bootstrap": angle_stats["p_bootstrap"],
+            }
+        )
+
+    _save_behavior_csv(output_root / "g1_mechanism_comparison_table.csv", comparison_rows)
+    _save_markdown_table(output_root / "g1_mechanism_comparison_table.md", comparison_rows)
+    return comparison_rows
+
+
+def _format_table_value(value: object) -> str:
+    if value is None:
+        return ""
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if not np.isfinite(numeric):
+        return ""
+    if abs(numeric) >= 100.0:
+        return f"{numeric:.2f}"
+    return f"{numeric:.4f}"
+
+
+def _save_markdown_table(path: Path, rows: list[dict[str, object]]) -> None:
+    if not rows:
+        return
+    headers = list(rows[0].keys())
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write("| " + " | ".join(headers) + " |\n")
+        handle.write("| " + " | ".join(["---"] * len(headers)) + " |\n")
+        for row in rows:
+            handle.write("| " + " | ".join(_format_table_value(row.get(header)) for header in headers) + " |\n")
 
 
 def _save_u_validation_plot(path: Path, rows: list[dict[str, object]]) -> None:
