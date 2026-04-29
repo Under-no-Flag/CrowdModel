@@ -58,6 +58,24 @@ DIRECTION_SETTINGS = (
         family="single_return",
         directions={"top": "E", "middle": "E", "bottom": "W"},
     ),
+    DirectionSetting(
+        case_id="case8_topC_middleE_bottomW",
+        title="Case 8: top channel closed, middle entry and bottom return",
+        family="one_closed",
+        directions={"top": "CLOSED", "middle": "E", "bottom": "W"},
+    ),
+    DirectionSetting(
+        case_id="case9_topE_middleC_bottomW",
+        title="Case 9: middle channel closed, top entry and bottom return",
+        family="one_closed",
+        directions={"top": "E", "middle": "CLOSED", "bottom": "W"},
+    ),
+    DirectionSetting(
+        case_id="case10_topE_middleW_bottomC",
+        title="Case 10: bottom channel closed, top entry and middle return",
+        family="one_closed",
+        directions={"top": "E", "middle": "W", "bottom": "CLOSED"},
+    ),
 )
 
 
@@ -139,17 +157,25 @@ def _dump_routes_toml(payload: dict[str, object]) -> str:
 def _direction_controls(channel_directions: dict[str, str]) -> list[dict[str, object]]:
     controls: list[dict[str, object]] = []
     for channel_name in ("top", "middle", "bottom"):
-        direction = channel_directions[channel_name]
-        controls.append(
-            {
-                "mode": "fixed_direction",
-                "region": f"{channel_name}_channel",
-                "direction": direction,
-                "alpha": 10.0,
-                "beta": 0.2,
-                "allowed_directions": [direction],
-            }
-        )
+        direction = channel_directions[channel_name].upper()
+        if direction == "CLOSED":
+            controls.append(
+                {
+                    "mode": "closed",
+                    "region": f"{channel_name}_channel",
+                }
+            )
+        else:
+            controls.append(
+                {
+                    "mode": "fixed_direction",
+                    "region": f"{channel_name}_channel",
+                    "direction": direction,
+                    "alpha": 10.0,
+                    "beta": 0.2,
+                    "allowed_directions": [direction],
+                }
+            )
     return controls
 
 
@@ -228,6 +254,7 @@ def _attach_scan_metadata(
         "is_baseline": is_baseline,
         "entry_channels": [name for name, direction in directions.items() if direction == "E"],
         "return_channels": [name for name, direction in directions.items() if direction == "W"],
+        "closed_channels": [name for name, direction in directions.items() if direction == "CLOSED"],
     }
     summary["g2_scan"] = scan
     metadata = summary.get("metadata")
@@ -323,7 +350,7 @@ def main() -> None:
 
     payload = {
         "experiment_group": "G2",
-        "design_version": "direction_scan_multistage",
+        "design_version": "direction_scan_multistage_with_closure",
         "baseline_config": str(BASELINE_CONFIG.resolve()),
         "direction_settings": [
             {

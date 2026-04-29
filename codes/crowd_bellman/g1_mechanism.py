@@ -442,6 +442,9 @@ def build_g1_mechanism_report(
     _save_flow_metric_boxplots(output_root / "g1_flow_metric_boxplots.png", behavior_summaries)
     _save_attraction_contour_panel(output_root / "g1_channel_attraction_contours.png", behavior_summaries)
     _save_vector_field_panel(output_root / "g1_vector_field_comparison.png", behavior_summaries)
+    _save_m_approach_flow_comparison(output_root / "g1_m_approach_flow_comparison.png", behavior_summaries)
+    _save_u_direction_field_comparison(output_root / "g1_u_direction_field_comparison.png", behavior_summaries)
+    _save_um_configuration_flow_comparison(output_root / "g1_um_configuration_flow_comparison.png", behavior_summaries)
     comparison_rows = _save_mechanism_comparison_table(
         output_root=output_root,
         table_rows=table_rows,
@@ -494,6 +497,9 @@ def build_g1_mechanism_report(
             "flow_metric_boxplots": str(output_root / "g1_flow_metric_boxplots.png"),
             "channel_attraction_contours": str(output_root / "g1_channel_attraction_contours.png"),
             "vector_field_comparison": str(output_root / "g1_vector_field_comparison.png"),
+            "m_approach_flow_comparison": str(output_root / "g1_m_approach_flow_comparison.png"),
+            "u_direction_field_comparison": str(output_root / "g1_u_direction_field_comparison.png"),
+            "um_configuration_flow_comparison": str(output_root / "g1_um_configuration_flow_comparison.png"),
             "mechanism_comparison_table_csv": str(output_root / "g1_mechanism_comparison_table.csv"),
             "mechanism_comparison_table_md": str(output_root / "g1_mechanism_comparison_table.md"),
             "mechanism_comparison_rows": comparison_rows,
@@ -683,7 +689,7 @@ def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str
     cases = _panel_cases(fields)
     if not cases:
         return
-    fig, axes = plt.subplots(2, 3, figsize=(12.5, 7.4), dpi=150)
+    fig, axes = plt.subplots(2, 3, figsize=(12.5, 8.2), dpi=150)
     axes_flat = list(axes.flat)
     contour_colors = ["#4C78A8", "#F58518", "#54A24B"]
     channel_labels = ("Top capture boundary", "Middle capture boundary", "Bottom capture boundary")
@@ -704,7 +710,7 @@ def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str
                 ax.contour(binary, levels=[0.5], colors=[color], linewidths=1.4)
         oy, ox = np.where(~walkable)
         ax.scatter(ox, oy, s=1.6, c="black", marker="s", linewidths=0)
-        ax.set_title(_display_case_id(case_id))
+        ax.set_title(_display_case_id(case_id), pad=10)
         ax.set_xticks([])
         ax.set_yticks([])
     for ax in axes_flat[len(cases) :]:
@@ -716,7 +722,7 @@ def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str
     legend_handles.append(Line2D([0], [0], color="black", lw=0.8, alpha=0.6, label="Mean-density contour"))
     fig.legend(handles=legend_handles, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 0.01))
     fig.suptitle("Channel Attraction Domains and Mean-Density Contours")
-    fig.tight_layout(rect=(0.0, 0.06, 1.0, 0.95))
+    fig.subplots_adjust(left=0.015, right=0.985, top=0.90, bottom=0.12, wspace=0.04, hspace=0.22)
     fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
@@ -753,6 +759,217 @@ def _save_vector_field_panel(path: Path, behavior_summaries: list[dict[str, obje
         ax.axis("off")
     fig.suptitle("Mean Flow-Field Comparison")
     fig.tight_layout()
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def _save_m_approach_flow_comparison(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+    fields = _load_fields(behavior_summaries)
+    case_ids = ["case1_baseline", "case_m_only_middle"]
+    if not all(case_id in fields for case_id in case_ids):
+        return
+
+    reference = fields["case1_baseline"]
+    walkable_ref = np.asarray(reference["walkable"], dtype=bool)
+    analysis_ref = np.asarray(reference["analysis_mask"], dtype=bool)
+    y_idx, x_idx = np.where(analysis_ref | (~walkable_ref))
+    if x_idx.size == 0 or y_idx.size == 0:
+        return
+    x0 = max(0, int(x_idx.min()) - 4)
+    x1 = min(walkable_ref.shape[1], int(x_idx.max()) + 5)
+    y0 = max(0, int(y_idx.min()) - 4)
+    y1 = min(walkable_ref.shape[0], int(y_idx.max()) + 5)
+
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 5.4), dpi=150, sharex=True, sharey=True)
+    for ax, case_id in zip(axes, case_ids):
+        field = fields[case_id]
+        density = np.asarray(field["mean_density"], dtype=float)
+        ux = np.asarray(field["mean_dir_x"], dtype=float)
+        uy = np.asarray(field["mean_dir_y"], dtype=float)
+        walkable = np.asarray(field["walkable"], dtype=bool)
+        analysis_mask = np.asarray(field["analysis_mask"], dtype=bool)
+
+        density_plot = density[y0:y1, x0:x1].copy()
+        density_plot[~walkable[y0:y1, x0:x1]] = np.nan
+        im = ax.imshow(density_plot, origin="lower", cmap="viridis")
+
+        ux_crop = ux[y0:y1, x0:x1].copy()
+        uy_crop = uy[y0:y1, x0:x1].copy()
+        valid = analysis_mask[y0:y1, x0:x1] & walkable[y0:y1, x0:x1] & (np.hypot(ux_crop, uy_crop) > 1.0e-8)
+        ux_crop[~valid] = 0.0
+        uy_crop[~valid] = 0.0
+
+        yy, xx = np.mgrid[0 : y1 - y0, 0 : x1 - x0]
+        ax.streamplot(
+            xx,
+            yy,
+            ux_crop,
+            uy_crop,
+            color="white",
+            density=1.25,
+            linewidth=0.9,
+            arrowsize=0.9,
+            minlength=0.08,
+        )
+        q_step = 5
+        qy, qx = np.mgrid[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step]
+        q_valid = valid[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step]
+        ax.quiver(
+            qx[q_valid],
+            qy[q_valid],
+            ux_crop[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step][q_valid],
+            uy_crop[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step][q_valid],
+            color="white",
+            scale=24,
+            width=0.003,
+            alpha=0.85,
+        )
+
+        obstacle_y, obstacle_x = np.where(~walkable[y0:y1, x0:x1])
+        ax.scatter(obstacle_x, obstacle_y, s=1.7, c="black", marker="s", linewidths=0)
+        ax.set_title(_display_case_id(case_id), pad=8)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.set_xlim(0, x1 - x0 - 1)
+        ax.set_ylim(0, y1 - y0 - 1)
+
+    cbar_ax = fig.add_axes((0.925, 0.16, 0.018, 0.68))
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label("mean density")
+    fig.suptitle("Approach Flow Comparison: Baseline vs M-only")
+    fig.subplots_adjust(left=0.02, right=0.89, top=0.88, bottom=0.08, wspace=0.05)
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def _field_crop_bounds(fields: dict[str, dict[str, np.ndarray]], case_ids: list[str], pad: int = 4) -> tuple[int, int, int, int]:
+    reference_case = case_ids[0]
+    reference = fields[reference_case]
+    mask = np.zeros_like(np.asarray(reference["walkable"], dtype=bool), dtype=bool)
+    for case_id in case_ids:
+        field = fields[case_id]
+        mask |= np.asarray(field["analysis_mask"], dtype=bool)
+        mask |= ~np.asarray(field["walkable"], dtype=bool)
+    y_idx, x_idx = np.where(mask)
+    if x_idx.size == 0 or y_idx.size == 0:
+        return (0, mask.shape[1], 0, mask.shape[0])
+    x0 = max(0, int(x_idx.min()) - pad)
+    x1 = min(mask.shape[1], int(x_idx.max()) + pad + 1)
+    y0 = max(0, int(y_idx.min()) - pad)
+    y1 = min(mask.shape[0], int(y_idx.max()) + pad + 1)
+    return (x0, x1, y0, y1)
+
+
+def _draw_flow_field_panel(
+    ax: plt.Axes,
+    field: dict[str, np.ndarray],
+    *,
+    bounds: tuple[int, int, int, int],
+    title: str,
+    stream_density: float = 1.15,
+) -> object:
+    x0, x1, y0, y1 = bounds
+    density = np.asarray(field["mean_density"], dtype=float)
+    ux = np.asarray(field["mean_dir_x"], dtype=float)
+    uy = np.asarray(field["mean_dir_y"], dtype=float)
+    walkable = np.asarray(field["walkable"], dtype=bool)
+    analysis_mask = np.asarray(field["analysis_mask"], dtype=bool)
+
+    density_plot = density[y0:y1, x0:x1].copy()
+    density_plot[~walkable[y0:y1, x0:x1]] = np.nan
+    im = ax.imshow(density_plot, origin="lower", cmap="viridis")
+
+    ux_crop = ux[y0:y1, x0:x1].copy()
+    uy_crop = uy[y0:y1, x0:x1].copy()
+    valid = analysis_mask[y0:y1, x0:x1] & walkable[y0:y1, x0:x1] & (np.hypot(ux_crop, uy_crop) > 1.0e-8)
+    ux_crop[~valid] = 0.0
+    uy_crop[~valid] = 0.0
+
+    yy, xx = np.mgrid[0 : y1 - y0, 0 : x1 - x0]
+    ax.streamplot(
+        xx,
+        yy,
+        ux_crop,
+        uy_crop,
+        color="white",
+        density=stream_density,
+        linewidth=0.85,
+        arrowsize=0.85,
+        minlength=0.08,
+    )
+    q_step = 5
+    qy, qx = np.mgrid[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step]
+    q_valid = valid[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step]
+    ax.quiver(
+        qx[q_valid],
+        qy[q_valid],
+        ux_crop[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step][q_valid],
+        uy_crop[0 : y1 - y0 : q_step, 0 : x1 - x0 : q_step][q_valid],
+        color="white",
+        scale=24,
+        width=0.003,
+        alpha=0.85,
+    )
+
+    obstacle_y, obstacle_x = np.where(~walkable[y0:y1, x0:x1])
+    ax.scatter(obstacle_x, obstacle_y, s=1.7, c="black", marker="s", linewidths=0)
+    ax.set_title(title, pad=8)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(0, x1 - x0 - 1)
+    ax.set_ylim(0, y1 - y0 - 1)
+    return im
+
+
+def _save_u_direction_field_comparison(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+    fields = _load_fields(behavior_summaries)
+    case_ids = ["case1_baseline", "case_u_only_middle"]
+    if not all(case_id in fields for case_id in case_ids):
+        return
+
+    bounds = _field_crop_bounds(fields, case_ids, pad=4)
+    fig, axes = plt.subplots(1, 2, figsize=(11.5, 5.4), dpi=150, sharex=True, sharey=True)
+    im = None
+    for ax, case_id in zip(axes, case_ids):
+        im = _draw_flow_field_panel(
+            ax,
+            fields[case_id],
+            bounds=bounds,
+            title=_display_case_id(case_id),
+            stream_density=1.15,
+        )
+    cbar_ax = fig.add_axes((0.925, 0.16, 0.018, 0.68))
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label("mean density")
+    fig.suptitle("Direction-Constraint Effect: Baseline vs U-only")
+    fig.subplots_adjust(left=0.02, right=0.89, top=0.88, bottom=0.08, wspace=0.05)
+    fig.savefig(path)
+    plt.close(fig)
+
+
+def _save_um_configuration_flow_comparison(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+    fields = _load_fields(behavior_summaries)
+    case_ids = ["case2_middle_guided", "case3_top_guided", "case4_bottom_guided"]
+    if not all(case_id in fields for case_id in case_ids):
+        return
+
+    bounds = _field_crop_bounds(fields, case_ids, pad=4)
+    fig, axes = plt.subplots(1, 3, figsize=(14.8, 5.0), dpi=150, sharex=True, sharey=True)
+    im = None
+    titles = ["U+M middle", "U+M top", "U+M bottom"]
+    for ax, case_id, title in zip(axes, case_ids, titles):
+        im = _draw_flow_field_panel(
+            ax,
+            fields[case_id],
+            bounds=bounds,
+            title=title,
+            stream_density=1.05,
+        )
+    cbar_ax = fig.add_axes((0.925, 0.16, 0.016, 0.68))
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label("mean density")
+    fig.suptitle("U+M Configuration Sensitivity: Guided Channel Comparison")
+    fig.subplots_adjust(left=0.015, right=0.90, top=0.86, bottom=0.08, wspace=0.04)
     fig.savefig(path)
     plt.close(fig)
 

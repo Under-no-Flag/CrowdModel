@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating anisotropic geometric guidance with discrete directional constraints. The lower level employs a Hughes-type macroscopic crowd model enhanced with metric tensor fields for channel guidance and constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way channel control. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three raw physical metrics are introduced for efficiency, safety, and load balancing, and are further converted into dimensionless indicators for cross-scheme comparison and scalarization. The proposed method exploits the local response characteristics of Bellman potential fields and employs surrogate pre-screening with Bellman warm-start strategies to reduce computational cost. Numerical experiments demonstrate the effectiveness of the proposed approach.
+This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating discrete directional constraints with anisotropic geometric guidance. The lower level employs a Hughes-type macroscopic crowd model enhanced with constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way, bidirectional, and closed channel states, and then uses metric tensor fields to represent soft channel-alignment guidance within the feasible direction set. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three raw physical metrics are introduced for efficiency, safety, and load balancing, and are further converted into dimensionless indicators for cross-scheme comparison and scalarization. The proposed method exploits the local response characteristics of Bellman potential fields and employs surrogate pre-screening with Bellman warm-start strategies to reduce computational cost. Numerical experiments demonstrate the effectiveness of the proposed approach.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -54,14 +54,14 @@ Existing large-scale event security management practices typically integrate sys
 
 However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}. First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of different passage direction configurations, geometric guidance intensities, and phase-dependent behavioral preferences. Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}. Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations. Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
 
-To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating one-way passage constraints, geometric guidance, and multi-stage route behavior, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way passage rules are formulated as constraints on the local admissible direction set, and an anisotropic metric tensor characterizes the cost differences between axial and lateral movement, simulating pedestrian pre-alignment and streamline reorganization near passages. At the optimization level, this paper distinguishes ``controllable management variables'' (passage direction configuration and geometric guidance intensity) from ``exogenous behavioral parameters'' (visitor route diversion preferences identified from historical data). Based on this boundary, total travel time, high-density exposure time, and channel cumulative flow variance are adopted as efficiency, safety, and load balancing indicators, forming a scalarized optimization problem under fixed weights. A simplified instance of the Structure-Aware Hybrid Block Optimization framework (SA-HBO) is designed to solve this problem, exploiting the discrete neighborhood structure of passage direction variables, the continuous nature of geometric guidance variables, and the response characteristics of Bellman potential fields to local control changes, improving candidate strategy evaluation efficiency through surrogate pre-screening, full simulation confirmation, and Bellman warm-start procedures.
+To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, geometric guidance, and multi-stage route behavior, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set, and an anisotropic metric tensor characterizes the cost differences between axial and lateral movement, simulating pedestrian pre-alignment and streamline reorganization near passages. At the optimization level, this paper distinguishes ``controllable management variables'' (passage direction configuration and geometric guidance intensity) from ``exogenous behavioral parameters'' (visitor route diversion preferences identified from historical data). Based on this boundary, total travel time, high-density exposure time, and channel cumulative flow variance are adopted as efficiency, safety, and load balancing indicators, forming a scalarized optimization problem under fixed weights. A simplified instance of the Structure-Aware Hybrid Block Optimization framework (SA-HBO) is designed to solve this problem, exploiting the discrete neighborhood structure of passage direction variables, the continuous nature of geometric guidance variables, and the response characteristics of Bellman potential fields to local control changes, improving candidate strategy evaluation efficiency through surrogate pre-screening, full simulation confirmation, and Bellman warm-start procedures.
 
 The main contributions of this paper are as follows.
 
 \begin{enumerate}
 \item A ``waterfront platform--multi-stepped passage'' crowd flow modeling framework for open scenic areas is proposed, representing visitor behavior as a multi-stage, multi-route continuum flow process, where different subpopulations possess independent potential functions while sharing collective congestion feedback.
 
-\item A Bellman--conservation law coupled model integrating one-way passage constraints and geometric guidance is constructed, enabling control rules to directly affect local optimal direction selection, with an anisotropic metric tensor simulating pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
+\item A Bellman--conservation law coupled model integrating passage constraints and geometric guidance is constructed. The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic metric tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
 
 \item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, channel flow variance).
 
@@ -124,10 +124,48 @@ The potential function satisfies the eikonal equation:
 \label{eq:eikonal}
 \end{equation}
 
-While this model captures basic congestion effects, it assumes isotropic movement and cannot represent channel geometries or directional controls. We address these limitations in the following subsections.
+While this model captures basic congestion effects, it assumes that all directions are feasible and equally weighted. It therefore cannot represent one-way rules, temporary closures, or channel-induced geometric preferences. We address these limitations by first introducing HJB admissible-direction constraints for hard channel rules and then introducing the metric tensor to encode soft geometric guidance within the feasible direction set.
+
+\subsection{Channel Control via Constrained HJB}
+\label{sec:hjb}
+
+Many crowd management measures directly restrict available movement directions rather than merely adjusting traversal costs. Examples include one-way corridors, bidirectional passages, and temporary closures. Such rules are hard feasibility constraints on the local action set and are naturally modeled via constrained optimal control.
+
+Let $U(x)$ denote the set of admissible unit directions at position $x$. The velocity satisfies:
+\begin{equation}
+\mathbf{v} = f(\rho) \mathbf{u}, \quad \mathbf{u}(x) \in U(x), \quad |\mathbf{u}| = 1.
+\label{eq:constrained_velocity}
+\end{equation}
+
+By the Bellman optimality principle, the potential function satisfies the constrained HJB equation:
+\begin{equation}
+\max_{\mathbf{u} \in U(x)} \left\{-f(\rho) \mathbf{u} \cdot \nabla \phi\right\} = 1.
+\label{eq:constrained_hjb}
+\end{equation}
+
+When $U(x)$ is the full unit circle, \eqref{eq:constrained_hjb} reduces to the classical Hughes model. For restricted control sets, various channel rules can be expressed naturally. For channel $c$ with region $\Omega_c$ and reference tangent $\tau_c(x)$, define
+\begin{equation}
+s_c \in \{-1,0,+1,\varnothing\},
+\label{eq:channel_state}
+\end{equation}
+where $+1$, $-1$, $0$, and $\varnothing$ denote forward one-way, reverse one-way, bidirectional, and closed states, respectively. The corresponding admissible set is
+\begin{equation}
+U_c(x;s_c)=
+\begin{cases}
+\{\tau_c(x)\}, & s_c=+1,\\
+\{-\tau_c(x)\}, & s_c=-1,\\
+\{\tau_c(x),-\tau_c(x)\}, & s_c=0,\\
+\varnothing, & s_c=\varnothing,
+\end{cases}
+\quad x\in\Omega_c .
+\label{eq:channel_admissible_set}
+\end{equation}
+For a closed channel, the continuous maximum over an empty set is not used as an ordinary HJB state. Numerically, this state is handled as no feasible control in the channel region, equivalently $\phi(x)=+\infty$ for unreachable cells or infinite Bellman step cost from those cells.
 
 \subsection{Channel Geometric Guidance via Metric Tensor}
 \label{sec:guidance}
+
+The admissible set $U(x)$ determines which directions are feasible, but it does not fully describe how pedestrians approach and align with channel geometry before entering a passage. In real scenes, pedestrians often pre-align with the channel axis and merge smoothly near entrances rather than abruptly changing direction at the channel boundary. Therefore, after defining hard HJB constraints, we introduce a metric tensor $\mathbf{M}(x)$ to encode soft geometric preference within the feasible direction set.
 
 To represent anisotropic channel geometries such as corridors and barriers, we introduce a spatially varying symmetric positive-definite metric tensor $\mathbf{M}(x)$ that generalizes the classical eikonal equation to anisotropic form \cite{cristiani2016}:
 \begin{equation}
@@ -146,38 +184,9 @@ For a channel region $\Omega_c$ with unit tangent $\tau(x)$ and unit normal $n(x
 \mathbf{M}(x) = \alpha(x) \tau \tau^{\top} + \beta(x) n n^{\top}, \quad x \in \Omega_c,
 \label{eq:metric_tensor}
 \end{equation}
-where $\alpha(x)$ and $\beta(x)$ control the traversal weights in tangential and normal directions, respectively. Setting $\alpha(x) \gg \beta(x)$ encourages movement along the channel axis while suppressing lateral crossing, achieving continuous geometric guidance without explicit prohibition. Outside channels, $\mathbf{M}(x) = \mathbf{I}$ recovers the isotropic case.
+where $\alpha(x)$ and $\beta(x)$ control the traversal weights in tangential and normal directions, respectively. In the discrete Bellman update used in this paper, the directional step cost is proportional to $1/\sqrt{\mathbf{u}^{\top}\mathbf{M}(x)\mathbf{u}}$. Hence setting $\alpha(x) \gg \beta(x)$ lowers the effective cost along the channel tangent and suppresses cross-channel deviations, achieving continuous geometric guidance without explicit prohibition. Outside channels, $\mathbf{M}(x) = \mathbf{I}$ recovers the isotropic case.
 
-\textit{Remark}: The metric tensor approach represents directional preferences rather than hard constraints. As long as costs remain finite, the model allows individuals to deviate from preferred directions when facing congestion or detour requirements. This motivates the introduction of constrained HJB framework for strict directional controls.
-
-\subsection{Channel Control via Constrained HJB}
-\label{sec:hjb}
-
-Many crowd management measures directly restrict available movement directions rather than merely adjusting traversal costs. Examples include one-way corridors and temporary closures. Such rules are naturally modeled via constrained optimal control.
-
-Let $U(x)$ denote the set of admissible unit directions at position $x$. The velocity satisfies:
-\begin{equation}
-\mathbf{v} = f(\rho) \mathbf{u}, \quad \mathbf{u}(x) \in U(x), \quad |\mathbf{u}| = 1.
-\label{eq:constrained_velocity}
-\end{equation}
-
-By the Bellman optimality principle, the potential function satisfies the constrained HJB equation:
-\begin{equation}
-\max_{\mathbf{u} \in U(x)} \left\{-f(\rho) \mathbf{u} \cdot \nabla \phi\right\} = 1.
-\label{eq:constrained_hjb}
-\end{equation}
-
-When $U(x)$ is the full unit circle, \eqref{eq:constrained_hjb} reduces to the classical Hughes model. For restricted control sets, various channel rules can be expressed naturally. For a strict one-way channel with allowed direction $\tau(x)$:
-\begin{equation}
-U(x) = \{\tau(x)\}, \quad x \in \Omega_c,
-\label{eq:oneway_constraint}
-\end{equation}
-and the HJB equation becomes:
-\begin{equation}
--f(\rho) \tau(x) \cdot \nabla \phi = 1,
-\label{eq:oneway_hjb}
-\end{equation}
-encoding one-way movement as a signed directional constraint.
+\textit{Remark}: The metric tensor represents directional preference rather than hard feasibility. As long as costs remain finite, pedestrians may still deviate when congestion or detours require it. Thus $U(x)$ answers which directions are allowed, whereas $\mathbf{M}(x)$ answers which allowed directions better follow the channel geometry.
 
 \subsection{Unified Discrete Bellman Formulation}
 
@@ -311,15 +320,15 @@ This captures cumulative space-time exposure to dangerous crowding conditions, r
 
 Let $q_c(t)$ be the flux through channel $c$ at time $t$, with cumulative flow $F_c = \int_0^T q_c(t) \, dt$. The load balancing metric is:
 \begin{equation}
-J_5(z \mid \hat{p}) = \text{Var}(F_1, \dots, F_m).
-\label{eq:j5}
+J_3(z \mid \hat{p}) = \text{Var}(F_1, \dots, F_m).
+\label{eq:j3}
 \end{equation}
 
 Lower variance indicates more even distribution of traffic across channels, reducing risk concentration and improving facility utilization.
 
 \subsection{Dimensionless Normalization}
 
-Because $J_1$, $J_2$, and $J_5$ have different physical units and numerical scales, we further define normalized indicators for policy comparison and optimization. Let $M_{\text{tot}} = M_{\text{init}} + M_{\text{in}}$ denote the total evaluated crowd mass, let $|\Omega_w|$ be the walkable area, and let $F = \sum_{c=1}^m F_c$ be the total cumulative channel flow. We define
+Because $J_1$, $J_2$, and $J_3$ have different physical units and numerical scales, we further define normalized indicators for policy comparison and optimization. Let $M_{\text{tot}} = M_{\text{init}} + M_{\text{in}}$ denote the total evaluated crowd mass, let $|\Omega_w|$ be the walkable area, and let $F = \sum_{c=1}^m F_c$ be the total cumulative channel flow. We define
 \begin{equation}
 \tilde{J}_1(z \mid \hat{p}) = \frac{J_1(z \mid \hat{p})}{M_{\text{tot}} T},
 \label{eq:j1_norm}
@@ -330,19 +339,19 @@ Because $J_1$, $J_2$, and $J_5$ have different physical units and numerical scal
 \end{equation}
 and
 \begin{equation}
-\tilde{J}_5(z \mid \hat{p}) =
+\tilde{J}_3(z \mid \hat{p}) =
 \frac{\text{Var}(F_1, \dots, F_m)}{F^2 (m-1)/m^2}
 =
 \frac{m^2}{m-1}\text{Var}(p_1, \dots, p_m),
-\label{eq:j5_norm}
+\label{eq:j3_norm}
 \end{equation}
-where $p_c = F_c/F$. The normalized metrics are dimensionless, with $\tilde{J}_2 \in [0,1]$ and $\tilde{J}_5 \in [0,1]$.
+where $p_c = F_c/F$. The normalized metrics are dimensionless, with $\tilde{J}_2 \in [0,1]$ and $\tilde{J}_3 \in [0,1]$.
 
 \subsection{Scalarized Optimization Objective}
 
-Given weights $(\lambda_1, \lambda_2, \lambda_5)$, the scalarized objective is:
+Given weights $(\lambda_1, \lambda_2, \lambda_3)$, the scalarized objective is:
 \begin{equation}
-J(z \mid \hat{p}) = \lambda_1 \tilde{J}_1(z \mid \hat{p}) + \lambda_2 \tilde{J}_2(z \mid \hat{p}) + \lambda_5 \tilde{J}_5(z \mid \hat{p}),
+J(z \mid \hat{p}) = \lambda_1 \tilde{J}_1(z \mid \hat{p}) + \lambda_2 \tilde{J}_2(z \mid \hat{p}) + \lambda_3 \tilde{J}_3(z \mid \hat{p}),
 \label{eq:scalarized}
 \end{equation}
 
@@ -363,7 +372,7 @@ We distinguish controllable variables from exogenous behavioral parameters:
 
 \textbf{Controllable variables}:
 \begin{enumerate}
-\item \textit{Channel direction configuration} $s = (s_1, \dots, s_C)$, where $s_c \in \{-1, 0, +1\}$ indicates reverse one-way, bidirectional, or forward one-way for channel $c$.
+\item \textit{Channel direction configuration} $s = (s_1, \dots, s_C)$, where $s_c \in \{-1, 0, +1,\varnothing\}$ indicates reverse one-way, bidirectional, forward one-way, or closed state for channel $c$.
 \item \textit{Geometric guidance intensity} $\eta = (\eta_1, \dots, \eta_C)$, where $\eta_c = \alpha_c / \beta_c \geq 1$ is the anisotropy ratio.
 \end{enumerate}
 
@@ -470,7 +479,7 @@ The experiments employ three primary raw metrics and their normalized counterpar
 \begin{itemize}
 \item \textit{Efficiency metric} $J_1$ and $\tilde{J}_1$: total travel time and its mass-time normalized form;
 \item \textit{Safety metric} $J_2$ and $\tilde{J}_2$: high-density exposure time and its space-time normalized form;
-\item \textit{Balance metric} $J_5$ and $\tilde{J}_5$: channel flow variance and its normalized imbalance index.
+\item \textit{Balance metric} $J_3$ and $\tilde{J}_3$: channel flow variance and its normalized imbalance index.
 \end{itemize}
 
 Behavioral indicators include channel capture domain ratios, flow distribution ratios, direction consistency indices, and approach angle distributions.
@@ -478,23 +487,54 @@ Behavioral indicators include channel capture domain ratios, flow distribution r
 \subsection{Mechanism Validation}
 \label{sec:mechanism}
 
-The mechanism validation experiments address two fundamental questions: (1) Do geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local decision-making and flow patterns? (2) Does the model produce sufficiently sensitive and interpretable responses to configuration changes?
+\subsubsection{Validation Objectives and Logic}
+
+The mechanism validation experiments address two fundamental questions. First, do geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local decision-making and flow patterns of the crowd? Second, does the model produce sufficiently sensitive and interpretable behavioral responses when channel configurations change? Answering these questions is a prerequisite for subsequent strategy evaluation and optimization studies, since any optimization result built upon a model with distorted or unresponsive mechanisms would lack practical reliability.
+
+The validation is organized into two parts. The first part verifies mechanism authenticity by comparing four configuration types---baseline, $U$-only, $M$-only, and combined $U+M$---to examine whether each mechanism induces the expected local behavioral changes. The second part verifies managerial applicability by testing whether the combined $U+M$ model yields clearly distinguishable behavioral responses to different channel control configurations (upper-channel-controlled, middle-channel-controlled, lower-channel-controlled).
 
 \subsubsection{Effect of Geometric Guidance $M(x)$}
 
-To verify whether geometric guidance alters approach patterns and attraction domains, we compare the baseline configuration (neither $M$ nor $U$) against the $M$-only configuration (anisotropic guidance applied to the middle channel).
+To verify whether geometric guidance alters channel approach patterns and attraction domain structures, we compare the baseline configuration (neither $M$ nor $U$) against the $M$-only configuration, in which anisotropic guidance is applied to the middle channel. The remaining two channels are left uncontrolled.
 
-\textbf{Results:} Under the baseline configuration, the three channels exhibit approximately balanced capture domains: upper $33.73\%$, middle $30.00\%$, lower $34.98\%$. Flow distributions are similarly balanced: upper $33.82\%$, middle $32.35\%$, lower $33.83\%$.
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_channel_attraction_contours.png}
+\caption{Channel attraction domains and mean-density contours in the G1 experiment. Blue, orange, and green curves mark the capture-domain boundaries of the upper, middle, and lower channels, respectively. The grayscale background and thin gray lines show the time-averaged density field and its contours.}
+\label{fig:g1_attraction}
+\end{figure}
 
-Under the $M$-only configuration, the middle channel capture domain expands significantly to $63.41\%$, and its flow share jumps to $99.32\%$. This demonstrates that geometric guidance $M(x)$ reshapes local attraction domains and fundamentally alters approach patterns.
+Fig.~\ref{fig:g1_attraction} presents the channel attraction domains and mean-density contours across all G1 mechanism configurations. Under the baseline configuration, the three channels exhibit approximately balanced capture domains: upper $33.73\%$, middle $30.00\%$, lower $34.98\%$. Flow distributions are similarly balanced: upper $33.82\%$, middle $32.35\%$, lower $33.83\%$.
+
+Under the $M$-only configuration, the middle channel capture domain expands significantly to $63.41\%$, and its flow share jumps to $99.32\%$. This demonstrates that geometric guidance $M(x)$ alone is sufficient to reshape local attraction domain structures, causing the crowd to converge toward the guided channel earlier and fundamentally altering the approach pattern.
+
+The mechanism differences are directly visible in Fig.~\ref{fig:g1_attraction}. Under the baseline configuration, the capture-domain boundaries of the three channels partition the feeder region roughly according to the channels' vertical positions, and mean-density hotspots appear near the entrances of all three channels, indicating that without guidance, the crowd naturally distributes itself based primarily on geometric distance. After introducing $M(x)$, the orange capture domain of the middle channel visibly expands upward and downward, and more concentrated high-density contours form in front of the middle channel entrance. This indicates that the anisotropic metric does not merely alter global indicators but reconstructs local attraction domains and approach paths ahead of the channel entrance. In contrast, the $U$-only panel mainly reflects the exclusion of channel accessibility by feasible-direction constraints, while the $U+M$ panels and their top- and bottom-channel variants show that capture domains migrate systematically with the position of the guided channel. The conclusion supported by Fig.~\ref{fig:g1_attraction} is therefore that the core behavioral effect of $M(x)$ is to alter \emph{which channel attracts the crowd and when alignment with that channel begins}, rather than to explicitly forbid any path. This soft guidance mechanism provides a continuous and interpretable basis for flow reorganization under combined $U+M$ control.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_m_approach_flow_comparison.png}
+\caption{Approach flow comparison between baseline (left) and $M$-only (right) configurations. White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
+\label{fig:g1_m_approach}
+\end{figure}
+
+Fig.~\ref{fig:g1_m_approach} further reveals the effect of $M(x)$ on the approach process. Under the baseline configuration, the incoming flow from the left diverts toward the three channels only when approaching the central wall, exhibiting an overall pattern of near-parallel entry with localized turning at the channel openings. Under the $M$-only configuration, however, streamlines begin converging toward the middle channel at a noticeably earlier upstream position, forming a fan-shaped gathering pattern in front of the entrance and producing a more concentrated mean-density hotspot near the middle channel entrance. This confirms that geometric guidance alters the approach path and the turning position: pedestrians complete pre-alignment before entering the bottleneck, rather than merely changing the speed direction inside the channel.
 
 \subsubsection{Effect of Directional Constraints $U(x)$}
 
-To verify whether directional constraints alter local optimal directions and channel selection, we compare the baseline against the $U$-only configuration (middle channel restricted to eastward-only flow).
+To verify whether directional constraints alter local optimal directions and channel selection structure, we compare the baseline configuration against the $U$-only configuration, in which the middle channel is restricted to eastward-only flow.
 
-\textbf{Results:} Under the $U$-only configuration, the middle channel capture domain drops to $0$, and its flow share drops to $0$, with upper and lower channels splitting traffic approximately $50/50$. This confirms that $U(x)$ significantly rewrites feasible path choices.
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_u_direction_field_comparison.png}
+\caption{Local direction field comparison between baseline (left) and $U$-only (right) configurations. White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
+\label{fig:g1_u_direction}
+\end{figure}
 
-To further verify the suppression of counter-flow and head-on conflicts, we conduct a bidirectional flow sub-experiment. Two configurations are tested: bidirectional baseline (westbound and eastbound crowds simultaneously) and bidirectional with middle channel one-way rule.
+Under the $U$-only configuration, the middle channel capture domain drops to $0$, and its flow share drops to $0$, with the upper and lower channels splitting the traffic approximately $50/50$. This demonstrates that $U(x)$ significantly rewrites feasible path choices, but the unidirectional inflow experiment alone is insufficient to establish the mechanism's effectiveness in suppressing counter-flow and head-on conflicts.
+
+Fig.~\ref{fig:g1_u_direction} further illustrates this point. Under the baseline configuration, the direction field in front of the entrances points toward all three channels, and the middle channel maintains clear eastbound flow streamlines. Under the $U$-only configuration, the middle channel is excluded from the feasible choice set by the directional constraint, and the streamlines that would have approached the middle channel separate ahead of the entrance, diverting to the upper and lower passable channels. This figure demonstrates that the primary role of $U(x)$ is not smooth induction but rather the direct restructuring of reachable channel and path selection by modifying the local admissible direction set.
+
+To further verify the suppression of counter-flow and head-on conflicts, we conduct a bidirectional flow sub-experiment. Two configurations are tested: a bidirectional baseline (westbound and eastbound crowds present simultaneously) and a bidirectional with middle channel one-way rule (middle channel restricted to eastward only).
 
 \begin{table}[!t]
 \caption{Bidirectional $U(x)$ Validation Results}
@@ -507,62 +547,93 @@ To further verify the suppression of counter-flow and head-on conflicts, we cond
 \hline
 \textbf{Configuration} & \textbf{Westbound Share} & \textbf{Counter-flow Mass} & \textbf{Head-on Exposure} \\
 \hline
-Bidirectional baseline & $73.19\%$ & $152.15$ & $1055.74$ \\
+Bidirectional baseline & $72.10\%$ & $188.15$ & $887.70$ \\
 Middle channel one-way & $0$ & $0$ & $0$ \\
 \hline
 \end{tabular}
 }
 \end{table}
 
-The results in Table \ref{tab:bidirectional} show that when the middle channel enforces a one-way rule, westbound crowds are completely excluded, and counter-flow mass time and head-on cell exposure are both driven to zero. This confirms that $U(x)$ not only changes path selection but effectively suppresses counter-flow and head-on conflicts under bidirectional demand.
+The results in Table~\ref{tab:bidirectional} show that when the middle channel enforces a one-way rule, westbound crowds are completely excluded from the middle channel, and the westbound share, counter-flow mass time, and head-on cell exposure within that channel are all driven to zero. This confirms that $U(x)$ not only changes path selection but effectively suppresses counter-flow and head-on conflicts under bidirectional demand.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_bidirectional_dynamics_lines.png}
+\caption{Dynamic comparison of reverse flow in the middle channel under bidirectional conditions. Left: westbound mass share in the middle channel over time. Right: head-on conflict intensity in the middle channel over time.}
+\label{fig:g1_bidirectional_dynamics}
+\end{figure}
+
+Fig.~\ref{fig:g1_bidirectional_dynamics} presents the temporal dynamics. In the bidirectional baseline, the westbound share in the middle channel remains persistently high, accompanied by sustained head-on conflict mass. Once the middle channel one-way rule is imposed, both curves are rapidly driven to zero and remain stable throughout the observation window. This demonstrates that the suppression of bidirectional head-on conflicts by $U(x)$ is not a short-lived accidental outcome but a structural change that persists over the entire observation period.
 
 \subsubsection{Combined $U+M$ Effects and Configuration Sensitivity}
 
-To verify whether the combined $U+M$ model produces distinguishable responses to different channel configurations, we test three setups: middle-channel-controlled ($U+M$-middle), upper-channel-controlled ($U+M$-top), and lower-channel-controlled ($U+M$-bottom).
+To verify whether the combined $U+M$ model produces distinguishable behavioral responses to different channel configurations, we test three setups: middle-channel-controlled ($U+M$-middle), upper-channel-controlled ($U+M$-top), and lower-channel-controlled ($U+M$-bottom).
 
 \begin{table}[!t]
-\caption{Configuration Sensitivity Results}
+\caption{Combined $U+M$ Configuration Sensitivity: Capture Domains and Flow Shares}
 \label{tab:sensitivity}
 \centering
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.05}
+\setlength{\tabcolsep}{2pt}
+\renewcommand{\arraystretch}{1.08}
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{|c|c|c|c|c|c|}
+\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
 \hline
-\textbf{Config} & \textbf{Dominant Capture} & \textbf{Dominant Flow} & \textbf{Upper} & \textbf{Middle} & \textbf{Lower} \\
+\textbf{Configuration} & \textbf{Dominant} & \textbf{Dominant} & \textbf{Upper} & \textbf{Middle} & \textbf{Lower} & \textbf{Upper} & \textbf{Middle} & \textbf{Lower} \\
+& \textbf{Capture} & \textbf{Flow} & \textbf{Capture} & \textbf{Capture} & \textbf{Capture} & \textbf{Flow} & \textbf{Flow} & \textbf{Flow} \\
 \hline
-middle & middle & middle & $\sim$1/3 & dominant & $\sim$1/3 \\
-top & top & top & dominant & $\sim$1/3 & $\sim$1/3 \\
-bottom & bottom & bottom & $\sim$1/3 & $\sim$1/3 & dominant \\
+$U+M$-middle & middle & middle & $11.29\%$ & $62.63\%$ & $12.95\%$ & $0.40\%$ & $98.87\%$ & $0.72\%$ \\
+$U+M$-top & top & top & $57.37\%$ & $12.76\%$ & $22.26\%$ & $95.15\%$ & $0.74\%$ & $4.11\%$ \\
+$U+M$-bottom & bottom & bottom & $20.55\%$ & $11.98\%$ & $58.06\%$ & $2.98\%$ & $0.70\%$ & $96.31\%$ \\
 \hline
 \end{tabular}
 }
 \end{table}
 
-Table \ref{tab:sensitivity} demonstrates that the $U+M$ model exhibits stable and interpretable responses to configuration changes: when the middle channel is controlled, it becomes the dominant capture and flow channel; when the upper or lower channel is controlled, the corresponding channel becomes dominant. This sensitivity validates the model as a foundation for subsequent strategy comparison and optimization.
+Table~\ref{tab:sensitivity} reports the quantitative results. The $U+M$ model exhibits stable and interpretable responses to configuration changes: when the middle channel is controlled, it becomes the dominant capture channel ($62.63\%$) and dominant flow channel ($98.87\%$); when the upper channel is controlled, the upper channel becomes dominant ($57.37\%$ capture, $95.15\%$ flow); and when the lower channel is controlled, the lower channel becomes dominant ($58.06\%$ capture, $96.31\%$ flow). This demonstrates that the combined model is capable of distinguishing different control schemes and can serve as a reliable evaluation oracle for subsequent strategy comparison and optimization.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_um_configuration_flow_comparison.png}
+\caption{Flow field comparison for $U+M$ combined mechanism under different channel control configurations. The three sub-figures correspond to middle-, upper-, and lower-channel-controlled setups, respectively. White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
+\label{fig:g1_um_configuration}
+\end{figure}
+
+Fig.~\ref{fig:g1_um_configuration} shows that changing the controlled channel position induces synchronous migration of density hotspots and approach streamlines. When the middle channel is controlled, the crowd concentrates in front of the middle channel entrance and passes through it; when the upper channel is controlled, the dominant convergence region shifts to the upper channel entrance; and when the lower channel is controlled, it shifts to the lower channel entrance. These spatial patterns are consistent with the dominant capture and flow channels reported in Table~\ref{tab:sensitivity}, confirming that the $U+M$ combined mechanism can not only express the local rules of a single channel but also produce distinguishable and interpretable global flow reorganization in response to different spatial configurations.
 
 \subsubsection{Mechanism Validation Conclusions}
 
-The experimental results support four key conclusions:
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_direction_consistency_radar.png}
+\caption{Local direction consistency radar chart from the G1 experiment. The radar chart aggregates the local direction consistency index across the upper, middle, and lower channels under different mechanism configurations. Values closer to $1$ indicate more concentrated local flow direction and stronger compliance with eastbound passage organization.}
+\label{fig:g1_radar}
+\end{figure}
+
+Fig.~\ref{fig:g1_radar} supplements the preceding spatial flow-field findings from the perspective of directional organization. Under the baseline configuration, the three channels exhibit relatively similar direction consistency indices, reflecting that all channels carry a share of eastbound flow under natural distribution. The $U$-only configuration eliminates middle channel passage, so the middle channel consistency no longer forms a meaningful observation, while the upper and lower channels maintain high consistency. Under the $M$-only and $U+M$ configurations, the middle channel direction consistency reaches $0.992$ and $1.000$, respectively, indicating that when geometric guidance and directional constraints act jointly, not only is channel selection restructured, but the local directional organization within the channel also becomes more concentrated.
+
+Synthesizing the experimental results from Fig.~\ref{fig:g1_attraction} through Fig.~\ref{fig:g1_radar} and Tables~\ref{tab:bidirectional}--\ref{tab:sensitivity}, the G1 experiments support the following conclusions:
+
 \begin{enumerate}
-\item Geometric guidance $M(x)$ significantly alters local approach patterns and channel attraction domains, enabling earlier alignment with channel axes and smoother convergence.
-\item Directional constraints $U(x)$ reshape feasible paths and directional organization, effectively suppressing counter-flow and head-on conflicts under bidirectional demand.
-\item The combined $U+M$ model produces configuration-sensitive responses that are both rule-compliant and behaviorally realistic.
-\item Either $U$ or $M$ alone yields incomplete or behaviorally unrealistic responses; the full model is necessary for reliable optimization.
+\item \textbf{Geometric guidance $M(x)$ significantly alters local approach patterns and channel attraction domains.} By reducing the effective travel cost along the channel axis, $M(x)$ causes the crowd to align with the channel direction earlier and converge smoothly, rather than making abrupt turns immediately before the entrance. This soft guidance mechanism provides a continuous, interpretable basis for flow reorganization.
+
+\item \textbf{Directional constraints $U(x)$ reshape feasible path choices and directional organization.} $U(x)$ directly restructures the set of reachable channels and paths by modifying the local admissible direction set. Under bidirectional demand, it effectively suppresses counter-flow and head-on conflicts, with the suppression effect sustained throughout the entire observation period as a structural change rather than a transient outcome.
+
+\item \textbf{The combined $U+M$ model exhibits clear sensitivity to different channel configurations.} It produces behavioral responses that are both rule-compliant and behaviorally realistic. Changing the controlled channel position induces synchronous migration of density hotspots, capture domains, and approach streamlines.
+
+\item \textbf{The full model is necessary for reliable optimization.} If either $U$ or $M$ is removed, the model's response to configuration changes becomes either incomplete or behaviorally unrealistic. $U(x)$ answers which directions are allowed, while $M(x)$ answers which allowed directions better follow channel geometry. Subsequent optimization studies must therefore be built upon the joint mechanism.
 \end{enumerate}
 
 \subsection{Control Strategy Comparison}
 \label{sec:strategy}
 
-This subsection compares different channel control strategies in terms of normalized efficiency ($\tilde{J}_1$), normalized safety ($\tilde{J}_2$), and normalized load balancing ($\tilde{J}_5$). The strategies under comparison include:
+This subsection compares different channel control strategies in terms of normalized efficiency ($\tilde{J}_1$), normalized safety ($\tilde{J}_2$), and normalized load balancing ($\tilde{J}_3$). The strategies under comparison include:
 \begin{itemize}
-\item Baseline (no control);
-\item Upper-channel-guided;
-\item Middle-channel-guided;
-\item Lower-channel-guided.
+\item Baseline (unrestricted bidirectional channels);
+\item Six directional configurations, including single-entry and single-return strategy families;
+\item Three one-closed-channel configurations, where the upper, middle, or lower channel is temporarily closed and the remaining channels provide one entry and one return direction.
 \end{itemize}
 
-Detailed results and analysis will be presented in the full version of this paper.
+These cases test whether direction settings and closures produce distinguishable load redistribution, hotspot migration, and objective trade-offs. Detailed numerical results and analysis will be presented in the full version of this paper.
 
 \subsection{Multi-Stage Flow Validation Experiments}
 \label{sec:multistage_exp}
@@ -574,14 +645,14 @@ Detailed results and analysis will be presented in the full version of this pape
 \subsection{Optimal Control Parameter Search}
 \label{sec:optimal}
 
-This subsection presents the first-version automated parameter search results. The search enumerates discrete strategy variables, performs coarse grid search on guidance intensity $\eta$, and searches over fixed splitting probability candidates to identify optimal control configurations under different objective weight combinations $(\lambda_1, \lambda_2, \lambda_5)$.
+This subsection presents the first-version automated parameter search results. The search enumerates discrete strategy variables, performs coarse grid search on guidance intensity $\eta$, and searches over fixed splitting probability candidates to identify optimal control configurations under different objective weight combinations $(\lambda_1, \lambda_2, \lambda_3)$.
 
 Detailed results and analysis will be presented in the full version of this paper.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presents a bi-level optimization framework for crowd channel management that combines anisotropic geometric guidance with discrete directional constraints. The proposed SA-HBO algorithm exploits problem structure through surrogate pre-screening, Bellman warm-start, and block coordinate updates to handle the expensive simulation-based optimization efficiently.
+This paper presents a bi-level optimization framework for crowd channel management that combines discrete directional constraints with anisotropic geometric guidance. The proposed SA-HBO algorithm exploits problem structure through surrogate pre-screening, Bellman warm-start, and block coordinate updates to handle the expensive simulation-based optimization efficiently.
 
 The numerical experiments validate that: (1) geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local crowd behaviors; (2) the combined model exhibits stable sensitivity to configuration changes; (3) directional constraints effectively suppress counter-flow and head-on conflicts under bidirectional demand. These findings establish the foundation for subsequent strategy optimization studies.
 

@@ -115,6 +115,7 @@ def build_g2_strategy_report(
             "direction_bottom": directions.get("bottom"),
             "entry_channels": ",".join(scan.get("entry_channels", [])),
             "return_channels": ",".join(scan.get("return_channels", [])),
+            "closed_channels": ",".join(scan.get("closed_channels", [])),
             "j1": summary.get("j1_normalized", summary.get("j1_total_travel_time")),
             "j2": summary.get("j2_normalized", summary.get("j2_high_density_exposure")),
             "j5": summary.get("j5_normalized", summary.get("j5_channel_flux_variance")),
@@ -148,7 +149,7 @@ def build_g2_strategy_report(
 
     report = {
         "experiment_group": "G2",
-        "design_version": "direction_scan_multistage",
+        "design_version": "direction_scan_multistage_with_closure",
         "cases": case_summaries,
         "behavior_cases": behavior_summaries,
         "non_dominated_cases": non_dominated_case_ids,
@@ -204,6 +205,8 @@ def _family_color(family: str) -> str:
         return "#F58518"
     if family == "single_return":
         return "#4C78A8"
+    if family == "one_closed":
+        return "#54A24B"
     return "gray"
 
 

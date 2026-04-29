@@ -128,6 +128,10 @@ def _direction_bitmask(direction_names: tuple[str, ...] | None) -> np.uint16:
         return DIRECTIONS.all_mask
 
     normalized = tuple(name.upper() for name in direction_names)
+    if any(name in {"NONE", "CLOSED", "EMPTY"} for name in normalized):
+        if len(normalized) != 1:
+            raise ValueError("NONE/CLOSED direction cannot be combined with other directions")
+        return np.uint16(0)
     if "ALL" in normalized:
         return DIRECTIONS.all_mask
 
@@ -220,6 +224,9 @@ def _apply_control(
     mode = control.mode.lower()
     if mode == "identity":
         pass
+    elif mode == "closed":
+        allowed_mask[control_region] = np.uint16(0)
+        return
     elif mode == "isotropic":
         if control.value is None or control.value <= 0.0:
             raise ValueError(f"Control value must be positive for isotropic mode in stage {stage.stage_id}")
