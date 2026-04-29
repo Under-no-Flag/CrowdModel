@@ -111,7 +111,7 @@ In the classical Hughes model \cite{hughes2003}, pedestrians move in the directi
 \mathbf{v} = f(\rho) \frac{-\nabla \phi}{|\nabla \phi|},
 \label{eq:velocity}
 \end{equation}
-where $f(\rho)$ is the speed-density relationship. We adopt the Greenshields form:
+where $f(\rho)$ is the speed-density relationship. We adopt the Greenshields form \cite{Greenshields1935ASO}:
 \begin{equation}
 f(\rho) = v_{\max}\left(1 - \frac{\rho}{\rho_{\max}}\right),
 \label{eq:greenshields}
@@ -181,7 +181,7 @@ encoding one-way movement as a signed directional constraint.
 
 \subsection{Unified Discrete Bellman Formulation}
 
-To unify anisotropic geometry with discrete constraints, we employ a discrete Bellman formulation. For grid point $x$ and admissible direction $\mathbf{u} \in U(x)$, define the step cost:
+To unify anisotropic geometry with discrete constraints, we employ a discrete Bellman formulation. For grid point $x$ and admissible direction $\mathbf{u} \in U(x)$, define the step cost \cite{HOOGENDOORN2004169}:
 \begin{equation}
 \text{Cost}(x, \mathbf{u}) = \frac{\Delta x}{f(\rho(x))} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}(x) \mathbf{u}}},
 \label{eq:step_cost}
@@ -207,7 +207,7 @@ Real-world scenarios often involve complex itineraries with multiple stages and 
 
 \subsubsection{Stage-Route Decomposition}
 
-Let the complete behavior chain consist of $S$ stages, where stage $s$ has $R_s$ alternative routes. The total density decomposes as:
+Let the complete behavior chain consist of $S$ stages, where stage $s$ has $R_s$ alternative routes. The total density decomposes as \cite{WONG2002827}:
 \begin{equation}
 \rho(x,t) = \sum_{s=1}^{S} \sum_{r=1}^{R_s} \rho_{s,r}(x,t),
 \label{eq:density_decomp}

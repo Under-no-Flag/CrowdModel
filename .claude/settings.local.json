@@ -9,7 +9,8 @@
       "Bash(python _verify.py)",
       "Bash(grep -n '[^\\\\\\\\]&' references.bib)",
       "Bash(python _sync_intro.py)",
-      "Bash(grep -q '@.*{__TRACKED_VAR__,' references.bib)"
+      "Bash(grep -q '@.*{__TRACKED_VAR__,' references.bib)",
+      "Bash(python plot_metric_tensor_illustration.py)"
     ]
   }
 }

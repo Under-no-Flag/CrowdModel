@@ -182,4 +182,19 @@ E.~Cristiani, F.~S. Priuli, and A.~Tosin, ``Modeling rationality to control self
 \bibitem{priuli2015control}
 F.~Priuli, A.~Tosin, and E.~Cristiani, ``On the control of self-organized systems: The case of pedestrian flows,'' in \emph{Proceedings of the 5th International Conference on Pedestrian and Evacuation Dynamics}, 2015.
 
+\bibitem{Greenshields1935ASO}
+\BIBentryALTinterwordspacing
+B.~D. Greenshields, J.~R. Bibbins, W.~Channing, and H.~H. Miller, ``A study of traffic capacity,'' 1935. [Online]. Available: \url{https://api.semanticscholar.org/CorpusID:107546777}
+\BIBentrySTDinterwordspacing
+
+\bibitem{HOOGENDOORN2004169}
+\BIBentryALTinterwordspacing
+S.~Hoogendoorn and P.~Bovy, ``Pedestrian route-choice and activity scheduling theory and models,'' \emph{Transportation Research Part B: Methodological}, vol.~38, no.~2, pp. 169--190, 2004. [Online]. Available: \url{https://www.sciencedirect.com/science/article/pii/S0191261503000079}
+\BIBentrySTDinterwordspacing
+
+\bibitem{WONG2002827}
+\BIBentryALTinterwordspacing
+G.~Wong and S.~Wong, ``A multi-class traffic flow model – an extension of lwr model with heterogeneous drivers,'' \emph{Transportation Research Part A: Policy and Practice}, vol.~36, no.~9, pp. 827--841, 2002. [Online]. Available: \url{https://www.sciencedirect.com/science/article/pii/S0965856401000428}
+\BIBentrySTDinterwordspacing
+
 \end{thebibliography}
