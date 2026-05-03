@@ -309,6 +309,7 @@ def main() -> None:
         simulation_overrides=simulation_overrides or None,
         write_root_summary=False,
         step_observer_factory=observer_factory,
+        channel_flux_directions={"top": "FREE", "middle": "FREE", "bottom": "FREE"},
     )
     _attach_scan_metadata(
         summary=baseline_summary,
@@ -331,6 +332,7 @@ def main() -> None:
             simulation_overrides=simulation_overrides or None,
             write_root_summary=False,
             step_observer_factory=observer_factory,
+            channel_flux_directions=setting.directions,
         )
         _attach_scan_metadata(
             summary=summary,

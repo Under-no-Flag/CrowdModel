@@ -136,6 +136,7 @@ def simulate_case(
     output_dir: Path,
     objective_cfg: ObjectiveConfig | None = None,
     step_observer: StepObserver | None = None,
+    channel_flux_directions: dict[str, str] | None = None,
 ) -> dict[str, object]:
     output_dir.mkdir(parents=True, exist_ok=True)
     if objective_cfg is None:
@@ -314,6 +315,7 @@ def simulate_case(
             channel_masks=case.channel_masks,
             probe_x=case.probe_x,
             inflow_total=inflow_total,
+            channel_flux_directions=channel_flux_directions,
         )
 
         if step_observer is not None:

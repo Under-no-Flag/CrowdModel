@@ -71,6 +71,7 @@ def run_from_config(
     simulation_overrides: dict[str, object] | None = None,
     write_root_summary: bool = True,
     step_observer_factory: StepObserverFactory | None = None,
+    channel_flux_directions: dict[str, str] | None = None,
 ) -> dict[str, object]:
     run_spec = load_run_config(config_path)
 
@@ -113,6 +114,7 @@ def run_from_config(
         output_dir=case_output_dir,
         objective_cfg=run_spec.objective,
         step_observer=step_observer,
+        channel_flux_directions=channel_flux_directions,
     )
     summary["config_path"] = str(run_spec.config_path)
     summary["scene_path"] = str(run_spec.scene_path)

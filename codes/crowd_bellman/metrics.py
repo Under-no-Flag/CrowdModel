@@ -77,14 +77,26 @@ def channel_flux_increment(
     channel_mask: np.ndarray,
     dx: float,
     dt: float,
+    direction: str = "E",
 ) -> float:
     face_index = int(np.clip(probe_x, 0, fx.shape[1] - 1))
     right_col = min(face_index + 1, channel_mask.shape[1] - 1)
     y_valid = np.where(channel_mask[:, face_index] | channel_mask[:, right_col])[0]
     if y_valid.size == 0:
         return 0.0
-    positive_flux = np.maximum(fx[y_valid, face_index], 0.0)
-    return float(np.sum(positive_flux) * dx * dt)
+    face_flux = fx[y_valid, face_index]
+    normalized_direction = direction.upper()
+    if normalized_direction in {"E", "EAST", "EASTBOUND"}:
+        counted_flux = np.maximum(face_flux, 0.0)
+    elif normalized_direction in {"W", "WEST", "WESTBOUND"}:
+        counted_flux = np.maximum(-face_flux, 0.0)
+    elif normalized_direction in {"FREE", "ABS", "ABSOLUTE", "BOTH", "BIDIRECTIONAL"}:
+        counted_flux = np.abs(face_flux)
+    elif normalized_direction in {"CLOSED", "NONE"}:
+        counted_flux = np.zeros_like(face_flux)
+    else:
+        raise ValueError(f"Unsupported channel flux direction: {direction!r}")
+    return float(np.sum(counted_flux) * dx * dt)
 
 
 def channel_flux_variance(channel_flux_cumulative: dict[str, float]) -> float:
@@ -342,6 +354,7 @@ def record_step(
     channel_masks: dict[str, np.ndarray],
     probe_x: dict[str, int],
     inflow_total: float,
+    channel_flux_directions: dict[str, str] | None = None,
 ) -> None:
     cell_area = dx * dx
     walkable_rho = rho[walkable]
@@ -370,6 +383,7 @@ def record_step(
             channel_mask=channel_mask,
             dx=dx,
             dt=dt,
+            direction=(channel_flux_directions or {}).get(name, "E"),
         )
 
 
