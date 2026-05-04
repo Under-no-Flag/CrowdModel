@@ -30,6 +30,7 @@ from crowd_bellman.core import (
     solve_bellman,
     tensor_from_tau,
 )
+from crowd_bellman.plotting import DENSITY_CMAP
 
 OUTPUT_DIR = Path(__file__).resolve().parent / "results" / "metric_tensor_illustration"
 
@@ -172,13 +173,13 @@ def _draw_panel(
                     facecolor="#d62728", alpha=0.04, zorder=0)
 
     # --- phi heatmap ---
-    im = ax.imshow(phi_plot, origin="lower", cmap="YlOrRd", alpha=0.55)
+    im = ax.imshow(phi_plot, origin="lower", cmap=DENSITY_CMAP, alpha=0.55)
 
     # --- phi contours (equipotential / isochrone lines) ---
     vmax = np.nanmax(phi_plot)
     if np.isfinite(vmax) and vmax > 1e-6:
         levels = np.linspace(0, vmax, 16)
-        ax.contour(phi_plot, levels=levels, colors="#8B0000", linewidths=0.55, alpha=0.65)
+        ax.contour(phi_plot, levels=levels, colors="#8B0000", linewidths=0.55, alpha=0.65, linestyles="--")
 
     # --- optimal direction field (quiver) ---
     qstep = 4

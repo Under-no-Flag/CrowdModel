@@ -23,6 +23,7 @@ class SimulationConfig:
     save_every: int = 40
     bellman_backend: str = "optimized"
     direction_recovery_backend: str = "vectorized"
+    density_contour_levels: tuple[float, ...] | int | None = None
 
 
 @dataclass(frozen=True)

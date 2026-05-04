@@ -13,6 +13,7 @@ from matplotlib.lines import Line2D
 import numpy as np
 
 from .metrics import save_json
+from .plotting import DENSITY_CMAP, DensityContourLevels, draw_density_contours
 
 
 def _crop_bounds(mask: np.ndarray, pad: int = 4) -> tuple[int, int, int, int]:
@@ -86,6 +87,7 @@ class CaseBehaviorCollector:
     observation_start_fraction: float = 0.15
     rho_threshold: float = 0.05
     alignment_angle_deg: float = 15.0
+    density_contour_levels: DensityContourLevels = None
 
     def __post_init__(self) -> None:
         self.channel_order = tuple(self.channel_masks.keys())
@@ -326,7 +328,9 @@ class CaseBehaviorCollector:
         fig, ax = plt.subplots(1, 1, figsize=(7.5, 5.5), dpi=150)
         density = mean_density.copy()
         density[~self.walkable] = np.nan
-        im = ax.imshow(density[y0:y1, x0:x1], origin="lower", cmap="viridis")
+        density_view = density[y0:y1, x0:x1]
+        im = ax.imshow(density_view, origin="lower", cmap=DENSITY_CMAP)
+        draw_density_contours(ax, density_view, self.density_contour_levels)
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="mean density")
 
         step = 3
@@ -405,6 +409,7 @@ def build_g1_mechanism_report(
     case_summaries: list[dict[str, object]],
     behavior_summaries: list[dict[str, object]],
     bridge_summary: dict[str, object] | None = None,
+    density_contour_levels: DensityContourLevels = None,
 ) -> dict[str, object]:
     output_root.mkdir(parents=True, exist_ok=True)
     summary_by_case = {str(item["case_id"]): item for item in case_summaries}
@@ -440,11 +445,11 @@ def build_g1_mechanism_report(
     _save_configuration_plot(output_root / "g1_configuration_sensitivity.png", table_rows)
     _save_direction_consistency_radar(output_root / "g1_direction_consistency_radar.png", table_rows)
     _save_flow_metric_boxplots(output_root / "g1_flow_metric_boxplots.png", behavior_summaries)
-    _save_attraction_contour_panel(output_root / "g1_channel_attraction_contours.png", behavior_summaries)
-    _save_vector_field_panel(output_root / "g1_vector_field_comparison.png", behavior_summaries)
-    _save_m_approach_flow_comparison(output_root / "g1_m_approach_flow_comparison.png", behavior_summaries)
-    _save_u_direction_field_comparison(output_root / "g1_u_direction_field_comparison.png", behavior_summaries)
-    _save_um_configuration_flow_comparison(output_root / "g1_um_configuration_flow_comparison.png", behavior_summaries)
+    _save_attraction_contour_panel(output_root / "g1_channel_attraction_contours.png", behavior_summaries, density_contour_levels=density_contour_levels)
+    _save_vector_field_panel(output_root / "g1_vector_field_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
+    _save_m_approach_flow_comparison(output_root / "g1_m_approach_flow_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
+    _save_u_direction_field_comparison(output_root / "g1_u_direction_field_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
+    _save_um_configuration_flow_comparison(output_root / "g1_um_configuration_flow_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
     comparison_rows = _save_mechanism_comparison_table(
         output_root=output_root,
         table_rows=table_rows,
@@ -684,7 +689,12 @@ def _panel_cases(fields: dict[str, dict[str, np.ndarray]]) -> list[str]:
     return [case_id for case_id in preferred if case_id in fields]
 
 
-def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+def _save_attraction_contour_panel(
+    path: Path,
+    behavior_summaries: list[dict[str, object]],
+    *,
+    density_contour_levels: DensityContourLevels = None,
+) -> None:
     fields = _load_fields(behavior_summaries)
     cases = _panel_cases(fields)
     if not cases:
@@ -700,10 +710,14 @@ def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str
         capture_map = np.asarray(field["capture_map"], dtype=int)
         density_plot = density.copy()
         density_plot[~walkable] = np.nan
-        ax.imshow(density_plot, origin="lower", cmap="Greys", alpha=0.85)
-        finite = density_plot[np.isfinite(density_plot)]
-        if finite.size > 0 and float(np.nanmax(finite)) > float(np.nanmin(finite)):
-            ax.contour(density_plot, levels=6, colors="black", linewidths=0.45, alpha=0.45)
+        ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, alpha=0.85)
+        draw_density_contours(
+            ax,
+            density_plot,
+            density_contour_levels,
+            linewidths=0.45,
+            alpha=0.55,
+        )
         for channel_index, color in enumerate(contour_colors):
             binary = (capture_map == channel_index).astype(float)
             if np.any(binary > 0.0) and np.any(binary < 1.0):
@@ -719,7 +733,7 @@ def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str
         Line2D([0], [0], color=color, lw=2.0, label=label)
         for color, label in zip(contour_colors, channel_labels)
     ]
-    legend_handles.append(Line2D([0], [0], color="black", lw=0.8, alpha=0.6, label="Mean-density contour"))
+    legend_handles.append(Line2D([0], [0], color="black", lw=0.8, alpha=0.6, linestyle="--", label="Mean-density contour"))
     fig.legend(handles=legend_handles, loc="lower center", ncol=4, frameon=False, bbox_to_anchor=(0.5, 0.01))
     fig.suptitle("Channel Attraction Domains and Mean-Density Contours")
     fig.subplots_adjust(left=0.015, right=0.985, top=0.90, bottom=0.12, wspace=0.04, hspace=0.22)
@@ -727,7 +741,12 @@ def _save_attraction_contour_panel(path: Path, behavior_summaries: list[dict[str
     plt.close(fig)
 
 
-def _save_vector_field_panel(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+def _save_vector_field_panel(
+    path: Path,
+    behavior_summaries: list[dict[str, object]],
+    *,
+    density_contour_levels: DensityContourLevels = None,
+) -> None:
     fields = _load_fields(behavior_summaries)
     cases = _panel_cases(fields)
     if not cases:
@@ -743,7 +762,8 @@ def _save_vector_field_panel(path: Path, behavior_summaries: list[dict[str, obje
         analysis_mask = np.asarray(field["analysis_mask"], dtype=bool)
         density_plot = density.copy()
         density_plot[~walkable] = np.nan
-        ax.imshow(density_plot, origin="lower", cmap="viridis")
+        ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP)
+        draw_density_contours(ax, density_plot, density_contour_levels)
         step = 5
         yy, xx = np.mgrid[0:density.shape[0]:step, 0:density.shape[1]:step]
         ux_d = ux[0:density.shape[0]:step, 0:density.shape[1]:step]
@@ -763,7 +783,12 @@ def _save_vector_field_panel(path: Path, behavior_summaries: list[dict[str, obje
     plt.close(fig)
 
 
-def _save_m_approach_flow_comparison(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+def _save_m_approach_flow_comparison(
+    path: Path,
+    behavior_summaries: list[dict[str, object]],
+    *,
+    density_contour_levels: DensityContourLevels = None,
+) -> None:
     fields = _load_fields(behavior_summaries)
     case_ids = ["case1_baseline", "case_m_only_middle"]
     if not all(case_id in fields for case_id in case_ids):
@@ -791,7 +816,8 @@ def _save_m_approach_flow_comparison(path: Path, behavior_summaries: list[dict[s
 
         density_plot = density[y0:y1, x0:x1].copy()
         density_plot[~walkable[y0:y1, x0:x1]] = np.nan
-        im = ax.imshow(density_plot, origin="lower", cmap="viridis")
+        im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP)
+        draw_density_contours(ax, density_plot, density_contour_levels)
 
         ux_crop = ux[y0:y1, x0:x1].copy()
         uy_crop = uy[y0:y1, x0:x1].copy()
@@ -867,6 +893,7 @@ def _draw_flow_field_panel(
     bounds: tuple[int, int, int, int],
     title: str,
     stream_density: float = 1.15,
+    density_contour_levels: DensityContourLevels = None,
 ) -> object:
     x0, x1, y0, y1 = bounds
     density = np.asarray(field["mean_density"], dtype=float)
@@ -877,7 +904,8 @@ def _draw_flow_field_panel(
 
     density_plot = density[y0:y1, x0:x1].copy()
     density_plot[~walkable[y0:y1, x0:x1]] = np.nan
-    im = ax.imshow(density_plot, origin="lower", cmap="viridis")
+    im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP)
+    draw_density_contours(ax, density_plot, density_contour_levels)
 
     ux_crop = ux[y0:y1, x0:x1].copy()
     uy_crop = uy[y0:y1, x0:x1].copy()
@@ -921,7 +949,12 @@ def _draw_flow_field_panel(
     return im
 
 
-def _save_u_direction_field_comparison(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+def _save_u_direction_field_comparison(
+    path: Path,
+    behavior_summaries: list[dict[str, object]],
+    *,
+    density_contour_levels: DensityContourLevels = None,
+) -> None:
     fields = _load_fields(behavior_summaries)
     case_ids = ["case1_baseline", "case_u_only_middle"]
     if not all(case_id in fields for case_id in case_ids):
@@ -937,6 +970,7 @@ def _save_u_direction_field_comparison(path: Path, behavior_summaries: list[dict
             bounds=bounds,
             title=_display_case_id(case_id),
             stream_density=1.15,
+            density_contour_levels=density_contour_levels,
         )
     cbar_ax = fig.add_axes((0.925, 0.16, 0.018, 0.68))
     cbar = fig.colorbar(im, cax=cbar_ax)
@@ -947,7 +981,12 @@ def _save_u_direction_field_comparison(path: Path, behavior_summaries: list[dict
     plt.close(fig)
 
 
-def _save_um_configuration_flow_comparison(path: Path, behavior_summaries: list[dict[str, object]]) -> None:
+def _save_um_configuration_flow_comparison(
+    path: Path,
+    behavior_summaries: list[dict[str, object]],
+    *,
+    density_contour_levels: DensityContourLevels = None,
+) -> None:
     fields = _load_fields(behavior_summaries)
     case_ids = ["case2_middle_guided", "case3_top_guided", "case4_bottom_guided"]
     if not all(case_id in fields for case_id in case_ids):
@@ -964,6 +1003,7 @@ def _save_um_configuration_flow_comparison(path: Path, behavior_summaries: list[
             bounds=bounds,
             title=title,
             stream_density=1.05,
+            density_contour_levels=density_contour_levels,
         )
     cbar_ax = fig.add_axes((0.925, 0.16, 0.016, 0.68))
     cbar = fig.colorbar(im, cax=cbar_ax)

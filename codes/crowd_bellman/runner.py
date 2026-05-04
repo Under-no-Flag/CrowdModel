@@ -350,6 +350,7 @@ def simulate_case(
                 walkable=case.walkable,
                 rho_max=cfg.rho_max,
                 panel_title=f"{groups[vis_key].name} density and direction",
+                density_contour_levels=cfg.density_contour_levels,
             )
         step += 1
 
