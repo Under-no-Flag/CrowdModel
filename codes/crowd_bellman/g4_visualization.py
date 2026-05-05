@@ -24,9 +24,10 @@ TERM_COLORS = {
 CHANNEL_COLORS = {
     "top": "#4C78A8",
     "middle": "#F58518",
-    "bottom": "#54A24B",
+    "lower_middle": "#54A24B",
+    "bottom": "#B279A2",
 }
-CHANNELS = ("top", "middle", "bottom")
+CHANNELS = ("top", "middle", "lower_middle", "bottom")
 TERMS = ("j1", "j2", "j5")
 
 
@@ -67,7 +68,7 @@ def _read_evaluation_rows(path: Path) -> list[dict[str, object]]:
     with path.open("r", encoding="utf-8-sig", newline="") as handle:
         for raw in csv.DictReader(handle):
             row: dict[str, object] = dict(raw)
-            for key in (
+            numeric_keys = (
                 "eval_id",
                 "objective_value",
                 "j1",
@@ -76,16 +77,12 @@ def _read_evaluation_rows(path: Path) -> list[dict[str, object]]:
                 "j1_raw",
                 "j2_raw",
                 "j5_raw",
-                "eta_top",
-                "eta_middle",
-                "eta_bottom",
-                "flux_top",
-                "flux_middle",
-                "flux_bottom",
-                "flux_share_top",
-                "flux_share_middle",
-                "flux_share_bottom",
-            ):
+            ) + tuple(
+                item
+                for channel in CHANNELS
+                for item in (f"eta_{channel}", f"flux_{channel}", f"flux_share_{channel}")
+            )
+            for key in numeric_keys:
                 if key in row:
                     row[key] = _number(row[key])
             row["method"] = _method_for_source(str(row.get("source", "")))
@@ -259,9 +256,10 @@ def _save_best_channel_flux(path: Path, rows: list[dict[str, object]], method_ro
         raise ValueError("No best cases can be matched to evaluation rows")
 
     x = np.arange(len(selected), dtype=float)
-    width = 0.24
+    width = 0.8 / max(1, len(CHANNELS))
     fig, ax = plt.subplots(1, 1, figsize=(8.2, 4.8), dpi=160)
-    for offset, channel in zip((-width, 0.0, width), CHANNELS):
+    for idx, channel in enumerate(CHANNELS):
+        offset = (idx - (len(CHANNELS) - 1) / 2.0) * width
         values = [_float(row.get(f"flux_share_{channel}", math.nan)) for _, row in selected]
         ax.bar(x + offset, values, width=width, color=CHANNEL_COLORS[channel], label=channel)
     ax.set_title("Best-case channel flux share")
@@ -270,7 +268,7 @@ def _save_best_channel_flux(path: Path, rows: list[dict[str, object]], method_ro
     ax.set_xticklabels([method for method, _ in selected])
     ax.set_ylim(0.0, max(0.62, max(_float(row.get(f"flux_share_{channel}", 0.0)) for _, row in selected for channel in CHANNELS) * 1.16))
     ax.grid(axis="y", alpha=0.25)
-    ax.legend(frameon=False, ncols=3)
+    ax.legend(frameon=False, ncols=len(CHANNELS))
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
@@ -288,16 +286,9 @@ def _save_top_candidates_csv(path: Path, rows: list[dict[str, object]]) -> Path:
         "j1",
         "j2",
         "j5",
-        "direction_top",
-        "direction_middle",
-        "direction_bottom",
-        "eta_top",
-        "eta_middle",
-        "eta_bottom",
-        "flux_share_top",
-        "flux_share_middle",
-        "flux_share_bottom",
-    ]
+    ] + [f"direction_{channel}" for channel in CHANNELS]
+    fields += [f"eta_{channel}" for channel in CHANNELS]
+    fields += [f"flux_share_{channel}" for channel in CHANNELS]
     with path.open("w", encoding="utf-8", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fields)
         writer.writeheader()
@@ -347,12 +338,10 @@ def _save_markdown_summary(
             f"- Terms: J1={_float(best_overall.get('j1', math.nan)):.6f}, "
             f"J2={_float(best_overall.get('j2', math.nan)):.6f}, "
             f"J5={_float(best_overall.get('j5', math.nan)):.6f}",
-            f"- Directions: top={best_overall.get('direction_top', '')}, "
-            f"middle={best_overall.get('direction_middle', '')}, "
-            f"bottom={best_overall.get('direction_bottom', '')}",
-            f"- Eta: top={_float(best_overall.get('eta_top', math.nan)):.6g}, "
-            f"middle={_float(best_overall.get('eta_middle', math.nan)):.6g}, "
-            f"bottom={_float(best_overall.get('eta_bottom', math.nan)):.6g}",
+            "- Directions: "
+            + ", ".join(f"{channel}={best_overall.get(f'direction_{channel}', '')}" for channel in CHANNELS),
+            "- Eta: "
+            + ", ".join(f"{channel}={_float(best_overall.get(f'eta_{channel}', math.nan)):.6g}" for channel in CHANNELS),
             "",
             "## Generated figures",
             "",

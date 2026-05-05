@@ -14,15 +14,15 @@ from .config_workflow import run_from_config
 from .metrics import save_json
 
 
-CHANNEL_NAMES = ("top", "middle", "bottom")
+CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
 CHANNEL_STATES = ("E", "W", "FREE", "CLOSED")
 DEFAULT_BASELINE_CONFIG = Path("codes/scenes/examples/g2_multistage_directional/run_baseline.toml")
 
 
 @dataclass(frozen=True)
 class ControlVector:
-    directions: tuple[str, str, str]
-    eta: tuple[float, float, float]
+    directions: tuple[str, ...]
+    eta: tuple[float, ...]
 
     def normalized(self) -> "ControlVector":
         directions = tuple(_normalize_state(state) for state in self.directions)
@@ -82,8 +82,8 @@ class SAHBOConfig:
     iterations: int = 4
     proxy_top_k: int = 3
     neighborhood_radius: int = 1
-    initial_eta: tuple[float, float, float] = (8.0, 8.0, 8.0)
-    initial_directions: tuple[str, str, str] = ("FREE", "FREE", "FREE")
+    initial_eta: tuple[float, ...] = (8.0, 8.0, 8.0, 8.0)
+    initial_directions: tuple[str, ...] = ("FREE", "FREE", "FREE", "FREE")
     eta_lower_bound: float = 1.0
     eta_upper_bound: float = 12.0
     eta_step_size: float = 1.2
@@ -98,17 +98,20 @@ class SAHBOConfig:
 
 @dataclass
 class GridSearchConfig:
-    direction_sets: tuple[tuple[str, str, str], ...] = (
-        ("FREE", "FREE", "FREE"),
-        ("E", "W", "W"),
-        ("W", "E", "W"),
-        ("W", "W", "E"),
-        ("W", "E", "E"),
-        ("E", "W", "E"),
-        ("E", "E", "W"),
-        ("CLOSED", "E", "W"),
-        ("E", "CLOSED", "W"),
-        ("E", "W", "CLOSED"),
+    direction_sets: tuple[tuple[str, ...], ...] = (
+        ("FREE", "FREE", "FREE", "FREE"),
+        ("E", "W", "W", "W"),
+        ("W", "E", "W", "W"),
+        ("W", "W", "E", "W"),
+        ("W", "W", "W", "E"),
+        ("W", "E", "E", "E"),
+        ("E", "W", "E", "E"),
+        ("E", "E", "W", "E"),
+        ("E", "E", "E", "W"),
+        ("CLOSED", "E", "W", "W"),
+        ("E", "CLOSED", "W", "W"),
+        ("E", "W", "CLOSED", "W"),
+        ("E", "W", "W", "CLOSED"),
     )
     eta_values: tuple[float, ...] = (1.0, 4.0, 8.0, 12.0)
     max_evaluations: int | None = None
@@ -327,7 +330,7 @@ def run_grid_search(
                 break
             control = ControlVector(
                 directions=tuple(_normalize_state(state) for state in directions),
-                eta=(float(eta_value), float(eta_value), float(eta_value)),
+                eta=tuple(float(eta_value) for _ in CHANNEL_NAMES),
             )
             records.append(evaluator.evaluate(control, source="grid"))
             evaluated += 1
@@ -383,12 +386,12 @@ def save_g4_outputs(
 
 
 def generate_direction_neighbors(
-    directions: tuple[str, str, str],
+    directions: tuple[str, ...],
     *,
     radius: int,
-) -> list[tuple[str, str, str]]:
+) -> list[tuple[str, ...]]:
     base = tuple(_normalize_state(state) for state in directions)
-    neighbors: set[tuple[str, str, str]] = {base}
+    neighbors: set[tuple[str, ...]] = {base}
     channel_count = len(base)
     max_radius = max(0, min(int(radius), channel_count))
     for change_count in range(1, max_radius + 1):
@@ -407,8 +410,8 @@ def generate_direction_neighbors(
 
 def proxy_score(
     *,
-    directions: tuple[str, str, str],
-    eta: tuple[float, float, float],
+    directions: tuple[str, ...],
+    eta: tuple[float, ...],
     incumbent_summary: dict[str, object],
 ) -> float:
     states = tuple(_normalize_state(state) for state in directions)

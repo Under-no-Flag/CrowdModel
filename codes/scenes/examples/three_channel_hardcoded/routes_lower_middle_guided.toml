@@ -1,6 +1,6 @@
 [case]
-case_id = "case2_middle_guided"
-title = "Case 2: geometry-guided middle one-way channel"
+case_id = "case5_lower_middle_guided"
+title = "Case 5: geometry-guided lower-middle one-way channel"
 
 [[stages]]
 stage_id = "main_exit"
@@ -11,13 +11,13 @@ sink_region = "exit_east"
 [[stages.controls]]
 mode = "target_point"
 region = "feeder_band"
-target_point = [48, 36]
+target_point = [48, 55]
 alpha = 8.0
 beta = 0.35
 
 [[stages.controls]]
 mode = "fixed_direction"
-region = "middle_channel"
+region = "lower_middle_channel"
 direction = "E"
 alpha = 10.0
 beta = 0.2
@@ -30,7 +30,7 @@ value = 0.15
 
 [[stages.controls]]
 mode = "isotropic"
-region = "lower_middle_channel"
+region = "middle_channel"
 value = 0.15
 
 [[stages.controls]]

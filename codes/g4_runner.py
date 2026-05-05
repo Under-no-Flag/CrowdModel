@@ -5,6 +5,7 @@ from pathlib import Path
 import tomllib
 
 from crowd_bellman.g4_sahbo import (
+    CHANNEL_NAMES,
     DEFAULT_BASELINE_CONFIG,
     G4EvaluationCache,
     GridSearchConfig,
@@ -25,8 +26,8 @@ DEFAULT_G4_RUN_CONFIG = {
         "iterations": 4,
         "proxy_top_k": 3,
         "neighborhood_radius": 1,
-        "initial_directions": ("FREE", "FREE", "FREE"),
-        "initial_eta": (8.0, 8.0, 8.0),
+        "initial_directions": ("FREE", "FREE", "FREE", "FREE"),
+        "initial_eta": (8.0, 8.0, 8.0, 8.0),
         "eta_lower_bound": 1.0,
         "eta_upper_bound": 12.0,
         "eta_step_size": 1.2,
@@ -48,16 +49,15 @@ def _parse_float_tuple(raw: str, *, expected_len: int | None = None) -> tuple[fl
     return values
 
 
-def _parse_three_float_tuple(raw: str) -> tuple[float, float, float]:
-    values = _parse_float_tuple(raw, expected_len=3)
-    return (values[0], values[1], values[2])
+def _parse_channel_float_tuple(raw: str) -> tuple[float, ...]:
+    return _parse_float_tuple(raw, expected_len=len(CHANNEL_NAMES))
 
 
-def _parse_state_tuple(raw: str) -> tuple[str, str, str]:
+def _parse_state_tuple(raw: str) -> tuple[str, ...]:
     values = tuple(item.strip().upper() for item in raw.split(",") if item.strip())
-    if len(values) != 3:
-        raise ValueError("Expected exactly three channel states, e.g. FREE,FREE,FREE")
-    return (values[0], values[1], values[2])
+    if len(values) != len(CHANNEL_NAMES):
+        raise ValueError(f"Expected exactly {len(CHANNEL_NAMES)} channel states, e.g. FREE,FREE,FREE,FREE")
+    return values
 
 
 def _as_float_tuple(value: object, *, field_name: str, expected_len: int | None = None) -> tuple[float, ...]:
@@ -72,23 +72,23 @@ def _as_float_tuple(value: object, *, field_name: str, expected_len: int | None 
     return values
 
 
-def _as_state_tuple(value: object, *, field_name: str) -> tuple[str, str, str]:
+def _as_state_tuple(value: object, *, field_name: str) -> tuple[str, ...]:
     if isinstance(value, str):
         return _parse_state_tuple(value)
     if isinstance(value, list | tuple):
         values = tuple(str(item).upper() for item in value)
-        if len(values) != 3:
-            raise ValueError(f"{field_name} must contain exactly three states")
-        return (values[0], values[1], values[2])
-    raise ValueError(f"{field_name} must be a comma-separated string or a list of three states")
+        if len(values) != len(CHANNEL_NAMES):
+            raise ValueError(f"{field_name} must contain exactly {len(CHANNEL_NAMES)} states")
+        return values
+    raise ValueError(f"{field_name} must be a comma-separated string or a list of {len(CHANNEL_NAMES)} states")
 
 
-def _as_direction_sets(value: object) -> tuple[tuple[str, str, str], ...] | None:
+def _as_direction_sets(value: object) -> tuple[tuple[str, ...], ...] | None:
     if value is None:
         return None
     if not isinstance(value, list | tuple):
-        raise ValueError("grid.direction_sets must be a list of three-state lists")
-    direction_sets: list[tuple[str, str, str]] = []
+        raise ValueError(f"grid.direction_sets must be a list of {len(CHANNEL_NAMES)}-state lists")
+    direction_sets: list[tuple[str, ...]] = []
     for index, item in enumerate(value):
         direction_sets.append(_as_state_tuple(item, field_name=f"grid.direction_sets[{index}]"))
     return tuple(direction_sets)
@@ -147,7 +147,7 @@ def _load_g4_config(path: Path | None) -> dict[str, object]:
         if "initial_directions" in sahbo:
             sahbo["initial_directions"] = _as_state_tuple(sahbo["initial_directions"], field_name="sahbo.initial_directions")
         if "initial_eta" in sahbo:
-            sahbo["initial_eta"] = _as_float_tuple(sahbo["initial_eta"], field_name="sahbo.initial_eta", expected_len=3)
+            sahbo["initial_eta"] = _as_float_tuple(sahbo["initial_eta"], field_name="sahbo.initial_eta", expected_len=len(CHANNEL_NAMES))
         config["sahbo"] = sahbo
 
     grid_table = raw.get("grid", {})
@@ -219,7 +219,7 @@ def main() -> None:
     if args.initial_directions is not None:
         sahbo_table["initial_directions"] = _parse_state_tuple(args.initial_directions)
     if args.initial_eta is not None:
-        sahbo_table["initial_eta"] = _parse_three_float_tuple(args.initial_eta)
+        sahbo_table["initial_eta"] = _parse_channel_float_tuple(args.initial_eta)
     _override_if_present(sahbo_table, "eta_lower_bound", args.eta_lower)
     _override_if_present(sahbo_table, "eta_upper_bound", args.eta_upper)
     _override_if_present(sahbo_table, "eta_step_size", args.eta_step_size)
@@ -253,7 +253,7 @@ def main() -> None:
                 iterations=int(sahbo_table["iterations"]),
                 proxy_top_k=int(sahbo_table["proxy_top_k"]),
                 neighborhood_radius=int(sahbo_table["neighborhood_radius"]),
-                initial_eta=_as_float_tuple(sahbo_table["initial_eta"], field_name="sahbo.initial_eta", expected_len=3),  # type: ignore[arg-type]
+                initial_eta=_as_float_tuple(sahbo_table["initial_eta"], field_name="sahbo.initial_eta", expected_len=len(CHANNEL_NAMES)),  # type: ignore[arg-type]
                 initial_directions=_as_state_tuple(sahbo_table["initial_directions"], field_name="sahbo.initial_directions"),
                 eta_lower_bound=float(sahbo_table["eta_lower_bound"]),
                 eta_upper_bound=float(sahbo_table["eta_upper_bound"]),

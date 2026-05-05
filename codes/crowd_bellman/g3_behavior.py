@@ -13,6 +13,9 @@ import numpy as np
 from .metrics import save_json
 
 
+CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
+
+
 @dataclass
 class G3BehaviorCollector:
     case_id: str
@@ -95,11 +98,9 @@ def build_g3_behavior_report(
             "j5_raw": summary.get("j5_channel_flux_variance"),
             "sink_cumulative": summary.get("final_sink_cumulative"),
             "peak_density": summary.get("peak_density_max"),
-            "entry_1_2_flux_share": summary.get("channel_flux_share", {}).get("entry_1_2"),
-            "exit_8_flux_share": summary.get("channel_flux_share", {}).get("exit_8"),
-            "exit_9_flux_share": summary.get("channel_flux_share", {}).get("exit_9"),
-            "exit_10_flux_share": summary.get("channel_flux_share", {}).get("exit_10"),
         }
+        for channel_name in CHANNEL_NAMES:
+            row[f"{channel_name}_flux_share"] = summary.get("channel_flux_share", {}).get(channel_name)
         for region_name in ("stage1_goal", "stage2_goal", "route8_goal", "route9_goal", "route10_goal"):
             peak_info = behavior.get("peak_region_mass", {}).get(region_name, {})
             row[f"{region_name}_peak_mass"] = peak_info.get("peak_mass")
@@ -153,13 +154,14 @@ def _save_exit_split_plot(path: Path, rows: list[dict[str, object]]) -> None:
         return
     labels = [str(row["case_id"]) for row in rows]
     x = np.arange(len(labels))
-    width = 0.25
+    width = 0.8 / max(1, len(CHANNEL_NAMES))
     fig, ax = plt.subplots(1, 1, figsize=(9.5, 4.8), dpi=150)
-    for offset, channel_name in zip((-width, 0.0, width), ("exit_8", "exit_9", "exit_10")):
+    for idx, channel_name in enumerate(CHANNEL_NAMES):
+        offset = (idx - (len(CHANNEL_NAMES) - 1) / 2.0) * width
         ax.bar(x + offset, [float(row[f"{channel_name}_flux_share"] or 0.0) for row in rows], width=width, label=channel_name)
     ax.set_xticks(x)
     ax.set_xticklabels(labels, rotation=10)
-    ax.set_title("G3 exit-load split under different behavior layers")
+    ax.set_title("G3 channel-load split under different behavior layers")
     ax.grid(axis="y", alpha=0.2)
     ax.legend()
     fig.tight_layout()

@@ -1,6 +1,6 @@
 [simulation]
-nx = 96
-ny = 72
+nx = 128
+ny = 96
 dx = 0.5
 steps = 1600
 time_horizon = 140.0
@@ -15,7 +15,7 @@ save_every = 40
 density_contour_levels = 0
 
 [objective]
-name = "three_channel_middle_guided"
+name = "four_channel_middle_guided"
 
 [scene]
 file = "scene.toml"
@@ -27,4 +27,6 @@ file = "population.toml"
 file = "routes_middle_guided.toml"
 
 [outputs]
-output_root = "../../../results/config_three_channel_middle_guided"
+output_root = "../../../results/config_four_channel_middle_guided"
+
+

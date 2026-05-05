@@ -16,6 +16,10 @@ from .metrics import save_json
 from .plotting import DENSITY_CMAP, DENSITY_INTERPOLATION, DensityContourLevels, draw_density_contours
 
 
+CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
+CHANNEL_COLORS = ["#4C78A8", "#F58518", "#54A24B", "#B279A2"]
+
+
 def _crop_bounds(mask: np.ndarray, pad: int = 4) -> tuple[int, int, int, int]:
     points = np.argwhere(mask)
     if points.size == 0:
@@ -363,7 +367,7 @@ class CaseBehaviorCollector:
         capture_view = np.full(capture_map.shape, np.nan, dtype=float)
         for channel_index, _channel_name in enumerate(self.channel_order):
             capture_view[capture_map == channel_index] = float(channel_index)
-        cmap = ListedColormap(["#4C78A8", "#F58518", "#54A24B"])
+        cmap = ListedColormap(CHANNEL_COLORS[: max(1, len(self.channel_order))])
 
         fig, ax = plt.subplots(1, 1, figsize=(7.5, 5.5), dpi=150)
         ax.imshow(capture_view[y0:y1, x0:x1], origin="lower", cmap=cmap, vmin=0.0, vmax=max(0, len(self.channel_order) - 1))
@@ -386,6 +390,7 @@ def _guided_channel(case_id: str) -> str | None:
     mapping = {
         "case2_middle_guided": "middle",
         "case3_top_guided": "top",
+        "case5_lower_middle_guided": "lower_middle",
         "case4_bottom_guided": "bottom",
     }
     return mapping.get(case_id)
@@ -398,6 +403,7 @@ def _display_case_id(case_id: str) -> str:
         "case_m_only_middle": "M-only",
         "case2_middle_guided": "U+M",
         "case3_top_guided": "U+M top",
+        "case5_lower_middle_guided": "U+M lower-middle",
         "case4_bottom_guided": "U+M bottom",
     }
     return labels.get(case_id, case_id)
@@ -427,11 +433,9 @@ def build_g1_mechanism_report(
             "j2_normalized": summary.get("j2_normalized"),
             "approach_angle_std_deg": behavior.get("approach_angle_std_deg"),
             "alignment_x_mean": behavior.get("alignment_x_mean"),
-            "top_capture_share": capture_share.get("top", 0.0),
-            "middle_capture_share": capture_share.get("middle", 0.0),
-            "bottom_capture_share": capture_share.get("bottom", 0.0),
+            **{f"{channel_name}_capture_share": capture_share.get(channel_name, 0.0) for channel_name in CHANNEL_NAMES},
         }
-        for channel_name in ("top", "middle", "bottom"):
+        for channel_name in CHANNEL_NAMES:
             channel_behavior = behavior.get("channel_behavior", {}).get(channel_name, {})
             row[f"{channel_name}_reverse_share"] = channel_behavior.get("reverse_direction_share")
             row[f"{channel_name}_consistency"] = channel_behavior.get("direction_consistency_east")
@@ -485,11 +489,11 @@ def build_g1_mechanism_report(
                     "case_id": row["case_id"],
                     "guided_channel": _guided_channel(str(row["case_id"])),
                     "dominant_capture_channel": max(
-                        ("top", "middle", "bottom"),
+                        CHANNEL_NAMES,
                         key=lambda channel_name: float(row.get(f"{channel_name}_capture_share", 0.0) or 0.0),
                     ),
                     "dominant_flux_channel": max(
-                        ("top", "middle", "bottom"),
+                        CHANNEL_NAMES,
                         key=lambda channel_name: float(row.get(f"{channel_name}_flux_share", 0.0) or 0.0),
                     ),
                 }
@@ -603,7 +607,7 @@ def _bootstrap_difference(
 def _focus_rows(rows: list[dict[str, object]], include_guided_variants: bool = False) -> list[dict[str, object]]:
     focus_ids = ["case1_baseline", "case_u_only_middle", "case_m_only_middle", "case2_middle_guided"]
     if include_guided_variants:
-        focus_ids.extend(["case3_top_guided", "case4_bottom_guided"])
+        focus_ids.extend(["case3_top_guided", "case5_lower_middle_guided", "case4_bottom_guided"])
     by_case = {str(row["case_id"]): row for row in rows}
     return [by_case[case_id] for case_id in focus_ids if case_id in by_case]
 
@@ -612,7 +616,7 @@ def _save_direction_consistency_radar(path: Path, rows: list[dict[str, object]])
     focus = _focus_rows(rows)
     if not focus:
         return
-    channels = ("top", "middle", "bottom")
+    channels = CHANNEL_NAMES
     angles = np.linspace(0, 2 * np.pi, len(channels), endpoint=False)
     closed_angles = np.concatenate([angles, angles[:1]])
 
@@ -684,6 +688,7 @@ def _panel_cases(fields: dict[str, dict[str, np.ndarray]]) -> list[str]:
         "case_u_only_middle",
         "case2_middle_guided",
         "case3_top_guided",
+        "case5_lower_middle_guided",
         "case4_bottom_guided",
     ]
     return [case_id for case_id in preferred if case_id in fields]
@@ -699,10 +704,10 @@ def _save_attraction_contour_panel(
     cases = _panel_cases(fields)
     if not cases:
         return
-    fig, axes = plt.subplots(2, 3, figsize=(12.5, 8.2), dpi=150)
+    fig, axes = plt.subplots(2, 4, figsize=(15.5, 8.2), dpi=150)
     axes_flat = list(axes.flat)
-    contour_colors = ["#4C78A8", "#F58518", "#54A24B"]
-    channel_labels = ("Top capture boundary", "Middle capture boundary", "Bottom capture boundary")
+    contour_colors = CHANNEL_COLORS
+    channel_labels = tuple(f"{channel_name.replace('_', '-').title()} capture boundary" for channel_name in CHANNEL_NAMES)
     for ax, case_id in zip(axes_flat, cases):
         field = fields[case_id]
         density = np.asarray(field["mean_density"], dtype=float)
@@ -751,7 +756,7 @@ def _save_vector_field_panel(
     cases = _panel_cases(fields)
     if not cases:
         return
-    fig, axes = plt.subplots(2, 3, figsize=(12.5, 7.4), dpi=150)
+    fig, axes = plt.subplots(2, 4, figsize=(15.5, 7.4), dpi=150)
     axes_flat = list(axes.flat)
     for ax, case_id in zip(axes_flat, cases):
         field = fields[case_id]
@@ -988,14 +993,14 @@ def _save_um_configuration_flow_comparison(
     density_contour_levels: DensityContourLevels = None,
 ) -> None:
     fields = _load_fields(behavior_summaries)
-    case_ids = ["case2_middle_guided", "case3_top_guided", "case4_bottom_guided"]
+    case_ids = ["case2_middle_guided", "case3_top_guided", "case5_lower_middle_guided", "case4_bottom_guided"]
     if not all(case_id in fields for case_id in case_ids):
         return
 
     bounds = _field_crop_bounds(fields, case_ids, pad=4)
-    fig, axes = plt.subplots(1, 3, figsize=(14.8, 5.0), dpi=150, sharex=True, sharey=True)
+    fig, axes = plt.subplots(1, 4, figsize=(17.5, 5.0), dpi=150, sharex=True, sharey=True)
     im = None
-    titles = ["U+M middle", "U+M top", "U+M bottom"]
+    titles = ["U+M middle", "U+M top", "U+M lower-middle", "U+M bottom"]
     for ax, case_id, title in zip(axes, case_ids, titles):
         im = _draw_flow_field_panel(
             ax,
@@ -1116,6 +1121,7 @@ def _save_m_validation_plot(path: Path, behavior_by_case: dict[str, dict[str, ob
         "case_m_only_middle",
         "case2_middle_guided",
         "case3_top_guided",
+        "case5_lower_middle_guided",
         "case4_bottom_guided",
     ]
     plotted = []
@@ -1145,16 +1151,21 @@ def _save_m_validation_plot(path: Path, behavior_by_case: dict[str, dict[str, ob
 
 
 def _save_configuration_plot(path: Path, rows: list[dict[str, object]]) -> None:
-    focus = [row for row in rows if row["case_id"] in {"case2_middle_guided", "case3_top_guided", "case4_bottom_guided"}]
+    focus = [
+        row
+        for row in rows
+        if row["case_id"] in {"case2_middle_guided", "case3_top_guided", "case5_lower_middle_guided", "case4_bottom_guided"}
+    ]
     if not focus:
         return
 
     labels = [str(row["case_id"]) for row in focus]
     x = np.arange(len(labels))
-    width = 0.25
+    width = 0.8 / max(1, len(CHANNEL_NAMES))
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), dpi=150)
-    for offset, channel_name in zip((-width, 0.0, width), ("top", "middle", "bottom")):
+    for idx, channel_name in enumerate(CHANNEL_NAMES):
+        offset = (idx - (len(CHANNEL_NAMES) - 1) / 2.0) * width
         axes[0].bar(
             x + offset,
             [float(row.get(f"{channel_name}_capture_share") or 0.0) for row in focus],

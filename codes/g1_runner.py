@@ -10,12 +10,13 @@ from crowd_bellman.metrics import save_json
 from crowd_bellman.plotting import parse_density_contour_levels, save_comparison_plot
 
 
-THREE_CHANNEL_CONFIGS = (
+FOUR_CHANNEL_CONFIGS = (
     Path("codes/scenes/examples/three_channel_hardcoded/run_baseline.toml"),
     Path("codes/scenes/examples/three_channel_hardcoded/run_m_only.toml"),
     Path("codes/scenes/examples/three_channel_hardcoded/run_u_only.toml"),
     Path("codes/scenes/examples/three_channel_hardcoded/run_middle_guided.toml"),
     Path("codes/scenes/examples/three_channel_hardcoded/run_top_guided.toml"),
+    Path("codes/scenes/examples/three_channel_hardcoded/run_lower_middle_guided.toml"),
     Path("codes/scenes/examples/three_channel_hardcoded/run_bottom_guided.toml"),
 )
 
@@ -96,7 +97,7 @@ def main() -> None:
         return collector.observe
 
     summaries: list[dict[str, object]] = []
-    for config_path in THREE_CHANNEL_CONFIGS:
+    for config_path in FOUR_CHANNEL_CONFIGS:
         summaries.append(
             run_from_config(
                 config_path=config_path,
@@ -151,7 +152,7 @@ def main() -> None:
     payload = {
         "experiment_group": "G1",
         "design_version": "2026-04-17_two_layer",
-        "config_paths": [str(path.resolve()) for path in THREE_CHANNEL_CONFIGS],
+        "config_paths": [str(path.resolve()) for path in FOUR_CHANNEL_CONFIGS],
         "cases": summaries,
         "behavior_cases": behavior_summaries,
         "bridge_case": bridge_summary,

@@ -30,5 +30,10 @@ value = 0.15
 
 [[stages.controls]]
 mode = "isotropic"
+region = "lower_middle_channel"
+value = 0.15
+
+[[stages.controls]]
+mode = "isotropic"
 region = "bottom_channel"
 value = 0.15

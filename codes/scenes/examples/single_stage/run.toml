@@ -1,6 +1,6 @@
 [simulation]
-nx = 40
-ny = 32
+nx = 128
+ny = 96
 dx = 0.5
 steps = 120
 time_horizon = 20.0
@@ -21,3 +21,4 @@ file = "routes.toml"
 
 [outputs]
 output_root = "../../../results/config_single_stage"
+

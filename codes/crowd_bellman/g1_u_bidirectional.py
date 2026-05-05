@@ -149,7 +149,9 @@ def build_bidirectional_u_report(
             "middle_counterflow_mass_time": validation.get("middle_counterflow_mass_time"),
             "middle_head_on_cell_time": validation.get("middle_head_on_cell_time"),
         }
-        for channel_name in ("top", "middle", "bottom"):
+        channel_directional_share = validation.get("channel_directional_share", {})
+        channel_names = tuple(channel_directional_share.keys()) if isinstance(channel_directional_share, dict) else ()
+        for channel_name in channel_names:
             directional = validation.get("channel_directional_share", {}).get(channel_name, {})
             row[f"{channel_name}_eastbound_share"] = directional.get("eastbound", 0.0)
             row[f"{channel_name}_westbound_share"] = directional.get("westbound", 0.0)

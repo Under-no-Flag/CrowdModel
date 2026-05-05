@@ -12,6 +12,7 @@ from crowd_bellman.plotting import parse_density_contour_levels
 
 
 BASELINE_CONFIG = Path("codes/scenes/examples/g2_multistage_directional/run_baseline.toml")
+CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
 
 
 @dataclass(frozen=True)
@@ -25,57 +26,75 @@ class DirectionSetting:
 DIRECTION_SETTINGS = (
     DirectionSetting(
         case_id="case2_topE_middleW_bottomW",
-        title="Case 2: single eastbound top lane, return via middle and bottom",
+        title="Case 2: single eastbound top lane, return via other channels",
         family="single_entry",
-        directions={"top": "E", "middle": "W", "bottom": "W"},
+        directions={"top": "E", "middle": "W", "lower_middle": "W", "bottom": "W"},
     ),
     DirectionSetting(
         case_id="case3_topW_middleE_bottomW",
-        title="Case 3: single eastbound middle lane, return via top and bottom",
+        title="Case 3: single eastbound middle lane, return via other channels",
         family="single_entry",
-        directions={"top": "W", "middle": "E", "bottom": "W"},
+        directions={"top": "W", "middle": "E", "lower_middle": "W", "bottom": "W"},
     ),
     DirectionSetting(
-        case_id="case4_topW_middleW_bottomE",
-        title="Case 4: single eastbound bottom lane, return via top and middle",
+        case_id="case4_topW_middleW_lowerMiddleE_bottomW",
+        title="Case 4: single eastbound lower-middle lane, return via other channels",
         family="single_entry",
-        directions={"top": "W", "middle": "W", "bottom": "E"},
+        directions={"top": "W", "middle": "W", "lower_middle": "E", "bottom": "W"},
     ),
     DirectionSetting(
-        case_id="case5_topW_middleE_bottomE",
-        title="Case 5: single westbound top lane, entry via middle and bottom",
+        case_id="case5_topW_middleW_lowerMiddleW_bottomE",
+        title="Case 5: single eastbound bottom lane, return via other channels",
+        family="single_entry",
+        directions={"top": "W", "middle": "W", "lower_middle": "W", "bottom": "E"},
+    ),
+    DirectionSetting(
+        case_id="case6_topW_middleE_lowerMiddleE_bottomE",
+        title="Case 6: single westbound top lane, entry via other channels",
         family="single_return",
-        directions={"top": "W", "middle": "E", "bottom": "E"},
+        directions={"top": "W", "middle": "E", "lower_middle": "E", "bottom": "E"},
     ),
     DirectionSetting(
-        case_id="case6_topE_middleW_bottomE",
-        title="Case 6: single westbound middle lane, entry via top and bottom",
+        case_id="case7_topE_middleW_lowerMiddleE_bottomE",
+        title="Case 7: single westbound middle lane, entry via other channels",
         family="single_return",
-        directions={"top": "E", "middle": "W", "bottom": "E"},
+        directions={"top": "E", "middle": "W", "lower_middle": "E", "bottom": "E"},
     ),
     DirectionSetting(
-        case_id="case7_topE_middleE_bottomW",
-        title="Case 7: single westbound bottom lane, entry via top and middle",
+        case_id="case8_topE_middleE_lowerMiddleW_bottomE",
+        title="Case 8: single westbound lower-middle lane, entry via other channels",
         family="single_return",
-        directions={"top": "E", "middle": "E", "bottom": "W"},
+        directions={"top": "E", "middle": "E", "lower_middle": "W", "bottom": "E"},
     ),
     DirectionSetting(
-        case_id="case8_topC_middleE_bottomW",
-        title="Case 8: top channel closed, middle entry and bottom return",
-        family="one_closed",
-        directions={"top": "CLOSED", "middle": "E", "bottom": "W"},
+        case_id="case9_topE_middleE_lowerMiddleE_bottomW",
+        title="Case 9: single westbound bottom lane, entry via other channels",
+        family="single_return",
+        directions={"top": "E", "middle": "E", "lower_middle": "E", "bottom": "W"},
     ),
     DirectionSetting(
-        case_id="case9_topE_middleC_bottomW",
-        title="Case 9: middle channel closed, top entry and bottom return",
+        case_id="case10_topC_middleE_lowerMiddleW_bottomW",
+        title="Case 10: top channel closed",
         family="one_closed",
-        directions={"top": "E", "middle": "CLOSED", "bottom": "W"},
+        directions={"top": "CLOSED", "middle": "E", "lower_middle": "W", "bottom": "W"},
     ),
     DirectionSetting(
-        case_id="case10_topE_middleW_bottomC",
-        title="Case 10: bottom channel closed, top entry and middle return",
+        case_id="case11_topE_middleC_lowerMiddleW_bottomW",
+        title="Case 11: middle channel closed",
         family="one_closed",
-        directions={"top": "E", "middle": "W", "bottom": "CLOSED"},
+        directions={"top": "E", "middle": "CLOSED", "lower_middle": "W", "bottom": "W"},
+    ),
+    DirectionSetting(
+        case_id="case12_topE_middleW_lowerMiddleC_bottomW",
+        title="Case 12: lower-middle channel closed",
+        family="one_closed",
+        directions={"top": "E", "middle": "W", "lower_middle": "CLOSED", "bottom": "W"},
+    ),
+    DirectionSetting(
+        case_id="case13_topE_middleW_lowerMiddleW_bottomC",
+        title="Case 13: bottom channel closed",
+        family="one_closed",
+        directions={"top": "E", "middle": "W", "lower_middle": "W", "bottom": "CLOSED"},
     ),
 )
 
@@ -157,7 +176,7 @@ def _dump_routes_toml(payload: dict[str, object]) -> str:
 
 def _direction_controls(channel_directions: dict[str, str]) -> list[dict[str, object]]:
     controls: list[dict[str, object]] = []
-    for channel_name in ("top", "middle", "bottom"):
+    for channel_name in CHANNEL_NAMES:
         direction = channel_directions[channel_name].upper()
         if direction == "CLOSED":
             controls.append(
@@ -317,14 +336,14 @@ def main() -> None:
         simulation_overrides=simulation_overrides or None,
         write_root_summary=False,
         step_observer_factory=observer_factory,
-        channel_flux_directions={"top": "FREE", "middle": "FREE", "bottom": "FREE"},
+        channel_flux_directions={name: "FREE" for name in CHANNEL_NAMES},
     )
     _attach_scan_metadata(
         summary=baseline_summary,
         output_root=output_root,
         label="baseline",
         family="baseline",
-        directions={"top": "FREE", "middle": "FREE", "bottom": "FREE"},
+        directions={name: "FREE" for name in CHANNEL_NAMES},
         template_config=BASELINE_CONFIG,
         is_baseline=True,
     )

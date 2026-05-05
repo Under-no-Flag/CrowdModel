@@ -11,6 +11,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
+CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
+
+
 def _load_json(path: Path) -> dict[str, object]:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -51,15 +54,9 @@ def _summary_rows(comparison: dict[str, object]) -> list[dict[str, object]]:
                 "objective_value": case.get("objective_value", objective.get("objective_value", 0.0)),
                 "objective_name": objective_config.get("name", objective.get("name", "")),
                 "objective_term_mode": objective.get("term_mode", "raw"),
-                "channel_mean_density_top": channel_density["top"],
-                "channel_mean_density_middle": channel_density["middle"],
-                "channel_mean_density_bottom": channel_density["bottom"],
-                "channel_flux_cumulative_top": channel_flux["top"],
-                "channel_flux_cumulative_middle": channel_flux["middle"],
-                "channel_flux_cumulative_bottom": channel_flux["bottom"],
-                "channel_flux_share_top": channel_share["top"],
-                "channel_flux_share_middle": channel_share["middle"],
-                "channel_flux_share_bottom": channel_share["bottom"],
+                **{f"channel_mean_density_{name}": channel_density[name] for name in CHANNEL_NAMES},
+                **{f"channel_flux_cumulative_{name}": channel_flux[name] for name in CHANNEL_NAMES},
+                **{f"channel_flux_share_{name}": channel_share[name] for name in CHANNEL_NAMES},
                 "velocity_discontinuity_avg": case["velocity_discontinuity_avg"],
                 "density_gradient_avg": case["density_gradient_avg"],
             }
@@ -95,12 +92,15 @@ def save_section_5_1_tables(output_root: Path, comparison: dict[str, object]) ->
         "Term Mode",
         "Top Density",
         "Middle Density",
+        "Lower-Middle Density",
         "Bottom Density",
         "Top Flux",
         "Middle Flux",
+        "Lower-Middle Flux",
         "Bottom Flux",
         "Top Share",
         "Middle Share",
+        "Lower-Middle Share",
         "Bottom Share",
         "Vel. Disc.",
         "Density Grad.",
@@ -128,15 +128,9 @@ def save_section_5_1_tables(output_root: Path, comparison: dict[str, object]) ->
                         f'{row["objective_value"]:.3f}',
                         str(row["objective_name"]),
                         str(row["objective_term_mode"]),
-                        f'{row["channel_mean_density_top"]:.3f}',
-                        f'{row["channel_mean_density_middle"]:.3f}',
-                        f'{row["channel_mean_density_bottom"]:.3f}',
-                        f'{row["channel_flux_cumulative_top"]:.3f}',
-                        f'{row["channel_flux_cumulative_middle"]:.3f}',
-                        f'{row["channel_flux_cumulative_bottom"]:.3f}',
-                        f'{row["channel_flux_share_top"]:.3%}',
-                        f'{row["channel_flux_share_middle"]:.3%}',
-                        f'{row["channel_flux_share_bottom"]:.3%}',
+                        *(f'{row[f"channel_mean_density_{name}"]:.3f}' for name in CHANNEL_NAMES),
+                        *(f'{row[f"channel_flux_cumulative_{name}"]:.3f}' for name in CHANNEL_NAMES),
+                        *(f'{row[f"channel_flux_share_{name}"]:.3%}' for name in CHANNEL_NAMES),
                         f'{row["velocity_discontinuity_avg"]:.3f}',
                         f'{row["density_gradient_avg"]:.3f}',
                     ]
@@ -177,15 +171,15 @@ def save_section_5_1_timeseries_plot(output_root: Path, comparison: dict[str, ob
 
 def save_section_5_1_channel_plot(output_root: Path, comparison: dict[str, object]) -> None:
     cases = [str(case["case_id"]) for case in comparison["cases"]]
-    channels = ["top", "middle", "bottom"]
+    channels = list(CHANNEL_NAMES)
     x = np.arange(len(cases))
-    width = 0.22
+    width = 0.8 / max(1, len(channels))
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
     fig.suptitle("Section 5.1 Channel Statistics")
 
     for idx, channel in enumerate(channels):
-        offset = (idx - 1) * width
+        offset = (idx - (len(channels) - 1) / 2.0) * width
         density_values = [
             float(case["channel_time_mean_density"][channel])
             for case in comparison["cases"]

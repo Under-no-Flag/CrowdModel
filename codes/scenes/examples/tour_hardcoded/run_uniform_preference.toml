@@ -1,9 +1,9 @@
 [simulation]
-nx = 96
-ny = 72
+nx = 128
+ny = 96
 dx = 0.5
-steps = 600
-time_horizon = 40.0
+steps = 1600
+time_horizon = 140.0
 vmax = 1.5
 rho_max = 5.0
 rho_init = 2.2
@@ -28,3 +28,4 @@ file = "routes_uniform_preference.toml"
 
 [outputs]
 output_root = "../../../results/config_tour_uniform_preference"
+

@@ -15,7 +15,7 @@ save_every = 40
 density_contour_levels = 0
 
 [objective]
-name = "tour_hardcoded_migrated"
+name = "four_channel_lower_middle_guided"
 
 [scene]
 file = "scene.toml"
@@ -24,8 +24,8 @@ file = "scene.toml"
 file = "population.toml"
 
 [routes]
-file = "routes.toml"
+file = "routes_lower_middle_guided.toml"
 
 [outputs]
-output_root = "../../../results/config_tour_hardcoded"
+output_root = "../../../results/config_four_channel_lower_middle_guided"
 

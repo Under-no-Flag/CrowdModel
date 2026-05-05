@@ -1,6 +1,6 @@
 [simulation]
-nx = 192
-ny = 160
+nx = 128
+ny = 96
 dx = 0.5
 steps = 2200
 time_horizon = 220.0
@@ -36,3 +36,4 @@ file = "routes.toml"
 
 [outputs]
 output_root = "../../../results/config_bund_simplified"
+

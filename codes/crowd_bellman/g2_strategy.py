@@ -13,6 +13,9 @@ import numpy as np
 from .metrics import save_json
 
 
+CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
+
+
 @dataclass
 class G2StrategyCollector:
     case_id: str
@@ -110,9 +113,7 @@ def build_g2_strategy_report(
             "family": scan.get("family", "unknown"),
             "setting_label": scan.get("setting_label", case_id),
             "is_baseline": bool(scan.get("is_baseline", False)),
-            "direction_top": directions.get("top"),
-            "direction_middle": directions.get("middle"),
-            "direction_bottom": directions.get("bottom"),
+            **{f"direction_{channel_name}": directions.get(channel_name) for channel_name in CHANNEL_NAMES},
             "entry_channels": ",".join(scan.get("entry_channels", [])),
             "return_channels": ",".join(scan.get("return_channels", [])),
             "closed_channels": ",".join(scan.get("closed_channels", [])),
@@ -129,7 +130,7 @@ def build_g2_strategy_report(
             "hotspot_y": behavior.get("hotspot_centroid", {}).get("y"),
             "global_peak_time": behavior.get("global_peak", {}).get("time"),
         }
-        for channel_name in ("top", "middle", "bottom"):
+        for channel_name in CHANNEL_NAMES:
             row[f"flux_{channel_name}"] = summary.get("channel_flux_cumulative", {}).get(channel_name)
             row[f"flux_share_{channel_name}"] = summary.get("channel_flux_share", {}).get(channel_name)
             row[f"peak_time_{channel_name}"] = behavior.get("channel_peak_time", {}).get(channel_name)
@@ -192,10 +193,11 @@ def _save_csv(path: Path, rows: list[dict[str, object]]) -> None:
 def _label(row: dict[str, object]) -> str:
     if bool(row["is_baseline"]):
         return "baseline"
-    top = row.get("direction_top")
-    middle = row.get("direction_middle")
-    bottom = row.get("direction_bottom")
-    return f"T:{top} M:{middle} B:{bottom}"
+    abbreviations = {"top": "T", "middle": "M", "lower_middle": "L", "bottom": "B"}
+    return " ".join(
+        f"{abbreviations.get(channel_name, channel_name[:1].upper())}:{row.get(f'direction_{channel_name}')}"
+        for channel_name in CHANNEL_NAMES
+    )
 
 
 def _family_color(family: str) -> str:
@@ -261,9 +263,10 @@ def _save_channel_plot(path: Path, rows: list[dict[str, object]]) -> None:
         return
     labels = [_label(row) for row in rows]
     x = np.arange(len(rows))
-    width = 0.22
+    width = 0.8 / max(1, len(CHANNEL_NAMES))
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.0), dpi=150)
-    for offset, channel_name in zip((-width, 0.0, width), ("top", "middle", "bottom")):
+    for idx, channel_name in enumerate(CHANNEL_NAMES):
+        offset = (idx - (len(CHANNEL_NAMES) - 1) / 2.0) * width
         axes[0].bar(
             x + offset,
             [float(row.get(f"flux_share_{channel_name}") or 0.0) for row in rows],
