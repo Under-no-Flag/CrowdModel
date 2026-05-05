@@ -17,6 +17,7 @@ python codes/simulate_from_config.py --config codes/scenes/examples/single_stage
 
 - `codes/scenes/examples/bund_simplified/`: 南京东路-外滩简化场景，`5/6` 号通道进场，平台向南游览，再分流为 `9/10` 号通道离场或 `5/6` 原路返回
 - `codes/scenes/examples/g2_multistage_directional/`: G2 多阶段浏览场景，基线偏好经中通道进场、南向游览、再经中通道回流，可在批量实验里扫描三条通道的方向设置
+- `codes/scenes/examples/g4_sahbo_vs_grid/`: G4 优化实验配置，单独定义 SA-HBO 参数、网格搜索参数、仿真覆盖项和输出目录
 - `codes/scenes/examples/single_stage/`: 最小单阶段例子
 - `codes/scenes/examples/multi_stage/`: 多阶段与固定概率分流例子
 - `codes/scenes/examples/three_channel_hardcoded/`: 三通道主场景例子
@@ -414,3 +415,63 @@ python codes/simulate_from_config.py --config codes/scenes/examples/your_case/ru
 ```bash
 python codes/evaluate_objectives.py --input codes/results/your_group/comparison_summary.json --weights codes/scenes/examples/objective_sets/section_5_1.toml
 ```
+
+## 8. G4 优化配置
+
+G4 不直接复用普通 `run.toml` 作为入口，而使用单独的优化配置文件，例如：
+
+```bash
+python codes/g4_runner.py --config codes/scenes/examples/g4_sahbo_vs_grid/g4.toml
+```
+
+最小结构：
+
+```toml
+[g4]
+mode = "both"
+baseline_config = "../g2_multistage_directional/run_baseline.toml"
+output_root = "../../../results/g4_sahbo_vs_grid"
+beta = 0.35
+
+[simulation_overrides]
+steps = 600
+time_horizon = 40.0
+save_every = 40
+
+[sahbo]
+iterations = 4
+proxy_top_k = 3
+neighborhood_radius = 1
+initial_directions = ["FREE", "FREE", "FREE"]
+initial_eta = [8.0, 8.0, 8.0]
+eta_lower_bound = 1.0
+eta_upper_bound = 12.0
+eta_step_size = 1.2
+eta_perturbation = 0.8
+max_evaluations = 20
+random_seed = 7
+
+[grid]
+eta_values = [1.0, 4.0, 8.0, 12.0]
+max_evaluations = 20
+direction_sets = [
+  ["FREE", "FREE", "FREE"],
+  ["E", "W", "W"],
+  ["CLOSED", "E", "W"],
+]
+```
+
+说明：
+
+- `[g4]`
+  - `mode` 可取 `sahbo`、`grid`、`both`。
+  - `baseline_config` 指向一个普通仿真 `run.toml`，G4 会基于它生成候选控制配置。
+  - `output_root` 为 G4 结果根目录。
+  - `beta` 为由 `eta = alpha / beta` 还原 `alpha` 时使用的基准法向权重。
+- `[simulation_overrides]`
+  - 覆盖 `baseline_config` 中的仿真步数、时长和保存频率等字段。
+- `[sahbo]`
+  - 定义 SA-HBO 迭代次数、代理保留数、邻域半径、初始 `s/eta`、连续块步长和评估预算。
+- `[grid]`
+  - 定义网格搜索的 `eta_values`、方向配置集合和评估预算。
+- 命令行参数仍可覆盖 TOML 中的同名运行参数，例如 `--steps`、`--time-horizon`、`--sahbo-max-evals`。

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import itertools
 import math
 import tomllib
@@ -159,8 +160,6 @@ class G4EvaluationCache:
             "source": source,
             "eval_id": len(self.records) + 1,
             "config_path": str(run_path.resolve()),
-            "bellman_candidate_mode": "full_simulation",
-            "bellman_warm_start_enabled": False,
         }
         case_output_dir = self.output_root / str(summary["case_id"])
         save_json(case_output_dir / "summary.json", summary)
@@ -185,8 +184,8 @@ class G4EvaluationCache:
         routes_path = (self.baseline_config.parent / str(routes_table["file"])).resolve()
         base_routes = _load_toml(routes_path)
 
-        safe_source = source.replace(" ", "_").replace("/", "_")
-        case_id = f"g4_{safe_source}_{eval_id:04d}_{control.label}"
+        safe_source = _short_source_label(source)
+        case_id = f"g4_{eval_id:04d}_{safe_source}_{_control_digest(control)}"
         generated_routes = _build_routes(base_routes=base_routes, control=control, case_id=case_id, beta=self.beta)
         generated_run = {
             "simulation": dict(base_run["simulation"]),
@@ -371,8 +370,6 @@ def save_g4_outputs(
         "evaluator": {
             "baseline_config": str(evaluator.baseline_config),
             "evaluation_count": evaluator.evaluation_count,
-            "bellman_candidate_mode": "full_simulation",
-            "bellman_warm_start_enabled": False,
             "fixed_behavior_parameter": "p_hat",
         },
         "sahbo": sahbo_result,
@@ -631,6 +628,32 @@ def _state_to_flux_direction(state: str) -> str:
     if normalized == "CLOSED":
         return "CLOSED"
     return normalized
+
+
+def _short_source_label(source: str) -> str:
+    normalized = source.replace(" ", "_").replace("/", "_").replace("\\", "_").lower()
+    aliases = {
+        "sahbo_init": "si",
+        "grid": "gr",
+    }
+    if normalized in aliases:
+        return aliases[normalized]
+    if normalized.startswith("sahbo_iter"):
+        compact = (
+            normalized.replace("sahbo_iter", "s")
+            .replace("_discrete", "d")
+            .replace("_eta_plus", "ep")
+            .replace("_eta_minus", "em")
+            .replace("_eta_candidate", "ec")
+            .replace("_bt", "b")
+        )
+        return compact[:18]
+    return normalized[:18]
+
+
+def _control_digest(control: ControlVector) -> str:
+    payload = ";".join(control.directions) + "|" + ";".join(f"{value:.8g}" for value in control.eta)
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:10]
 
 
 def _budget_exhausted(evaluator: G4EvaluationCache, max_evaluations: int | None) -> bool:

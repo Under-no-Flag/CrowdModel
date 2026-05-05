@@ -1,0 +1,39 @@
+[g4]
+mode = "both"
+baseline_config = "../g2_multistage_directional/run_baseline.toml"
+output_root = "../../../results/g4_sahbo_vs_grid"
+beta = 0.35
+
+[simulation_overrides]
+steps = 1600
+time_horizon = 140.0
+save_every = 40
+
+[sahbo]
+iterations = 4
+proxy_top_k = 3
+neighborhood_radius = 1
+initial_directions = ["FREE", "FREE", "FREE"]
+initial_eta = [8.0, 8.0, 8.0]
+eta_lower_bound = 1.0
+eta_upper_bound = 12.0
+eta_step_size = 1.2
+eta_perturbation = 0.8
+max_evaluations = 20
+random_seed = 7
+
+[grid]
+eta_values = [1.0, 4.0, 8.0, 12.0]
+max_evaluations = 20
+direction_sets = [
+  ["FREE", "FREE", "FREE"],
+  ["E", "W", "W"],
+  ["W", "E", "W"],
+  ["W", "W", "E"],
+  ["W", "E", "E"],
+  ["E", "W", "E"],
+  ["E", "E", "W"],
+  ["CLOSED", "E", "W"],
+  ["E", "CLOSED", "W"],
+  ["E", "W", "CLOSED"],
+]

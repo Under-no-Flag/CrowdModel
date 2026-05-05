@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating discrete directional constraints with anisotropic geometric guidance. The lower level employs a Hughes-type macroscopic crowd model enhanced with constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way, bidirectional, and closed channel states, and then uses metric tensor fields to represent soft channel-alignment guidance within the feasible direction set. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three raw physical metrics are introduced for efficiency, safety, and load balancing, and are further converted into dimensionless indicators for cross-scheme comparison and scalarization. The proposed method exploits the local response characteristics of Bellman potential fields and employs surrogate pre-screening with Bellman warm-start strategies to reduce computational cost. Numerical experiments demonstrate the effectiveness of the proposed approach.
+This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating discrete directional constraints with anisotropic geometric guidance. The lower level employs a Hughes-type macroscopic crowd model enhanced with constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way, bidirectional, and closed channel states, and then uses metric tensor fields to represent soft channel-alignment guidance within the feasible direction set. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three raw physical metrics are introduced for efficiency, safety, and load balancing, and are further converted into dimensionless indicators for cross-scheme comparison and scalarization. The proposed method combines surrogate pre-screening, full simulation confirmation, and block-coordinate updates to search the mixed discrete-continuous control space. Numerical experiments demonstrate the effectiveness of the proposed approach.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -54,7 +54,7 @@ Existing large-scale event security management practices typically integrate sys
 
 However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}. First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of different passage direction configurations, geometric guidance intensities, and phase-dependent behavioral preferences. Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}. Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations. Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
 
-To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, geometric guidance, and multi-stage route behavior, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set, and an anisotropic metric tensor characterizes the cost differences between axial and lateral movement, simulating pedestrian pre-alignment and streamline reorganization near passages. At the optimization level, this paper distinguishes ``controllable management variables'' (passage direction configuration and geometric guidance intensity) from ``exogenous behavioral parameters'' (visitor route diversion preferences identified from historical data). Based on this boundary, total travel time, high-density exposure time, and channel cumulative flow variance are adopted as efficiency, safety, and load balancing indicators, forming a scalarized optimization problem under fixed weights. A simplified instance of the Structure-Aware Hybrid Block Optimization framework (SA-HBO) is designed to solve this problem, exploiting the discrete neighborhood structure of passage direction variables, the continuous nature of geometric guidance variables, and the response characteristics of Bellman potential fields to local control changes, improving candidate strategy evaluation efficiency through surrogate pre-screening, full simulation confirmation, and Bellman warm-start procedures.
+To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, geometric guidance, and multi-stage route behavior, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set, and an anisotropic metric tensor characterizes the cost differences between axial and lateral movement, simulating pedestrian pre-alignment and streamline reorganization near passages. At the optimization level, this paper distinguishes ``controllable management variables'' (passage direction configuration and geometric guidance intensity) from ``exogenous behavioral parameters'' (visitor route diversion preferences identified from historical data). Based on this boundary, total travel time, high-density exposure time, and channel cumulative flow variance are adopted as efficiency, safety, and load balancing indicators, forming a scalarized optimization problem under fixed weights. A simplified instance of the Structure-Aware Hybrid Block Optimization framework (SA-HBO) is designed to solve this problem, exploiting the discrete neighborhood structure of passage direction variables and the continuous nature of geometric guidance variables through surrogate pre-screening, full simulation confirmation, and acceptance/rejection mechanisms.
 
 The main contributions of this paper are as follows.
 
@@ -382,13 +382,13 @@ Thus the optimization variable is $z = (s, \eta)$.
 
 \subsection{Structure-Aware Hybrid Block Optimization}
 
-Treating this as a black-box optimization ignores three key structures: mixed discrete-continuous variables, local Bellman response characteristics, and the expensive multi-group simulation structure.
+Treating this as a black-box optimization ignores three key structures: mixed discrete-continuous variables, the expensive multi-group simulation structure, and the different roles of discrete direction settings and continuous guidance intensities.
 
 We propose Structure-Aware Hybrid Block Optimization (SA-HBO), with four core components:
 \begin{enumerate}
 \item Discrete block neighborhood search for channel directions;
 \item Surrogate pre-screening to reduce full simulations;
-\item Bellman warm-start with local re-solving for efficient evaluation;
+\item Full simulation confirmation for retained candidates;
 \item Continuous block projected stochastic approximation for guidance intensities.
 \end{enumerate}
 
@@ -438,19 +438,13 @@ with diagonal preconditioner $D_{\eta}$.
 
 \textit{Acceptance/Rejection}: Compare candidate objective $J_{\text{cand}}$ with current $J_{\text{cur}}$. Accept if $J_{\text{cand}} \leq J_{\text{cur}} - \varepsilon_{\text{acc}}$; otherwise reject and optionally backtrack. Maintain best solution $z_{\text{best}}$ throughout.
 
-\subsection{Bellman Warm-Start and Local Re-solving}
-
-Control changes typically affect only local regions. We identify the affected region $\Omega_{\text{chg}}^k$ where $U_{s,r}(x; \tilde{z}) \neq U_{s,r}(x; z^k)$ or $\mathbf{M}_{s,r}(x; \tilde{z}) \neq \mathbf{M}_{s,r}(x; z^k)$. Using the old potential as initialization, iterate only within an expanded neighborhood $\Omega_{\text{chg}}^{k,\delta}$ until convergence.
-
-This accelerates candidate evaluation. Periodic global corrections prevent error accumulation.
-
 \subsection{Algorithm Summary}
 
 \begin{enumerate}
 \item Initialize potentials and density, compute $J(z^0 \mid \hat{p})$, set $z_{\text{best}} = z^0$.
 \item For each iteration:
   \begin{itemize}
-  \item \textit{Discrete update}: Generate neighborhood, screen with surrogate, evaluate top candidates with Bellman warm-start, select $s^{k+1/2}$.
+  \item \textit{Discrete update}: Generate neighborhood, screen with surrogate, evaluate top candidates with full simulation, select $s^{k+1/2}$.
   \item \textit{Continuous update}: Generate perturbations, compute stochastic gradient, generate candidate, accept/reject to obtain $\eta^{k+1}$.
   \item \textit{State update}: Set $z^{k+1} = (s^{k+1/2}, \eta^{k+1})$, compute objective, update $z_{\text{best}}$ if improved.
   \end{itemize}
@@ -652,7 +646,7 @@ Detailed results and analysis will be presented in the full version of this pape
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presents a bi-level optimization framework for crowd channel management that combines discrete directional constraints with anisotropic geometric guidance. The proposed SA-HBO algorithm exploits problem structure through surrogate pre-screening, Bellman warm-start, and block coordinate updates to handle the expensive simulation-based optimization efficiently.
+This paper presents a bi-level optimization framework for crowd channel management that combines discrete directional constraints with anisotropic geometric guidance. The proposed SA-HBO algorithm exploits problem structure through surrogate pre-screening, full simulation confirmation, and block coordinate updates to handle the expensive simulation-based optimization efficiently.
 
 The numerical experiments validate that: (1) geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local crowd behaviors; (2) the combined model exhibits stable sensitivity to configuration changes; (3) directional constraints effectively suppress counter-flow and head-on conflicts under bidirectional demand. These findings establish the foundation for subsequent strategy optimization studies.
 

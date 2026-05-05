@@ -64,7 +64,8 @@ Example commands:
 - `python codes/g1_runner.py --steps 600 --time-horizon 40`
 - `python codes/g2_runner.py --steps 600 --time-horizon 40`
 - `python codes/g3_runner.py --steps 600 --time-horizon 40`
-- `python codes/g4_runner.py --mode both --steps 600 --time-horizon 40 --sahbo-max-evals 20 --grid-max-evals 20`
+- `python codes/g4_runner.py --config codes/scenes/examples/g4_sahbo_vs_grid/g4.toml`
+- `python codes/g4_runner.py --config codes/scenes/examples/g4_sahbo_vs_grid/g4.toml --steps 600 --time-horizon 40`
 
 ## Output
 
