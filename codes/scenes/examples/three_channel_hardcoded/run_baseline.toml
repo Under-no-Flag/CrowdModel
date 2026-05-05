@@ -2,8 +2,8 @@
 nx = 96
 ny = 72
 dx = 0.5
-steps = 600
-time_horizon = 40.0
+steps = 1200
+time_horizon = 80.0
 vmax = 1.5
 rho_max = 5.0
 rho_init = 2.2
@@ -12,6 +12,7 @@ bellman_f_eps = 0.08
 cfl = 0.9
 dt_cap = 0.18
 save_every = 40
+density_contour_levels = 0
 
 [objective]
 name = "three_channel_baseline"

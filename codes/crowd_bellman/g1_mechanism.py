@@ -13,7 +13,7 @@ from matplotlib.lines import Line2D
 import numpy as np
 
 from .metrics import save_json
-from .plotting import DENSITY_CMAP, DensityContourLevels, draw_density_contours
+from .plotting import DENSITY_CMAP, DENSITY_INTERPOLATION, DensityContourLevels, draw_density_contours
 
 
 def _crop_bounds(mask: np.ndarray, pad: int = 4) -> tuple[int, int, int, int]:
@@ -329,7 +329,7 @@ class CaseBehaviorCollector:
         density = mean_density.copy()
         density[~self.walkable] = np.nan
         density_view = density[y0:y1, x0:x1]
-        im = ax.imshow(density_view, origin="lower", cmap=DENSITY_CMAP)
+        im = ax.imshow(density_view, origin="lower", cmap=DENSITY_CMAP, interpolation=DENSITY_INTERPOLATION)
         draw_density_contours(ax, density_view, self.density_contour_levels)
         fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04, label="mean density")
 
@@ -710,7 +710,7 @@ def _save_attraction_contour_panel(
         capture_map = np.asarray(field["capture_map"], dtype=int)
         density_plot = density.copy()
         density_plot[~walkable] = np.nan
-        ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, alpha=0.85)
+        ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, alpha=0.85, interpolation=DENSITY_INTERPOLATION)
         draw_density_contours(
             ax,
             density_plot,
@@ -762,7 +762,7 @@ def _save_vector_field_panel(
         analysis_mask = np.asarray(field["analysis_mask"], dtype=bool)
         density_plot = density.copy()
         density_plot[~walkable] = np.nan
-        ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP)
+        ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, interpolation=DENSITY_INTERPOLATION)
         draw_density_contours(ax, density_plot, density_contour_levels)
         step = 5
         yy, xx = np.mgrid[0:density.shape[0]:step, 0:density.shape[1]:step]
@@ -816,7 +816,7 @@ def _save_m_approach_flow_comparison(
 
         density_plot = density[y0:y1, x0:x1].copy()
         density_plot[~walkable[y0:y1, x0:x1]] = np.nan
-        im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP)
+        im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, interpolation=DENSITY_INTERPOLATION)
         draw_density_contours(ax, density_plot, density_contour_levels)
 
         ux_crop = ux[y0:y1, x0:x1].copy()
@@ -904,7 +904,7 @@ def _draw_flow_field_panel(
 
     density_plot = density[y0:y1, x0:x1].copy()
     density_plot[~walkable[y0:y1, x0:x1]] = np.nan
-    im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP)
+    im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, interpolation=DENSITY_INTERPOLATION)
     draw_density_contours(ax, density_plot, density_contour_levels)
 
     ux_crop = ux[y0:y1, x0:x1].copy()

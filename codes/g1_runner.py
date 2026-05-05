@@ -107,6 +107,10 @@ def main() -> None:
             )
         )
 
+    report_density_contour_levels = density_contour_levels
+    if args.density_contour_levels is None and summaries:
+        report_density_contour_levels = summaries[0].get("config", {}).get("density_contour_levels")
+
     behavior_summaries: list[dict[str, object]] = []
     for summary in summaries:
         case_id = str(summary["case_id"])
@@ -162,7 +166,7 @@ def main() -> None:
         case_summaries=summaries,
         behavior_summaries=behavior_summaries,
         bridge_summary=bridge_summary,
-        density_contour_levels=density_contour_levels,
+        density_contour_levels=report_density_contour_levels,
     )
     build_bidirectional_u_report(
         output_root=output_root,

@@ -15,9 +15,10 @@ from .metrics import CaseStats
 
 DensityContourLevels = int | Sequence[float] | None
 DENSITY_CMAP = LinearSegmentedColormap.from_list(
-    "density_green_to_red",
-    ("#1a9850", "#ffffbf", "#d73027"),
+    "density_blue_to_red",
+    ("#00106e", "#0057ff", "#00b7ff", "#24d96b", "#ffe600", "#ff8a00", "#d7191c"),
 )
+DENSITY_INTERPOLATION = "bilinear"
 
 
 def _contour_levels_from_data(
@@ -26,6 +27,9 @@ def _contour_levels_from_data(
     *,
     default_count: int = 6,
 ) -> np.ndarray | None:
+    if levels is None:
+        return None
+
     finite = np.asarray(values[np.isfinite(values)], dtype=float)
     if finite.size == 0:
         return None
@@ -34,9 +38,6 @@ def _contour_levels_from_data(
     vmax = float(np.nanmax(finite))
     if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
         return None
-
-    if levels is None:
-        levels = default_count
 
     if isinstance(levels, int):
         if levels <= 0:
@@ -110,12 +111,26 @@ def save_case_snapshot(
 
     density = rho.copy()
     density[~walkable] = np.nan
-    im0 = axes[0].imshow(density, origin="lower", cmap=DENSITY_CMAP, vmin=0.0, vmax=rho_max)
+    im0 = axes[0].imshow(
+        density,
+        origin="lower",
+        cmap=DENSITY_CMAP,
+        vmin=0.0,
+        vmax=rho_max,
+        interpolation=DENSITY_INTERPOLATION,
+    )
     draw_density_contours(axes[0], density, density_contour_levels)
     axes[0].set_title("Density")
     fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
 
-    im1 = axes[1].imshow(density, origin="lower", cmap=DENSITY_CMAP, vmin=0.0, vmax=rho_max)
+    im1 = axes[1].imshow(
+        density,
+        origin="lower",
+        cmap=DENSITY_CMAP,
+        vmin=0.0,
+        vmax=rho_max,
+        interpolation=DENSITY_INTERPOLATION,
+    )
     draw_density_contours(axes[1], density, density_contour_levels)
     axes[1].set_title(panel_title)
     fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)

@@ -5,6 +5,7 @@ dx = 0.5
 steps = 120
 time_horizon = 20.0
 save_every = 40
+density_contour_levels = 0
 
 [objective]
 name = "single_stage_demo"
