@@ -12,6 +12,7 @@ bellman_f_eps = 0.08
 cfl = 0.9
 dt_cap = 0.18
 save_every = 40
+density_contour_levels = 0
 
 [objective]
 name = "tour_single_stage_approx"

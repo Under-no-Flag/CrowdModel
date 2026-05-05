@@ -1,14 +1,95 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import matplotlib
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
+from matplotlib.colors import LinearSegmentedColormap
 import numpy as np
 
 from .metrics import CaseStats
+
+
+DensityContourLevels = int | Sequence[float] | None
+DENSITY_CMAP = LinearSegmentedColormap.from_list(
+    "density_blue_to_red",
+    ("#00106e", "#0057ff", "#00b7ff", "#24d96b", "#ffe600", "#ff8a00", "#d7191c"),
+)
+DENSITY_INTERPOLATION = "bilinear"
+
+
+def _contour_levels_from_data(
+    values: np.ndarray,
+    levels: DensityContourLevels,
+    *,
+    default_count: int = 6,
+) -> np.ndarray | None:
+    if levels is None:
+        return None
+
+    finite = np.asarray(values[np.isfinite(values)], dtype=float)
+    if finite.size == 0:
+        return None
+
+    vmin = float(np.nanmin(finite))
+    vmax = float(np.nanmax(finite))
+    if not np.isfinite(vmin) or not np.isfinite(vmax) or vmax <= vmin:
+        return None
+
+    if isinstance(levels, int):
+        if levels <= 0:
+            return None
+        return np.linspace(vmin, vmax, levels + 2, dtype=float)[1:-1]
+
+    raw = np.asarray(list(levels), dtype=float)
+    if raw.size == 0:
+        return None
+    raw = raw[np.isfinite(raw)]
+    raw = raw[(raw > vmin) & (raw < vmax)]
+    if raw.size == 0:
+        return None
+    return np.unique(np.sort(raw))
+
+
+def draw_density_contours(
+    ax: plt.Axes,
+    density: np.ndarray,
+    levels: DensityContourLevels = None,
+    *,
+    colors: str = "black",
+    linewidths: float = 0.55,
+    alpha: float = 0.65,
+    linestyles: str = "--",
+) -> object | None:
+    contour_levels = _contour_levels_from_data(density, levels)
+    if contour_levels is None:
+        return None
+    return ax.contour(
+        density,
+        levels=contour_levels,
+        colors=colors,
+        linewidths=linewidths,
+        alpha=alpha,
+        linestyles=linestyles,
+    )
+
+
+def parse_density_contour_levels(raw: str | None) -> DensityContourLevels:
+    if raw is None:
+        return None
+    text = raw.strip()
+    if not text or text.lower() in {"off", "false", "none", "no"}:
+        return 0
+    parts = [part.strip() for part in text.split(",") if part.strip()]
+    if len(parts) == 1:
+        try:
+            return int(parts[0])
+        except ValueError:
+            return (float(parts[0]),)
+    return tuple(float(part) for part in parts)
 
 
 def save_case_snapshot(
@@ -21,6 +102,7 @@ def save_case_snapshot(
     walkable: np.ndarray,
     rho_max: float,
     panel_title: str = "Density and direction",
+    density_contour_levels: DensityContourLevels = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -29,11 +111,27 @@ def save_case_snapshot(
 
     density = rho.copy()
     density[~walkable] = np.nan
-    im0 = axes[0].imshow(density, origin="lower", cmap="viridis", vmin=0.0, vmax=rho_max)
+    im0 = axes[0].imshow(
+        density,
+        origin="lower",
+        cmap=DENSITY_CMAP,
+        vmin=0.0,
+        vmax=rho_max,
+        interpolation=DENSITY_INTERPOLATION,
+    )
+    draw_density_contours(axes[0], density, density_contour_levels)
     axes[0].set_title("Density")
     fig.colorbar(im0, ax=axes[0], fraction=0.046, pad=0.04)
 
-    im1 = axes[1].imshow(density, origin="lower", cmap="viridis", vmin=0.0, vmax=rho_max)
+    im1 = axes[1].imshow(
+        density,
+        origin="lower",
+        cmap=DENSITY_CMAP,
+        vmin=0.0,
+        vmax=rho_max,
+        interpolation=DENSITY_INTERPOLATION,
+    )
+    draw_density_contours(axes[1], density, density_contour_levels)
     axes[1].set_title(panel_title)
     fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
 

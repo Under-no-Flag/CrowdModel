@@ -8,6 +8,7 @@ import tomllib
 from crowd_bellman.config_workflow import run_from_config
 from crowd_bellman.g2_strategy import G2StrategyCollector, build_g2_strategy_report
 from crowd_bellman.metrics import save_json
+from crowd_bellman.plotting import parse_density_contour_levels
 
 
 BASELINE_CONFIG = Path("codes/scenes/examples/g2_multistage_directional/run_baseline.toml")
@@ -270,6 +271,11 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--save-every", type=int, default=None)
     parser.add_argument("--time-horizon", type=float, default=None)
+    parser.add_argument(
+        "--density-contour-levels",
+        default=None,
+        help="Comma-separated density contour values, an integer count, or 'off'.",
+    )
     args = parser.parse_args()
 
     simulation_overrides: dict[str, object] = {}
@@ -279,6 +285,8 @@ def main() -> None:
         simulation_overrides["save_every"] = args.save_every
     if args.time_horizon is not None:
         simulation_overrides["time_horizon"] = args.time_horizon
+    if args.density_contour_levels is not None:
+        simulation_overrides["density_contour_levels"] = parse_density_contour_levels(args.density_contour_levels)
 
     output_root = Path(args.output_root)
     output_root.mkdir(parents=True, exist_ok=True)

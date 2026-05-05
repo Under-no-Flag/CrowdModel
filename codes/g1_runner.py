@@ -7,7 +7,7 @@ from crowd_bellman.config_workflow import run_from_config
 from crowd_bellman.g1_mechanism import CaseBehaviorCollector, build_g1_mechanism_report
 from crowd_bellman.g1_u_bidirectional import BidirectionalUCollector, build_bidirectional_u_report
 from crowd_bellman.metrics import save_json
-from crowd_bellman.plotting import save_comparison_plot
+from crowd_bellman.plotting import parse_density_contour_levels, save_comparison_plot
 
 
 THREE_CHANNEL_CONFIGS = (
@@ -32,6 +32,11 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--save-every", type=int, default=None)
     parser.add_argument("--time-horizon", type=float, default=None)
+    parser.add_argument(
+        "--density-contour-levels",
+        default=None,
+        help="Comma-separated density contour values, an integer count, or 'off'.",
+    )
     args = parser.parse_args()
 
     simulation_overrides: dict[str, object] = {}
@@ -41,6 +46,9 @@ def main() -> None:
         simulation_overrides["save_every"] = args.save_every
     if args.time_horizon is not None:
         simulation_overrides["time_horizon"] = args.time_horizon
+    density_contour_levels = parse_density_contour_levels(args.density_contour_levels)
+    if args.density_contour_levels is not None:
+        simulation_overrides["density_contour_levels"] = density_contour_levels
 
     output_root = Path(args.output_root)
     output_root.mkdir(parents=True, exist_ok=True)
@@ -63,6 +71,7 @@ def main() -> None:
             region_masks=bundle.region_masks,
             channel_masks=case.channel_masks,
             time_horizon=float(simulation.time_horizon),
+            density_contour_levels=simulation.density_contour_levels,
         )
         behavior_collectors[str(case.case_id)] = (collector, case_output_dir)
         return collector.observe
@@ -97,6 +106,10 @@ def main() -> None:
                 step_observer_factory=observer_factory,
             )
         )
+
+    report_density_contour_levels = density_contour_levels
+    if args.density_contour_levels is None and summaries:
+        report_density_contour_levels = summaries[0].get("config", {}).get("density_contour_levels")
 
     behavior_summaries: list[dict[str, object]] = []
     for summary in summaries:
@@ -153,6 +166,7 @@ def main() -> None:
         case_summaries=summaries,
         behavior_summaries=behavior_summaries,
         bridge_summary=bridge_summary,
+        density_contour_levels=report_density_contour_levels,
     )
     build_bidirectional_u_report(
         output_root=output_root,

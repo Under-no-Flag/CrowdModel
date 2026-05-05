@@ -1,5 +1,3 @@
-
-# AGENT.md
 AGENT.md for codex
 ## 项目概述
 
