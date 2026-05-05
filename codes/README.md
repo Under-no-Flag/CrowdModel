@@ -19,6 +19,8 @@
   Runs the G3 behavior-layer batch for `single-stage approximation / multi-stage uniform preference / full multi-stage preference`, then writes behavior-layer comparison tables and plots.
 - `python codes/g4_runner.py`
   Runs the G4 optimization batch. It implements the current-paper SA-HBO loop for `z=(s, eta)` with fixed behavior parameter `p_hat`, then compares it with finite grid search over the same evaluator and writes iteration logs, evaluation CSV, and method-comparison outputs.
+- `python codes/visualize_g4_results.py --output-root codes/results/g4_sahbo_vs_grid`
+  Generates overall G4 result figures and a compact visual summary from a completed `g4_sahbo_grid_summary.json`, `g4_evaluation_log.csv`, and `g4_method_comparison.csv`.
 - `python codes/verify_unidirectional_hjb.py`
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
@@ -66,6 +68,7 @@ Example commands:
 - `python codes/g3_runner.py --steps 600 --time-horizon 40`
 - `python codes/g4_runner.py --config codes/scenes/examples/g4_sahbo_vs_grid/g4.toml`
 - `python codes/g4_runner.py --config codes/scenes/examples/g4_sahbo_vs_grid/g4.toml --steps 600 --time-horizon 40`
+- `python codes/visualize_g4_results.py --output-root codes/results/g4_sahbo_vs_grid`
 
 ## Output
 
