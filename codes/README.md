@@ -17,6 +17,8 @@
   Runs the G2 multistage directional-setting scan. It keeps one unrestricted `baseline` with middle-channel route preference, then scans six channel-direction configurations and writes Pareto, objective-comparison, channel-load, hotspot-migration, and summary outputs.
 - `python codes/g3_runner.py`
   Runs the G3 behavior-layer batch for `single-stage approximation / multi-stage uniform preference / full multi-stage preference`, then writes behavior-layer comparison tables and plots.
+- `python codes/g4_runner.py`
+  Runs the G4 optimization batch. It implements the current-paper SA-HBO loop for `z=(s, eta)` with fixed behavior parameter `p_hat`, then compares it with finite grid search over the same evaluator and writes iteration logs, evaluation CSV, and method-comparison outputs.
 - `python codes/verify_unidirectional_hjb.py`
   Verifies the strict one-way reduction `tau · grad(phi) = -1 / f(rho)`.
 - `python codes/report_section_5_1.py --output-root <results_dir>`
@@ -62,6 +64,7 @@ Example commands:
 - `python codes/g1_runner.py --steps 600 --time-horizon 40`
 - `python codes/g2_runner.py --steps 600 --time-horizon 40`
 - `python codes/g3_runner.py --steps 600 --time-horizon 40`
+- `python codes/g4_runner.py --mode both --steps 600 --time-horizon 40 --sahbo-max-evals 20 --grid-max-evals 20`
 
 ## Output
 
