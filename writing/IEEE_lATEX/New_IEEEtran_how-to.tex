@@ -456,66 +456,71 @@ Stopping criteria include: small objective change, no discrete variable change f
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-This section presents numerical experiments to validate the model mechanisms, evaluate control strategies, and demonstrate the optimization framework. The experimental design follows a two-layer validation logic: first verifying whether the model mechanisms authentically alter local crowd behaviors, then comparing different channel control strategies in terms of efficiency, safety, and load balancing.
+This section presents numerical experiments to validate the proposed model mechanisms, control strategies, and optimization framework. The experiments use a four-channel scenario, which is a simplified abstraction of the Bund waterfront viewing-platform environment. One side of the platform contains the initial crowd region and entry boundary, the other side contains the viewing and exit region, and a central wall contains four representative passages: upper, middle, lower-middle, and lower passages. This abstraction preserves the essential spatial structure while reducing the actual passage system to four controllable channels, so that mechanism validation, strategy enumeration, and optimization search can be conducted in a finite and interpretable parameter space. The experiments follow a progressive logic: local mechanism validation is first conducted on the four-channel setting; the analysis then extends to multi-channel, multi-stage control strategies, behavior-layer validation, and finally joint optimization over channel direction and geometric guidance intensity.
 
 \subsection{Experimental Setup}
 \label{sec:setup}
 
-\subsubsection{Three-Channel Scenario}
+\subsubsection{Four-Channel Scenario}
 
-The experiments employ a three-channel scenario as the primary testbed for mechanism validation and strategy comparison. The geometry consists of an initial crowd region on the left, an exit region on the right, and three passages (upper, middle, lower) through a central wall separating the two regions.
+The four-channel scenic-platform scenario is used as the common basis for mechanism validation, strategy comparison, and optimization. The left side represents the initial crowd region and entry boundary, the right side represents the platform and exit target region, and the central wall contains four passages arranged from top to bottom as the upper, middle, lower-middle, and lower channels. Depending on the experiment group, pedestrians perform a single-stage crossing task, a bidirectional passage task, or a multi-stage ``entry--tour--exit'' behavior chain.
 
-Numerical parameters are set as follows: grid resolution $96\times72$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, maximum simulation steps $600$, and time horizon $T=40$.
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/scene.png}
+\caption{Four-channel simulation scenario used in the numerical experiments.}
+\label{fig:experiment_scene}
+\end{figure}
 
-\subsubsection{Evaluation Metrics}
-
-The experiments employ three primary raw metrics and their normalized counterparts:
-\begin{itemize}
-\item \textit{Efficiency metric} $J_1$ and $\tilde{J}_1$: total travel time and its mass-time normalized form;
-\item \textit{Safety metric} $J_2$ and $\tilde{J}_2$: high-density exposure time and its space-time normalized form;
-\item \textit{Balance metric} $J_3$ and $\tilde{J}_3$: channel flow variance and its normalized imbalance index.
-\end{itemize}
-
-Behavioral indicators include channel capture domain ratios, flow distribution ratios, direction consistency indices, and approach angle distributions.
+Numerical parameters are set as follows: grid resolution $128\times96$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, and safety density threshold $\rho_{\text{safe}}=3.5$. The mechanism validation experiment (G1) and the behavior-layer validation experiment (G3) use a time horizon of $T=140$, while the control strategy comparison experiment (G2) and the optimal control search experiment (G4) use a multi-stage continuous-flow horizon of $T=240$.
 
 \subsection{Mechanism Validation}
 \label{sec:mechanism}
 
-\subsubsection{Validation Objectives and Logic}
+\subsubsection{Validation Logic and Experimental Matrix}
 
-The mechanism validation experiments address two fundamental questions. First, do geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local decision-making and flow patterns of the crowd? Second, does the model produce sufficiently sensitive and interpretable behavioral responses when channel configurations change? Answering these questions is a prerequisite for subsequent strategy evaluation and optimization studies, since any optimization result built upon a model with distorted or unresponsive mechanisms would lack practical reliability.
+The G1 mechanism validation experiment does not aim to rank control strategies. Instead, it verifies whether the two local mechanisms in the model have clear and interpretable behavioral meanings. The experiment is organized around four mechanism propositions, as shown in Table~\ref{tab:g1_matrix}.
 
-The validation is organized into two parts. The first part verifies mechanism authenticity by comparing four configuration types---baseline, $U$-only, $M$-only, and combined $U+M$---to examine whether each mechanism induces the expected local behavioral changes. The second part verifies managerial applicability by testing whether the combined $U+M$ model yields clearly distinguishable behavioral responses to different channel control configurations (upper-channel-controlled, middle-channel-controlled, lower-channel-controlled).
+\begin{table}[!t]
+\caption{G1 Mechanism Validation Matrix}
+\label{tab:g1_matrix}
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.18}
+\begin{tabular}{|p{0.26\columnwidth}|p{0.21\columnwidth}|p{0.22\columnwidth}|p{0.22\columnwidth}|}
+\hline
+\textbf{Mechanism Proposition} & \textbf{Comparison} & \textbf{Main Observables} & \textbf{Expected Phenomenon} \\
+\hline
+$M(x)$ represents soft geometric guidance & baseline vs. $M$-only & channel flow share; approach streamlines & target-channel attraction expands; inflow converges earlier \\
+\hline
+$U(x)$ represents hard directional constraints & baseline vs. $U$-only & restricted-channel flow; local direction field & restricted direction is excluded; flow shifts to feasible channels \\
+\hline
+$U(x)$ suppresses reverse flow and counterflow & bidirectional baseline vs. one-way rule & reverse mass time; head-on cell time & reverse flow and counterflow intensity decrease \\
+\hline
+$U+M$ is spatially transferable & different controlled-channel locations & dominant flow channel; hotspot location & dominant flow migrates with the controlled channel \\
+\hline
+\end{tabular}
+\end{table}
 
-\subsubsection{Effect of Geometric Guidance $M(x)$}
+This matrix separates the functional levels of $M(x)$ and $U(x)$. The former concerns preference changes within the feasible direction set, whereas the latter concerns modification of the feasible direction set itself. The final proposition then tests whether their combination produces synchronous migration when the controlled channel location changes.
 
-To verify whether geometric guidance alters channel approach patterns and attraction domain structures, we compare the baseline configuration (neither $M$ nor $U$) against the $M$-only configuration, in which anisotropic guidance is applied to the middle channel. The remaining two channels are left uncontrolled.
+\subsubsection{Soft Guidance Mechanism: $M(x)$ Alters Channel Attraction}
+
+To verify whether geometric guidance changes the approach process, we compare the baseline configuration against the $M$-only configuration, in which anisotropic geometric guidance is applied to the middle channel.
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_channel_attraction_contours.png}
-\caption{Channel attraction domains and mean-density contours in the G1 experiment. Blue, orange, and green curves mark the capture-domain boundaries of the upper, middle, and lower channels, respectively. The grayscale background and thin gray lines show the time-averaged density field and its contours.}
-\label{fig:g1_attraction}
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_m_attraction_flow_comparison.png}
+\caption{Channel attraction domains and approach streamlines in the G1 experiment. The upper row shows capture-domain boundaries over the mean-density background, and the lower row shows time-averaged approach streamlines.}
+\label{fig:g1_m_attraction_flow}
 \end{figure}
 
-Fig.~\ref{fig:g1_attraction} presents the channel attraction domains and mean-density contours across all G1 mechanism configurations. Under the baseline configuration, the three channels exhibit approximately balanced capture domains: upper $33.73\%$, middle $30.00\%$, lower $34.98\%$. Flow distributions are similarly balanced: upper $33.82\%$, middle $32.35\%$, lower $33.83\%$.
+The baseline flow is mainly distributed between the middle and lower-middle channels: upper $1.64\%$, middle $48.78\%$, lower-middle $47.92\%$, and lower $1.66\%$. After introducing $M$-only guidance, the middle-channel flow share increases to $100.00\%$. As shown in Fig.~\ref{fig:g1_m_attraction_flow}, $M$-only guidance not only expands the attraction domain of the middle channel but also causes the incoming flow to converge toward the middle channel further upstream, forming a clear pre-alignment structure before the channel entrance. This indicates that the core role of $M(x)$ is to alter the relative travel cost within the feasible direction set, reshaping which channel attracts the crowd and when alignment begins, rather than directly prohibiting other passages.
 
-Under the $M$-only configuration, the middle channel capture domain expands significantly to $63.41\%$, and its flow share jumps to $99.32\%$. This demonstrates that geometric guidance $M(x)$ alone is sufficient to reshape local attraction domain structures, causing the crowd to converge toward the guided channel earlier and fundamentally altering the approach pattern.
+\subsubsection{Hard Directional Constraint Mechanism: $U(x)$}
 
-The mechanism differences are directly visible in Fig.~\ref{fig:g1_attraction}. Under the baseline configuration, the capture-domain boundaries of the three channels partition the feeder region roughly according to the channels' vertical positions, and mean-density hotspots appear near the entrances of all three channels, indicating that without guidance, the crowd naturally distributes itself based primarily on geometric distance. After introducing $M(x)$, the orange capture domain of the middle channel visibly expands upward and downward, and more concentrated high-density contours form in front of the middle channel entrance. This indicates that the anisotropic metric does not merely alter global indicators but reconstructs local attraction domains and approach paths ahead of the channel entrance. In contrast, the $U$-only panel mainly reflects the exclusion of channel accessibility by feasible-direction constraints, while the $U+M$ panels and their top- and bottom-channel variants show that capture domains migrate systematically with the position of the guided channel. The conclusion supported by Fig.~\ref{fig:g1_attraction} is therefore that the core behavioral effect of $M(x)$ is to alter \emph{which channel attracts the crowd and when alignment with that channel begins}, rather than to explicitly forbid any path. This soft guidance mechanism provides a continuous and interpretable basis for flow reorganization under combined $U+M$ control.
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_m_approach_flow_comparison.png}
-\caption{Approach flow comparison between baseline (left) and $M$-only (right) configurations. White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
-\label{fig:g1_m_approach}
-\end{figure}
-
-Fig.~\ref{fig:g1_m_approach} further reveals the effect of $M(x)$ on the approach process. Under the baseline configuration, the incoming flow from the left diverts toward the three channels only when approaching the central wall, exhibiting an overall pattern of near-parallel entry with localized turning at the channel openings. Under the $M$-only configuration, however, streamlines begin converging toward the middle channel at a noticeably earlier upstream position, forming a fan-shaped gathering pattern in front of the entrance and producing a more concentrated mean-density hotspot near the middle channel entrance. This confirms that geometric guidance alters the approach path and the turning position: pedestrians complete pre-alignment before entering the bottleneck, rather than merely changing the speed direction inside the channel.
-
-\subsubsection{Effect of Directional Constraints $U(x)$}
-
-To verify whether directional constraints alter local optimal directions and channel selection structure, we compare the baseline configuration against the $U$-only configuration, in which the middle channel is restricted to eastward-only flow.
+To verify whether directional constraints alter feasible path selection, we first compare the baseline configuration against the $U$-only configuration under unidirectional inflow, where the middle channel is subject to a directional constraint.
 
 \begin{figure}[!t]
 \centering
@@ -524,11 +529,9 @@ To verify whether directional constraints alter local optimal directions and cha
 \label{fig:g1_u_direction}
 \end{figure}
 
-Under the $U$-only configuration, the middle channel capture domain drops to $0$, and its flow share drops to $0$, with the upper and lower channels splitting the traffic approximately $50/50$. This demonstrates that $U(x)$ significantly rewrites feasible path choices, but the unidirectional inflow experiment alone is insufficient to establish the mechanism's effectiveness in suppressing counter-flow and head-on conflicts.
+Under the $U$-only configuration, the middle-channel flow share drops to $0$. The flow is redistributed to the upper, lower-middle, and lower channels, with shares of $19.25\%$, $68.76\%$, and $12.00\%$, respectively. This is the primary evidence for the role of $U(x)$: directional constraints do not continuously adjust route preference, but directly modify the local admissible direction set and thereby remove the restricted channel from the feasible choice set.
 
-Fig.~\ref{fig:g1_u_direction} further illustrates this point. Under the baseline configuration, the direction field in front of the entrances points toward all three channels, and the middle channel maintains clear eastbound flow streamlines. Under the $U$-only configuration, the middle channel is excluded from the feasible choice set by the directional constraint, and the streamlines that would have approached the middle channel separate ahead of the entrance, diverting to the upper and lower passable channels. This figure demonstrates that the primary role of $U(x)$ is not smooth induction but rather the direct restructuring of reachable channel and path selection by modifying the local admissible direction set.
-
-To further verify the suppression of counter-flow and head-on conflicts, we conduct a bidirectional flow sub-experiment. Two configurations are tested: a bidirectional baseline (westbound and eastbound crowds present simultaneously) and a bidirectional with middle channel one-way rule (middle channel restricted to eastward only).
+To further verify the ability of $U(x)$ to control directional conflicts, we conduct a bidirectional flow sub-experiment comparing a bidirectional baseline against a middle-channel eastbound one-way rule.
 
 \begin{table}[!t]
 \caption{Bidirectional $U(x)$ Validation Results}
@@ -541,14 +544,12 @@ To further verify the suppression of counter-flow and head-on conflicts, we cond
 \hline
 \textbf{Configuration} & \textbf{Westbound Share} & \textbf{Counter-flow Mass} & \textbf{Head-on Exposure} \\
 \hline
-Bidirectional baseline & $72.10\%$ & $188.15$ & $887.70$ \\
+Bidirectional baseline & $73.18\%$ & $415.75$ & $1213.76$ \\
 Middle channel one-way & $0$ & $0$ & $0$ \\
 \hline
 \end{tabular}
 }
 \end{table}
-
-The results in Table~\ref{tab:bidirectional} show that when the middle channel enforces a one-way rule, westbound crowds are completely excluded from the middle channel, and the westbound share, counter-flow mass time, and head-on cell exposure within that channel are all driven to zero. This confirms that $U(x)$ not only changes path selection but effectively suppresses counter-flow and head-on conflicts under bidirectional demand.
 
 \begin{figure}[!t]
 \centering
@@ -557,65 +558,42 @@ The results in Table~\ref{tab:bidirectional} show that when the middle channel e
 \label{fig:g1_bidirectional_dynamics}
 \end{figure}
 
-Fig.~\ref{fig:g1_bidirectional_dynamics} presents the temporal dynamics. In the bidirectional baseline, the westbound share in the middle channel remains persistently high, accompanied by sustained head-on conflict mass. Once the middle channel one-way rule is imposed, both curves are rapidly driven to zero and remain stable throughout the observation window. This demonstrates that the suppression of bidirectional head-on conflicts by $U(x)$ is not a short-lived accidental outcome but a structural change that persists over the entire observation period.
+The bidirectional experiment shows that after imposing the one-way rule, westbound pedestrians are completely excluded from the middle channel, and both the middle-channel reverse-flow mass time and head-on cell time become zero. Therefore, $U(x)$ does not merely change path choice under unidirectional demand; it also persistently suppresses reverse flow and head-on conflict under bidirectional demand. This distinction clarifies the functional difference between $U(x)$ and $M(x)$: $M(x)$ adjusts route preference, whereas $U(x)$ modifies the feasible direction set. Thus, $U(x)$ is the hard-constraint representation of directional control policies.
 
-\subsubsection{Combined $U+M$ Effects and Configuration Sensitivity}
+\subsubsection{Composability and Spatial Transferability of the Joint Mechanism}
 
-To verify whether the combined $U+M$ model produces distinguishable behavioral responses to different channel configurations, we test three setups: middle-channel-controlled ($U+M$-middle), upper-channel-controlled ($U+M$-top), and lower-channel-controlled ($U+M$-bottom).
+To verify the sensitivity of the joint mechanism to controlled-channel location, we test four $U+M$ configurations: middle-channel controlled, upper-channel controlled, lower-middle-channel controlled, and lower-channel controlled. The focus here is not on the efficiency or safety index of each configuration, but on whether the dominant flow channel changes synchronously when $U+M$ is applied to different channels.
 
 \begin{table}[!t]
-\caption{Combined $U+M$ Configuration Sensitivity: Capture Domains and Flow Shares}
+\caption{Dominant Flow Migration Under Different $U+M$ Controlled-Channel Locations}
 \label{tab:sensitivity}
 \centering
 \setlength{\tabcolsep}{2pt}
 \renewcommand{\arraystretch}{1.08}
 \resizebox{\columnwidth}{!}{%
-\begin{tabular}{|c|c|c|c|c|c|c|c|c|}
+\begin{tabular}{|c|c|c|c|c|c|}
 \hline
-\textbf{Configuration} & \textbf{Dominant} & \textbf{Dominant} & \textbf{Upper} & \textbf{Middle} & \textbf{Lower} & \textbf{Upper} & \textbf{Middle} & \textbf{Lower} \\
-& \textbf{Capture} & \textbf{Flow} & \textbf{Capture} & \textbf{Capture} & \textbf{Capture} & \textbf{Flow} & \textbf{Flow} & \textbf{Flow} \\
+\textbf{Configuration} & \textbf{Dominant Flow Channel} & \textbf{Upper Flow} & \textbf{Middle Flow} & \textbf{Lower-Middle Flow} & \textbf{Lower Flow} \\
 \hline
-$U+M$-middle & middle & middle & $11.29\%$ & $62.63\%$ & $12.95\%$ & $0.40\%$ & $98.87\%$ & $0.72\%$ \\
-$U+M$-top & top & top & $57.37\%$ & $12.76\%$ & $22.26\%$ & $95.15\%$ & $0.74\%$ & $4.11\%$ \\
-$U+M$-bottom & bottom & bottom & $20.55\%$ & $11.98\%$ & $58.06\%$ & $2.98\%$ & $0.70\%$ & $96.31\%$ \\
+baseline & middle/lower-middle & $1.64\%$ & $48.78\%$ & $47.92\%$ & $1.66\%$ \\
+$M$-only-middle & middle & $0$ & $100.00\%$ & $0$ & $0$ \\
+$U+M$-middle & middle & $0$ & $100.00\%$ & $0$ & $0$ \\
+$U+M$-top & upper & $100.00\%$ & $0$ & $0$ & $0$ \\
+$U+M$-lower-middle & lower-middle & $0$ & $0$ & $100.00\%$ & $0$ \\
+$U+M$-lower & lower & $0$ & $0$ & $0$ & $100.00\%$ \\
 \hline
 \end{tabular}
 }
 \end{table}
 
-Table~\ref{tab:sensitivity} reports the quantitative results. The $U+M$ model exhibits stable and interpretable responses to configuration changes: when the middle channel is controlled, it becomes the dominant capture channel ($62.63\%$) and dominant flow channel ($98.87\%$); when the upper channel is controlled, the upper channel becomes dominant ($57.37\%$ capture, $95.15\%$ flow); and when the lower channel is controlled, the lower channel becomes dominant ($58.06\%$ capture, $96.31\%$ flow). This demonstrates that the combined model is capable of distinguishing different control schemes and can serve as a reliable evaluation oracle for subsequent strategy comparison and optimization.
-
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_um_configuration_flow_comparison.png}
-\caption{Flow field comparison for $U+M$ combined mechanism under different channel control configurations. The three sub-figures correspond to middle-, upper-, and lower-channel-controlled setups, respectively. White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
+\caption{Flow field comparison for the $U+M$ combined mechanism under different controlled-channel locations. The sub-figures correspond to different guided channels; white streamlines and arrows represent time-averaged movement directions, and the background color encodes time-averaged density.}
 \label{fig:g1_um_configuration}
 \end{figure}
 
-Fig.~\ref{fig:g1_um_configuration} shows that changing the controlled channel position induces synchronous migration of density hotspots and approach streamlines. When the middle channel is controlled, the crowd concentrates in front of the middle channel entrance and passes through it; when the upper channel is controlled, the dominant convergence region shifts to the upper channel entrance; and when the lower channel is controlled, it shifts to the lower channel entrance. These spatial patterns are consistent with the dominant capture and flow channels reported in Table~\ref{tab:sensitivity}, confirming that the $U+M$ combined mechanism can not only express the local rules of a single channel but also produce distinguishable and interpretable global flow reorganization in response to different spatial configurations.
-
-\subsubsection{Mechanism Validation Conclusions}
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_direction_consistency_radar.png}
-\caption{Local direction consistency radar chart from the G1 experiment. The radar chart aggregates the local direction consistency index across the upper, middle, and lower channels under different mechanism configurations. Values closer to $1$ indicate more concentrated local flow direction and stronger compliance with eastbound passage organization.}
-\label{fig:g1_radar}
-\end{figure}
-
-Fig.~\ref{fig:g1_radar} supplements the preceding spatial flow-field findings from the perspective of directional organization. Under the baseline configuration, the three channels exhibit relatively similar direction consistency indices, reflecting that all channels carry a share of eastbound flow under natural distribution. The $U$-only configuration eliminates middle channel passage, so the middle channel consistency no longer forms a meaningful observation, while the upper and lower channels maintain high consistency. Under the $M$-only and $U+M$ configurations, the middle channel direction consistency reaches $0.992$ and $1.000$, respectively, indicating that when geometric guidance and directional constraints act jointly, not only is channel selection restructured, but the local directional organization within the channel also becomes more concentrated.
-
-Synthesizing the experimental results from Fig.~\ref{fig:g1_attraction} through Fig.~\ref{fig:g1_radar} and Tables~\ref{tab:bidirectional}--\ref{tab:sensitivity}, the G1 experiments support the following conclusions:
-
-\begin{enumerate}
-\item \textbf{Geometric guidance $M(x)$ significantly alters local approach patterns and channel attraction domains.} By reducing the effective travel cost along the channel axis, $M(x)$ causes the crowd to align with the channel direction earlier and converge smoothly, rather than making abrupt turns immediately before the entrance. This soft guidance mechanism provides a continuous, interpretable basis for flow reorganization.
-
-\item \textbf{Directional constraints $U(x)$ reshape feasible path choices and directional organization.} $U(x)$ directly restructures the set of reachable channels and paths by modifying the local admissible direction set. Under bidirectional demand, it effectively suppresses counter-flow and head-on conflicts, with the suppression effect sustained throughout the entire observation period as a structural change rather than a transient outcome.
-
-\item \textbf{The combined $U+M$ model exhibits clear sensitivity to different channel configurations.} It produces behavioral responses that are both rule-compliant and behaviorally realistic. Changing the controlled channel position induces synchronous migration of density hotspots, capture domains, and approach streamlines.
-
-\item \textbf{The full model is necessary for reliable optimization.} If either $U$ or $M$ is removed, the model's response to configuration changes becomes either incomplete or behaviorally unrealistic. $U(x)$ answers which directions are allowed, while $M(x)$ answers which allowed directions better follow channel geometry. Subsequent optimization studies must therefore be built upon the joint mechanism.
-\end{enumerate}
+The results show that changing the controlled-channel location induces synchronous migration of the dominant flow channel, density hotspot, and approach streamlines. When the upper, middle, lower-middle, or lower channel is selected as the joint guidance channel, the flow concentrates on the corresponding channel. This confirms that $U+M$ is not merely a local parameter setting that works at one fixed position; rather, it produces clear and interpretable behavioral responses as the spatial configuration changes. The joint mechanism can therefore serve as the lower-level simulator for subsequent strategy evaluation and optimization search.
 
 \subsection{Control Strategy Comparison}
 \label{sec:strategy}
