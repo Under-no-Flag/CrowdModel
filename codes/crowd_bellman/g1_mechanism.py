@@ -452,6 +452,7 @@ def build_g1_mechanism_report(
     _save_attraction_contour_panel(output_root / "g1_channel_attraction_contours.png", behavior_summaries, density_contour_levels=density_contour_levels)
     _save_vector_field_panel(output_root / "g1_vector_field_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
     _save_m_approach_flow_comparison(output_root / "g1_m_approach_flow_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
+    _save_m_attraction_flow_comparison(output_root / "g1_m_attraction_flow_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
     _save_u_direction_field_comparison(output_root / "g1_u_direction_field_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
     _save_um_configuration_flow_comparison(output_root / "g1_um_configuration_flow_comparison.png", behavior_summaries, density_contour_levels=density_contour_levels)
     comparison_rows = _save_mechanism_comparison_table(
@@ -507,6 +508,7 @@ def build_g1_mechanism_report(
             "channel_attraction_contours": str(output_root / "g1_channel_attraction_contours.png"),
             "vector_field_comparison": str(output_root / "g1_vector_field_comparison.png"),
             "m_approach_flow_comparison": str(output_root / "g1_m_approach_flow_comparison.png"),
+            "m_attraction_flow_comparison": str(output_root / "g1_m_attraction_flow_comparison.png"),
             "u_direction_field_comparison": str(output_root / "g1_u_direction_field_comparison.png"),
             "um_configuration_flow_comparison": str(output_root / "g1_um_configuration_flow_comparison.png"),
             "mechanism_comparison_table_csv": str(output_root / "g1_mechanism_comparison_table.csv"),
@@ -952,6 +954,87 @@ def _draw_flow_field_panel(
     ax.set_xlim(0, x1 - x0 - 1)
     ax.set_ylim(0, y1 - y0 - 1)
     return im
+
+
+def _draw_capture_boundary_panel(
+    ax: plt.Axes,
+    field: dict[str, np.ndarray],
+    *,
+    bounds: tuple[int, int, int, int],
+    title: str,
+    density_contour_levels: DensityContourLevels = None,
+) -> object:
+    x0, x1, y0, y1 = bounds
+    density = np.asarray(field["mean_density"], dtype=float)
+    walkable = np.asarray(field["walkable"], dtype=bool)
+    capture_map = np.asarray(field["capture_map"], dtype=int)
+
+    density_plot = density[y0:y1, x0:x1].copy()
+    density_plot[~walkable[y0:y1, x0:x1]] = np.nan
+    im = ax.imshow(density_plot, origin="lower", cmap=DENSITY_CMAP, alpha=0.88, interpolation=DENSITY_INTERPOLATION)
+    draw_density_contours(ax, density_plot, density_contour_levels, linewidths=0.45, alpha=0.55)
+
+    capture_crop = capture_map[y0:y1, x0:x1]
+    for channel_index, color in enumerate(CHANNEL_COLORS):
+        binary = (capture_crop == channel_index).astype(float)
+        if np.any(binary > 0.0) and np.any(binary < 1.0):
+            ax.contour(binary, levels=[0.5], colors=[color], linewidths=1.35)
+
+    obstacle_y, obstacle_x = np.where(~walkable[y0:y1, x0:x1])
+    ax.scatter(obstacle_x, obstacle_y, s=1.7, c="black", marker="s", linewidths=0)
+    ax.set_title(title, pad=8)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_xlim(0, x1 - x0 - 1)
+    ax.set_ylim(0, y1 - y0 - 1)
+    return im
+
+
+def _save_m_attraction_flow_comparison(
+    path: Path,
+    behavior_summaries: list[dict[str, object]],
+    *,
+    density_contour_levels: DensityContourLevels = None,
+) -> None:
+    fields = _load_fields(behavior_summaries)
+    case_ids = ["case1_baseline", "case_m_only_middle"]
+    if not all(case_id in fields for case_id in case_ids):
+        return
+
+    bounds = _field_crop_bounds(fields, case_ids, pad=4)
+    fig, axes = plt.subplots(2, 2, figsize=(11.5, 9.2), dpi=150, sharex=True, sharey=True)
+    im = None
+    for column, case_id in enumerate(case_ids):
+        label = _display_case_id(case_id)
+        im = _draw_capture_boundary_panel(
+            axes[0, column],
+            fields[case_id],
+            bounds=bounds,
+            title=f"{label}: capture domains",
+            density_contour_levels=density_contour_levels,
+        )
+        _draw_flow_field_panel(
+            axes[1, column],
+            fields[case_id],
+            bounds=bounds,
+            title=f"{label}: approach streamlines",
+            stream_density=1.15,
+            density_contour_levels=density_contour_levels,
+        )
+
+    legend_handles = [
+        Line2D([0], [0], color=color, lw=2.0, label=channel_name.replace("_", "-").title())
+        for color, channel_name in zip(CHANNEL_COLORS, CHANNEL_NAMES)
+    ]
+    legend_handles.append(Line2D([0], [0], color="#4A4A4A", lw=1.5, label="Approach streamline"))
+    fig.legend(handles=legend_handles, loc="lower center", ncol=5, frameon=False, bbox_to_anchor=(0.5, 0.012))
+    cbar_ax = fig.add_axes((0.925, 0.15, 0.018, 0.70))
+    cbar = fig.colorbar(im, cax=cbar_ax)
+    cbar.set_label("mean density")
+    fig.suptitle("M-only Effect: Channel Attraction and Approach Flow")
+    fig.subplots_adjust(left=0.025, right=0.895, top=0.92, bottom=0.085, wspace=0.04, hspace=0.16)
+    fig.savefig(path)
+    plt.close(fig)
 
 
 def _save_u_direction_field_comparison(
