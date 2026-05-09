@@ -595,17 +595,55 @@ $U+M$-lower & lower & $0$ & $0$ & $0$ & $100.00\%$ \\
 
 The results show that changing the controlled-channel location induces synchronous migration of the dominant flow channel, density hotspot, and approach streamlines. When the upper, middle, lower-middle, or lower channel is selected as the joint guidance channel, the flow concentrates on the corresponding channel. This confirms that $U+M$ is not merely a local parameter setting that works at one fixed position; rather, it produces clear and interpretable behavioral responses as the spatial configuration changes. The joint mechanism can therefore serve as the lower-level simulator for subsequent strategy evaluation and optimization search.
 
-\subsection{Control Strategy Comparison}
+\subsection{System Response and Optimization Complexity Under Directional Control}
 \label{sec:strategy}
 
-This subsection compares different channel control strategies in terms of normalized efficiency ($\tilde{J}_1$), normalized safety ($\tilde{J}_2$), and normalized load balancing ($\tilde{J}_3$). The strategies under comparison include:
-\begin{itemize}
-\item Baseline (unrestricted bidirectional channels);
-\item Six directional configurations, including single-entry and single-return strategy families;
-\item Three one-closed-channel configurations, where the upper, middle, or lower channel is temporarily closed and the remaining channels provide one entry and one return direction.
-\end{itemize}
+After validating that $U(x)$ and $M(x)$ produce the expected local control responses, we further examine whether the discrete directional control variable $s$ induces nontrivial system-level responses in the full multi-stage scenario. The purpose of this experiment is not to select a final optimal policy from a small enumeration, but to test whether interpretable perturbations of channel directions generate distinguishable changes in efficiency, safety exposure, and load balancing. Such evidence is needed before introducing an automated optimization procedure.
 
-These cases test whether direction settings and closures produce distinguishable load redistribution, hotspot migration, and objective trade-offs. Detailed numerical results and analysis will be presented in the full version of this paper.
+The complete combinatorial space of four-channel direction settings is large and contains many cases with weak operational meaning. We therefore construct a representative validation matrix with three policy families: single-entry (SE), single-return (SR), and one-channel-closed (CL), each rotated over the upper, middle, lower-middle, and bottom channels. Together with the all-free baseline (BSL), this gives $1+4+4+4=13$ cases. Direction codes are ordered as $[T,M,LM,B]$, where $T$, $M$, $LM$, and $B$ denote the upper, middle, lower-middle, and bottom channels. The symbols $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, free bidirectional passage, and closure, respectively. Case indices are retained only as configuration identifiers and are not mixed with policy-family labels.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary.png}
+\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_5$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions. (C) Objective summary heatmap, with only the best value in each objective dimension annotated.}
+\label{fig:g2_control_tradeoff}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_spatial_mechanism_summary.png}
+\caption{Spatial mechanism behind directional-control responses. (A) Channel-load distribution across the 13 representative cases, with annotations retained only for major loaded channels. (B) Hotspot migration over the same scene background used in the density maps. Marker size represents local exposure intensity, and color indicates the policy family. If an exposure-weighted centroid falls inside an obstacle due to averaging over separated high-density regions, it is mapped to the nearest walkable cell for visualization.}
+\label{fig:g2_spatial_mechanism}
+\end{figure*}
+
+Fig.~\ref{fig:g2_control_tradeoff} shows that different direction settings produce stable and clearly separated changes in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$. Using the aggregated normalized objective $\tilde{J}=\tilde{J}_1+\tilde{J}_2+\tilde{J}_5$, C8 (SR-LM, EEWE) obtains the lowest value, $\tilde{J}=0.5102$. The baseline C1 is close, with $\tilde{J}=0.5145$, but achieves the lowest safety exposure, $\tilde{J}_2=0.00785$. C9 (SR-B) gives the best load-balancing term, $\tilde{J}_5=0.1138$, while C3 (SE-M) gives the best efficiency term, $\tilde{J}_1=0.3141$, at the cost of higher safety exposure and load imbalance.
+
+\begin{table*}[!t]
+\centering
+\caption{Non-Dominated Directional-Control Cases in G2}
+\label{tab:g2_nondominated}
+\footnotesize
+\begin{tabular}{c c c c c c c l}
+\hline
+Case & Policy & Code & $\tilde{J}_1$ & $\tilde{J}_2$ & $\tilde{J}_5$ & $\tilde{J}$ & Main characteristic \\
+\hline
+C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure; close to the best aggregate objective \\
+C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency; risk concentrates near the middle channel \\
+C4 & SE-LM & WWEW & 0.3335 & 0.01662 & 0.3131 & 0.6632 & Lower-middle entry; efficient but load-imbalanced \\
+C6 & SR-T & WEEE & 0.4029 & 0.01174 & 0.1335 & 0.5482 & Highest exit throughput; relatively balanced \\
+C8 & SR-LM & EEWE & 0.3395 & 0.01311 & 0.1576 & \textbf{0.5102} & Lowest aggregate objective \\
+C9 & SR-B & EEEW & 0.4377 & 0.01344 & \textbf{0.1138} & 0.5649 & Most balanced channel loads \\
+\hline
+\end{tabular}
+\end{table*}
+
+These results indicate that perturbing the direction variable $s$ does not produce a monotonic improvement pattern, nor does any single configuration dominate all three objectives. The non-dominated set contains C1, C3, C4, C6, C8, and C9, confirming that the four-channel multi-stage scenario already forms a nontrivial multi-objective response structure.
+
+The direct spatial mechanism behind these objective differences is the redistribution of channel loads and high-density hotspots. As shown in Fig.~\ref{fig:g2_spatial_mechanism}(A), the baseline C1 concentrates flow mainly in the middle and lower-middle channels, with shares of $34.0\%$ and $47.2\%$, respectively. C8 has channel-load shares of $0.6\%$, $47.6\%$, $32.0\%$, and $19.7\%$, maintaining a low aggregate objective while still assigning the largest burden to the middle channel. C9 has load shares of $0$, $30.0\%$, $33.7\%$, and $36.3\%$, which explains its best load-balancing term but weaker efficiency.
+
+Fig.~\ref{fig:g2_spatial_mechanism}(B) further shows that directional control changes not only total flow allocation but also the spatial location of risk exposure. Hotspot locations are visualized in the true scene coordinate system and on the same feasible-domain and obstacle background as the density maps. Upper-channel-dominant or middle-closure configurations shift hotspots upward; middle-channel dominance places hotspots near the central passage; and lower-middle or bottom involvement shifts hotspots downward. Hence, the variations in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$ are not merely abstract numerical differences, but arise from coupled changes in channel-load redistribution, local safety exposure, and hotspot migration.
+
+The G2 experiment therefore supports the need for subsequent optimization from three perspectives. First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum. Second, the direction variable is combinatorial, and the 13 cases here are only an interpretable slice rather than an exhaustive enumeration. Third, the full control problem must also optimize the continuous geometric guidance strength $\eta$. The resulting problem is therefore a mixed discrete-continuous, simulation-driven optimization problem with expensive evaluations, motivating the automated search procedure introduced later.
 
 \subsection{Multi-Stage Flow Validation Experiments}
 \label{sec:multistage_exp}
