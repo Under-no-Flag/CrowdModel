@@ -1,13 +1,18 @@
 [g4]
-mode = "both"
+mode = "matrix"
 baseline_config = "../g2_multistage_directional/run_baseline.toml"
-output_root = "../../../results/g4_sahbo_vs_grid"
+output_root = "../../../results/g4_minimal_matrix"
 beta = 0.35
+workers = 6
 
 [simulation_overrides]
 steps = 1600
 time_horizon = 140.0
 save_every = 40
+
+[visualization]
+enabled = true
+top_n = 12
 
 [sahbo]
 iterations = 4
@@ -21,6 +26,41 @@ eta_step_size = 1.2
 eta_perturbation = 0.8
 max_evaluations = 20
 random_seed = 7
+
+[sahbo_no_proxy]
+iterations = 4
+proxy_top_k = 3
+neighborhood_radius = 1
+initial_directions = ["FREE", "FREE", "FREE", "FREE"]
+initial_eta = [8.0, 8.0, 8.0, 8.0]
+eta_lower_bound = 1.0
+eta_upper_bound = 12.0
+eta_step_size = 1.2
+eta_perturbation = 0.8
+max_evaluations = 20
+random_seed = 7
+
+[baseline]
+directions = ["FREE", "FREE", "FREE", "FREE"]
+eta = [8.0, 8.0, 8.0, 8.0]
+
+[random_search]
+max_evaluations = 20
+eta_lower_bound = 1.0
+eta_upper_bound = 12.0
+random_seed = 17
+
+[pure_sa]
+max_evaluations = 20
+neighborhood_radius = 1
+initial_directions = ["FREE", "FREE", "FREE", "FREE"]
+initial_eta = [8.0, 8.0, 8.0, 8.0]
+eta_lower_bound = 1.0
+eta_upper_bound = 12.0
+eta_perturbation = 0.8
+initial_temperature = 0.08
+cooling_factor = 0.85
+random_seed = 11
 
 [grid]
 eta_values = [1.0, 4.0, 8.0, 12.0]

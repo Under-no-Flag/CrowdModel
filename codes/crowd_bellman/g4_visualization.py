@@ -13,8 +13,21 @@ import numpy as np
 
 
 METHOD_COLORS = {
+    "baseline": "#7F7F7F",
+    "random_search": "#B279A2",
+    "pure_sa": "#54A24B",
+    "SA-HBO w/o proxy": "#E45756",
     "SA-HBO": "#4C78A8",
     "grid_search": "#F58518",
+}
+METHOD_ORDER = ("baseline", "random_search", "grid_search", "pure_sa", "SA-HBO w/o proxy", "SA-HBO")
+METHOD_LABELS = {
+    "baseline": "Baseline",
+    "random_search": "Random\nsearch",
+    "grid_search": "Grid\nsearch",
+    "pure_sa": "Pure SA",
+    "SA-HBO w/o proxy": "SA-HBO\nw/o proxy",
+    "SA-HBO": "SA-HBO",
 }
 TERM_COLORS = {
     "j1": "#4C78A8",
@@ -29,6 +42,7 @@ CHANNEL_COLORS = {
 }
 CHANNELS = ("top", "middle", "lower_middle", "bottom")
 TERMS = ("j1", "j2", "j5")
+PAPER_DPI = 300
 
 
 def build_g4_visual_report(output_root: Path, *, top_n: int = 12) -> dict[str, object]:
@@ -40,6 +54,7 @@ def build_g4_visual_report(output_root: Path, *, top_n: int = 12) -> dict[str, o
         raise ValueError(f"No G4 evaluation rows found under {output_root}")
 
     top_rows = sorted(rows, key=lambda row: _float(row["objective_value"]))[: max(1, int(top_n))]
+    paper_outputs = _save_paper_figures(output_root=output_root, rows=rows, method_rows=method_rows)
     outputs = {
         "objective_trace": str(_save_objective_trace(output_root / "g4_objective_trace.png", rows, method_rows)),
         "method_comparison": str(_save_method_comparison(output_root / "g4_method_comparison.png", method_rows)),
@@ -50,6 +65,7 @@ def build_g4_visual_report(output_root: Path, *, top_n: int = 12) -> dict[str, o
         "best_channel_flux_share": str(
             _save_best_channel_flux(output_root / "g4_best_channel_flux_share.png", rows, method_rows)
         ),
+        **paper_outputs,
         "top_candidates_csv": str(_save_top_candidates_csv(output_root / "g4_top_candidates.csv", top_rows)),
         "visual_summary": str(_save_markdown_summary(output_root / "g4_visual_summary.md", rows, method_rows, summary)),
     }
@@ -85,7 +101,7 @@ def _read_evaluation_rows(path: Path) -> list[dict[str, object]]:
             for key in numeric_keys:
                 if key in row:
                     row[key] = _number(row[key])
-            row["method"] = _method_for_source(str(row.get("source", "")))
+            row["method"] = _method_for_row(row)
             rows.append(row)
     return rows
 
@@ -110,11 +126,242 @@ def _read_summary(path: Path) -> dict[str, object]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _save_paper_figures(
+    *,
+    output_root: Path,
+    rows: list[dict[str, object]],
+    method_rows: list[dict[str, object]],
+) -> dict[str, str]:
+    paper_dir = output_root / "paper_figures"
+    paper_dir.mkdir(parents=True, exist_ok=True)
+    best_rows = _best_rows_by_method(rows, method_rows)
+    outputs = {
+        "paper_best_objective": _save_paper_best_objective(paper_dir / "g4_paper_best_objective.png", method_rows),
+        "paper_best_so_far": _save_paper_best_so_far(paper_dir / "g4_paper_best_so_far.png", rows),
+        "paper_objective_distribution": _save_paper_objective_distribution(
+            paper_dir / "g4_paper_objective_distribution.png", rows
+        ),
+        "paper_best_terms": _save_paper_best_terms(paper_dir / "g4_paper_best_terms.png", best_rows),
+        "paper_direction_matrix": _save_paper_direction_matrix(
+            paper_dir / "g4_paper_direction_matrix.png", best_rows
+        ),
+        "paper_eta_heatmap": _save_paper_eta_heatmap(paper_dir / "g4_paper_eta_heatmap.png", best_rows),
+        "paper_flux_heatmap": _save_paper_flux_heatmap(paper_dir / "g4_paper_flux_heatmap.png", best_rows),
+    }
+    return {name: str(path) for name, path in outputs.items()}
+
+
+def _save_paper_best_objective(path: Path, method_rows: list[dict[str, object]]) -> Path:
+    ordered = _ordered_method_rows(method_rows)
+    labels = [_method_label(str(row.get("method", ""))) for row in ordered]
+    values = [_float(row.get("objective_value", math.nan)) for row in ordered]
+    counts = [_float(row.get("evaluation_count", math.nan)) for row in ordered]
+    colors = [METHOD_COLORS.get(str(row.get("method", "")), "#777777") for row in ordered]
+
+    fig, ax = plt.subplots(1, 1, figsize=(7.4, 4.2), dpi=PAPER_DPI)
+    y = np.arange(len(ordered), dtype=float)
+    ax.barh(y, values, color=colors, height=0.62)
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels)
+    ax.invert_yaxis()
+    ax.set_xlabel("Best scalar objective")
+    ax.set_title("G4 best objective by method")
+    ax.grid(axis="x", alpha=0.25)
+    for yy, value, count in zip(y, values, counts):
+        ax.text(value, yy, f"  {value:.4f} ({count:.0f})", va="center", fontsize=8.5)
+    ax.set_xlim(0.0, max(values) * 1.22 if values else 1.0)
+    return _save_paper_figure(fig, path)
+
+
+def _save_paper_best_so_far(path: Path, rows: list[dict[str, object]]) -> Path:
+    fig, ax = plt.subplots(1, 1, figsize=(7.8, 4.8), dpi=PAPER_DPI)
+    for method in METHOD_ORDER:
+        method_rows = _rows_for_method(rows, method)
+        if not method_rows:
+            continue
+        xs = np.arange(1, len(method_rows) + 1, dtype=float)
+        values = np.array([_float(row["objective_value"]) for row in method_rows], dtype=float)
+        best_so_far = np.minimum.accumulate(values)
+        ax.step(
+            xs,
+            best_so_far,
+            where="post",
+            linewidth=1.8,
+            color=METHOD_COLORS.get(method, "#777777"),
+            label=_method_label(method).replace("\n", " "),
+        )
+        ax.scatter([xs[-1]], [best_so_far[-1]], s=24, color=METHOD_COLORS.get(method, "#777777"), zorder=3)
+    ax.set_title("G4 best-so-far convergence")
+    ax.set_xlabel("Evaluations within method")
+    ax.set_ylabel("Best objective so far")
+    ax.grid(True, alpha=0.25)
+    ax.legend(frameon=False, ncols=2, fontsize=8.5)
+    return _save_paper_figure(fig, path)
+
+
+def _save_paper_objective_distribution(path: Path, rows: list[dict[str, object]]) -> Path:
+    methods = [method for method in METHOD_ORDER if _rows_for_method(rows, method)]
+    data = [
+        [_float(row["objective_value"]) for row in _rows_for_method(rows, method)]
+        for method in methods
+    ]
+    labels = [_method_label(method) for method in methods]
+    colors = [METHOD_COLORS.get(method, "#777777") for method in methods]
+
+    fig, ax = plt.subplots(1, 1, figsize=(8.0, 4.8), dpi=PAPER_DPI)
+    box = ax.boxplot(data, labels=labels, patch_artist=True, widths=0.54, showfliers=False)
+    for patch, color in zip(box["boxes"], colors):
+        patch.set_facecolor(color)
+        patch.set_alpha(0.35)
+        patch.set_edgecolor(color)
+    for median in box["medians"]:
+        median.set_color("#222222")
+        median.set_linewidth(1.4)
+    for index, values in enumerate(data, start=1):
+        jitter = np.linspace(-0.09, 0.09, len(values)) if len(values) > 1 else np.array([0.0])
+        ax.scatter(
+            np.full(len(values), index, dtype=float) + jitter,
+            values,
+            s=18,
+            color=colors[index - 1],
+            alpha=0.7,
+            edgecolor="white",
+            linewidth=0.35,
+        )
+    ax.set_title("G4 objective distribution")
+    ax.set_ylabel("Scalar objective")
+    ax.grid(axis="y", alpha=0.25)
+    return _save_paper_figure(fig, path)
+
+
+def _save_paper_best_terms(path: Path, best_rows: list[dict[str, object]]) -> Path:
+    labels = [_method_label(str(row.get("method", ""))) for row in best_rows]
+    x = np.arange(len(best_rows), dtype=float)
+    bottoms = np.zeros(len(best_rows), dtype=float)
+
+    fig, ax = plt.subplots(1, 1, figsize=(8.0, 4.7), dpi=PAPER_DPI)
+    for term in TERMS:
+        values = np.array([_float(row.get(term, 0.0)) for row in best_rows], dtype=float)
+        ax.bar(x, values, bottom=bottoms, color=TERM_COLORS[term], width=0.62, label=term.upper())
+        bottoms += values
+    for xx, total in zip(x, bottoms):
+        ax.text(xx, total, f"{total:.3f}", ha="center", va="bottom", fontsize=8.0)
+    ax.set_title("Best-solution objective decomposition")
+    ax.set_ylabel("Normalized objective terms")
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels)
+    ax.grid(axis="y", alpha=0.25)
+    ax.legend(frameon=False, ncols=3)
+    return _save_paper_figure(fig, path)
+
+
+def _save_paper_direction_matrix(path: Path, best_rows: list[dict[str, object]]) -> Path:
+    state_to_value = {"CLOSED": 0, "W": 1, "FREE": 2, "E": 3}
+    matrix = np.array(
+        [
+            [state_to_value.get(str(row.get(f"direction_{channel}", "")).upper(), np.nan) for channel in CHANNELS]
+            for row in best_rows
+        ],
+        dtype=float,
+    )
+    colors = ["#BFBFBF", "#5B8FF9", "#A0A0A0", "#F6BD16"]
+    cmap = matplotlib.colors.ListedColormap(colors)
+    fig, ax = plt.subplots(1, 1, figsize=(6.8, 3.9), dpi=PAPER_DPI)
+    im = ax.imshow(matrix, cmap=cmap, vmin=-0.5, vmax=3.5, aspect="auto")
+    ax.set_title("Best-solution channel direction states")
+    ax.set_xticks(np.arange(len(CHANNELS)))
+    ax.set_xticklabels(_channel_labels())
+    ax.set_yticks(np.arange(len(best_rows)))
+    ax.set_yticklabels([_method_label(str(row.get("method", ""))).replace("\n", " ") for row in best_rows])
+    for y, row in enumerate(best_rows):
+        for x, channel in enumerate(CHANNELS):
+            state = str(row.get(f"direction_{channel}", ""))
+            ax.text(x, y, _state_symbol(state), ha="center", va="center", color="#111111", fontsize=9)
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+    cbar.set_ticks([0, 1, 2, 3])
+    cbar.set_ticklabels(["Closed", "W", "Free", "E"])
+    return _save_paper_figure(fig, path)
+
+
+def _save_paper_eta_heatmap(path: Path, best_rows: list[dict[str, object]]) -> Path:
+    matrix = np.array(
+        [
+            [_float(row.get(f"eta_{channel}", math.nan)) for channel in CHANNELS]
+            for row in best_rows
+        ],
+        dtype=float,
+    )
+    return _save_annotated_heatmap(
+        path=path,
+        matrix=matrix,
+        row_labels=[_method_label(str(row.get("method", ""))).replace("\n", " ") for row in best_rows],
+        col_labels=_channel_labels(),
+        title="Best-solution guidance intensity eta",
+        colorbar_label="eta",
+        fmt="{:.2f}",
+        cmap="YlGnBu",
+    )
+
+
+def _save_paper_flux_heatmap(path: Path, best_rows: list[dict[str, object]]) -> Path:
+    matrix = np.array(
+        [
+            [_float(row.get(f"flux_share_{channel}", math.nan)) for channel in CHANNELS]
+            for row in best_rows
+        ],
+        dtype=float,
+    )
+    return _save_annotated_heatmap(
+        path=path,
+        matrix=matrix,
+        row_labels=[_method_label(str(row.get("method", ""))).replace("\n", " ") for row in best_rows],
+        col_labels=_channel_labels(),
+        title="Best-solution channel flux share",
+        colorbar_label="flux share",
+        fmt="{:.1%}",
+        cmap="PuBuGn",
+    )
+
+
+def _save_annotated_heatmap(
+    *,
+    path: Path,
+    matrix: np.ndarray,
+    row_labels: list[str],
+    col_labels: list[str],
+    title: str,
+    colorbar_label: str,
+    fmt: str,
+    cmap: str,
+) -> Path:
+    fig, ax = plt.subplots(1, 1, figsize=(6.8, 3.9), dpi=PAPER_DPI)
+    im = ax.imshow(matrix, aspect="auto", cmap=cmap)
+    ax.set_title(title)
+    ax.set_xticks(np.arange(len(col_labels)))
+    ax.set_xticklabels(col_labels)
+    ax.set_yticks(np.arange(len(row_labels)))
+    ax.set_yticklabels(row_labels)
+    finite = matrix[np.isfinite(matrix)]
+    threshold = float(np.nanmean(finite)) if finite.size else 0.0
+    for y in range(matrix.shape[0]):
+        for x in range(matrix.shape[1]):
+            value = matrix[y, x]
+            if not np.isfinite(value):
+                label = ""
+            else:
+                label = fmt.format(value)
+            color = "white" if np.isfinite(value) and value > threshold else "#111111"
+            ax.text(x, y, label, ha="center", va="center", color=color, fontsize=8.0)
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+    cbar.set_label(colorbar_label)
+    return _save_paper_figure(fig, path)
+
+
 def _save_objective_trace(path: Path, rows: list[dict[str, object]], method_rows: list[dict[str, object]]) -> Path:
     fig, ax = plt.subplots(1, 1, figsize=(10.5, 5.4), dpi=160)
     rows_by_method = {
         method: [row for row in rows if row.get("method") == method]
-        for method in ("SA-HBO", "grid_search")
+        for method in METHOD_ORDER
     }
     for method, method_data in rows_by_method.items():
         if not method_data:
@@ -151,10 +398,7 @@ def _save_objective_trace(path: Path, rows: list[dict[str, object]], method_rows
     ax.set_ylabel("Objective value")
     ax.grid(True, alpha=0.28)
     ax.legend(frameon=False)
-    fig.tight_layout()
-    fig.savefig(path)
-    plt.close(fig)
-    return path
+    return _save_paper_figure(fig, path)
 
 
 def _save_method_comparison(path: Path, method_rows: list[dict[str, object]]) -> Path:
@@ -209,7 +453,7 @@ def _save_top_candidate_terms(path: Path, rows: list[dict[str, object]]) -> Path
 
 def _save_pareto_plot(path: Path, rows: list[dict[str, object]], method_rows: list[dict[str, object]]) -> Path:
     fig, ax = plt.subplots(1, 1, figsize=(7.4, 5.8), dpi=160)
-    for method in ("SA-HBO", "grid_search"):
+    for method in METHOD_ORDER:
         method_data = [row for row in rows if row.get("method") == method]
         if not method_data:
             continue
@@ -350,12 +594,75 @@ def _save_markdown_summary(
             "- `g4_top_candidates_objective_terms.png`",
             "- `g4_pareto_j1_j2.png`",
             "- `g4_best_channel_flux_share.png`",
+            "- `paper_figures/g4_paper_best_objective.png`",
+            "- `paper_figures/g4_paper_best_so_far.png`",
+            "- `paper_figures/g4_paper_objective_distribution.png`",
+            "- `paper_figures/g4_paper_best_terms.png`",
+            "- `paper_figures/g4_paper_direction_matrix.png`",
+            "- `paper_figures/g4_paper_eta_heatmap.png`",
+            "- `paper_figures/g4_paper_flux_heatmap.png`",
             "- `g4_top_candidates.csv`",
+            "",
+            "Paper figures are also exported as same-name PDF files under `paper_figures/`.",
             "",
         ]
     )
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
+
+
+def _save_paper_figure(fig: object, path: Path) -> Path:
+    fig.tight_layout()
+    fig.savefig(path, dpi=PAPER_DPI)
+    fig.savefig(path.with_suffix(".pdf"))
+    plt.close(fig)
+    return path
+
+
+def _ordered_method_rows(method_rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    by_method = {str(row.get("method", "")): row for row in method_rows}
+    ordered = [by_method[method] for method in METHOD_ORDER if method in by_method]
+    extras = [row for row in method_rows if str(row.get("method", "")) not in METHOD_ORDER]
+    return ordered + extras
+
+
+def _best_rows_by_method(
+    rows: list[dict[str, object]],
+    method_rows: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    best_rows: list[dict[str, object]] = []
+    for method_row in _ordered_method_rows(method_rows):
+        case_id = str(method_row.get("case_id", ""))
+        best = _find_row_by_case(rows, case_id)
+        if best is not None:
+            best_rows.append(best)
+    return best_rows
+
+
+def _rows_for_method(rows: list[dict[str, object]], method: str) -> list[dict[str, object]]:
+    method_rows = [row for row in rows if str(row.get("method", "")) == method]
+    return sorted(method_rows, key=lambda row: _float(row.get("method_eval_id", row.get("eval_id", math.inf))))
+
+
+def _method_label(method: str) -> str:
+    return METHOD_LABELS.get(method, method)
+
+
+def _channel_labels() -> list[str]:
+    return ["Top", "Middle", "Lower-mid", "Bottom"]
+
+
+def _state_symbol(state: str) -> str:
+    normalized = state.upper()
+    if normalized == "CLOSED":
+        return "X"
+    if normalized == "FREE":
+        return "F"
+    if normalized == "E":
+        return "E"
+    if normalized == "W":
+        return "W"
+    return "?"
 
 
 def _find_row_by_case(rows: list[dict[str, object]], case_id: str) -> dict[str, object] | None:
@@ -375,8 +682,36 @@ def _short_candidate_label(row: dict[str, object]) -> str:
     return f"{int(_float(row['eval_id']))}:{row.get('method', '')}\n{directions} {eta_label}"
 
 
+def _method_for_row(row: dict[str, object]) -> str:
+    method_key = str(row.get("method_key", "")).strip().lower()
+    if method_key == "baseline":
+        return "baseline"
+    if method_key == "random_search":
+        return "random_search"
+    if method_key == "grid":
+        return "grid_search"
+    if method_key == "pure_sa":
+        return "pure_sa"
+    if method_key == "sahbo_no_proxy":
+        return "SA-HBO w/o proxy"
+    if method_key == "sahbo":
+        return "SA-HBO"
+    return _method_for_source(str(row.get("source", "")))
+
+
 def _method_for_source(source: str) -> str:
-    return "grid_search" if source == "grid" else "SA-HBO"
+    normalized = source.lower()
+    if normalized == "baseline":
+        return "baseline"
+    if normalized.startswith("random_search"):
+        return "random_search"
+    if normalized == "grid":
+        return "grid_search"
+    if normalized.startswith("pure_sa"):
+        return "pure_sa"
+    if normalized.startswith("sahbo_no_proxy"):
+        return "SA-HBO w/o proxy"
+    return "SA-HBO"
 
 
 def _number(value: object) -> object:

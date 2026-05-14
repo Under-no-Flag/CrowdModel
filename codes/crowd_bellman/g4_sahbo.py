@@ -94,6 +94,39 @@ class SAHBOConfig:
     max_evaluations: int | None = None
     random_seed: int = 7
     beta: float = 0.35
+    use_proxy: bool = True
+
+
+@dataclass
+class BaselineConfig:
+    directions: tuple[str, ...] = ("FREE", "FREE", "FREE", "FREE")
+    eta: tuple[float, ...] = (8.0, 8.0, 8.0, 8.0)
+    beta: float = 0.35
+
+
+@dataclass
+class RandomSearchConfig:
+    max_evaluations: int = 20
+    eta_lower_bound: float = 1.0
+    eta_upper_bound: float = 12.0
+    random_seed: int = 17
+    beta: float = 0.35
+
+
+@dataclass
+class PureSAConfig:
+    max_evaluations: int = 20
+    neighborhood_radius: int = 1
+    initial_eta: tuple[float, ...] = (8.0, 8.0, 8.0, 8.0)
+    initial_directions: tuple[str, ...] = ("FREE", "FREE", "FREE", "FREE")
+    eta_lower_bound: float = 1.0
+    eta_upper_bound: float = 12.0
+    eta_perturbation: float = 0.8
+    initial_temperature: float = 0.08
+    cooling_factor: float = 0.85
+    acceptance_tolerance: float = 1.0e-9
+    random_seed: int = 11
+    beta: float = 0.35
 
 
 @dataclass
@@ -141,10 +174,28 @@ class G4EvaluationCache:
     def evaluation_count(self) -> int:
         return len(self.records)
 
-    def evaluate(self, control: ControlVector, *, source: str) -> EvaluationRecord:
+    def evaluate(self, control: ControlVector, *, source: str, record_cached: bool = False) -> EvaluationRecord:
         normalized_control = control.normalized()
         cached = self._cache.get(normalized_control)
         if cached is not None:
+            if record_cached:
+                summary = dict(cached.summary)
+                summary["g4_evaluation"] = {
+                    "source": source,
+                    "eval_id": len(self.records) + 1,
+                    "config_path": cached.config_path,
+                    "cached_from_eval_id": cached.eval_id,
+                }
+                record = EvaluationRecord(
+                    eval_id=len(self.records) + 1,
+                    source=source,
+                    control=normalized_control,
+                    objective_value=cached.objective_value,
+                    summary=summary,
+                    config_path=cached.config_path,
+                )
+                self.records.append(record)
+                return record
             return cached
 
         run_path = self._write_config(normalized_control, source=source, eval_id=len(self.records) + 1)
@@ -213,13 +264,16 @@ def run_sahbo(
     config: SAHBOConfig,
 ) -> dict[str, object]:
     rng = np.random.default_rng(config.random_seed)
+    method_name = "SA-HBO" if config.use_proxy else "SA-HBO w/o proxy"
+    source_prefix = "sahbo" if config.use_proxy else "sahbo_no_proxy"
+    start_count = evaluator.evaluation_count
     current = ControlVector(config.initial_directions, config.initial_eta).normalized()
-    current_record = evaluator.evaluate(current, source="sahbo_init")
+    current_record = evaluator.evaluate(current, source=f"{source_prefix}_init", record_cached=True)
     best_record = current_record
     iteration_logs: list[dict[str, object]] = []
 
     for iteration in range(config.iterations):
-        if _budget_exhausted(evaluator, config.max_evaluations):
+        if _budget_exhausted(evaluator, config.max_evaluations, start_count=start_count):
             break
 
         neighbors = generate_direction_neighbors(
@@ -227,26 +281,27 @@ def run_sahbo(
             radius=config.neighborhood_radius,
         )
         candidate_neighbors = [directions for directions in neighbors if directions != current.directions]
-        proxy_rows = [
-            {
-                "directions": directions,
-                "proxy_value": proxy_score(
-                    directions=directions,
-                    eta=current.eta,
-                    incumbent_summary=current_record.summary,
-                ),
-            }
-            for directions in candidate_neighbors
-        ]
-        proxy_rows.sort(key=lambda item: float(item["proxy_value"]))
-        retained = proxy_rows[: max(1, config.proxy_top_k)]
+        retained = _select_discrete_candidates(
+            candidate_neighbors=candidate_neighbors,
+            eta=current.eta,
+            incumbent_summary=current_record.summary,
+            top_k=config.proxy_top_k,
+            use_proxy=config.use_proxy,
+            rng=rng,
+        )
 
         discrete_records: list[EvaluationRecord] = []
         for item in retained:
-            if _budget_exhausted(evaluator, config.max_evaluations):
+            if _budget_exhausted(evaluator, config.max_evaluations, start_count=start_count):
                 break
             candidate = ControlVector(tuple(item["directions"]), current.eta).normalized()
-            discrete_records.append(evaluator.evaluate(candidate, source=f"sahbo_iter{iteration}_discrete"))
+            discrete_records.append(
+                evaluator.evaluate(
+                    candidate,
+                    source=f"{source_prefix}_iter{iteration}_discrete",
+                    record_cached=True,
+                )
+            )
 
         if discrete_records:
             current_record = min(discrete_records + [current_record], key=lambda record: record.objective_value)
@@ -260,7 +315,7 @@ def run_sahbo(
             "accepted": False,
             "reason": "budget_exhausted",
         }
-        if not _budget_exhausted(evaluator, config.max_evaluations):
+        if not _budget_exhausted(evaluator, config.max_evaluations, start_count=start_count):
             current, current_record, best_record, continuous_log = _continuous_block_update(
                 evaluator=evaluator,
                 current=current,
@@ -269,6 +324,8 @@ def run_sahbo(
                 config=config,
                 rng=rng,
                 iteration=iteration,
+                source_prefix=source_prefix,
+                start_count=start_count,
             )
 
         iteration_logs.append(
@@ -283,6 +340,7 @@ def run_sahbo(
                     {
                         "directions": {name: state for name, state in zip(CHANNEL_NAMES, item["directions"])},
                         "proxy_value": float(item["proxy_value"]),
+                        "selection": item.get("selection", "proxy"),
                     }
                     for item in retained
                 ],
@@ -297,7 +355,7 @@ def run_sahbo(
             pass
 
     return {
-        "method": "SA-HBO",
+        "method": method_name,
         "config": {
             "iterations": config.iterations,
             "proxy_top_k": config.proxy_top_k,
@@ -310,10 +368,132 @@ def run_sahbo(
             "max_evaluations": config.max_evaluations,
             "random_seed": config.random_seed,
             "beta": config.beta,
+            "use_proxy": config.use_proxy,
         },
         "best": best_record.to_row(),
         "iterations": iteration_logs,
-        "evaluation_count": evaluator.evaluation_count,
+        "evaluation_count": evaluator.evaluation_count - start_count,
+    }
+
+
+def run_baseline(
+    *,
+    evaluator: G4EvaluationCache,
+    config: BaselineConfig,
+) -> dict[str, object]:
+    record = evaluator.evaluate(
+        ControlVector(config.directions, config.eta),
+        source="baseline",
+        record_cached=True,
+    )
+    return {
+        "method": "baseline",
+        "config": {
+            "control": ControlVector(config.directions, config.eta).normalized().to_dict(),
+            "beta": config.beta,
+        },
+        "best": record.to_row(),
+        "evaluation_count": 1,
+        "ranking": [record.to_row()],
+    }
+
+
+def run_random_search(
+    *,
+    evaluator: G4EvaluationCache,
+    config: RandomSearchConfig,
+) -> dict[str, object]:
+    rng = np.random.default_rng(config.random_seed)
+    records: list[EvaluationRecord] = []
+    for _ in range(max(0, int(config.max_evaluations))):
+        control = _sample_random_control(
+            rng=rng,
+            eta_lower_bound=config.eta_lower_bound,
+            eta_upper_bound=config.eta_upper_bound,
+        )
+        records.append(evaluator.evaluate(control, source="random_search", record_cached=True))
+
+    best = min(records, key=lambda record: record.objective_value) if records else None
+    return {
+        "method": "random_search",
+        "config": {
+            "max_evaluations": config.max_evaluations,
+            "eta_lower_bound": config.eta_lower_bound,
+            "eta_upper_bound": config.eta_upper_bound,
+            "random_seed": config.random_seed,
+            "beta": config.beta,
+        },
+        "best": None if best is None else best.to_row(),
+        "evaluation_count": len(records),
+        "ranking": [record.to_row() for record in sorted(records, key=lambda item: item.objective_value)],
+    }
+
+
+def run_pure_sa(
+    *,
+    evaluator: G4EvaluationCache,
+    config: PureSAConfig,
+) -> dict[str, object]:
+    rng = np.random.default_rng(config.random_seed)
+    current = ControlVector(config.initial_directions, config.initial_eta).normalized()
+    current_record = evaluator.evaluate(current, source="pure_sa_init", record_cached=True)
+    best_record = current_record
+    records = [current_record]
+    logs: list[dict[str, object]] = []
+    temperature = max(float(config.initial_temperature), 1.0e-12)
+
+    while len(records) < max(1, int(config.max_evaluations)):
+        candidate = _propose_sa_control(current=current, config=config, rng=rng, temperature=temperature)
+        candidate_record = evaluator.evaluate(candidate, source="pure_sa_candidate", record_cached=True)
+        records.append(candidate_record)
+
+        objective_delta = float(candidate_record.objective_value - current_record.objective_value)
+        accepted = objective_delta <= -config.acceptance_tolerance
+        if not accepted:
+            acceptance_probability = math.exp(-max(objective_delta, 0.0) / max(temperature, 1.0e-12))
+            accepted = bool(rng.random() < acceptance_probability)
+        else:
+            acceptance_probability = 1.0
+
+        if accepted:
+            current = candidate_record.control
+            current_record = candidate_record
+        if candidate_record.objective_value < best_record.objective_value:
+            best_record = candidate_record
+
+        logs.append(
+            {
+                "iteration": len(records) - 1,
+                "temperature": float(temperature),
+                "candidate": candidate_record.control.to_dict(),
+                "candidate_objective": float(candidate_record.objective_value),
+                "current_objective_after_update": float(current_record.objective_value),
+                "best_objective": float(best_record.objective_value),
+                "objective_delta": float(objective_delta),
+                "acceptance_probability": float(min(1.0, acceptance_probability)),
+                "accepted": bool(accepted),
+            }
+        )
+        temperature *= float(config.cooling_factor)
+
+    return {
+        "method": "pure_sa",
+        "config": {
+            "max_evaluations": config.max_evaluations,
+            "neighborhood_radius": config.neighborhood_radius,
+            "initial_control": ControlVector(config.initial_directions, config.initial_eta).normalized().to_dict(),
+            "eta_lower_bound": config.eta_lower_bound,
+            "eta_upper_bound": config.eta_upper_bound,
+            "eta_perturbation": config.eta_perturbation,
+            "initial_temperature": config.initial_temperature,
+            "cooling_factor": config.cooling_factor,
+            "random_seed": config.random_seed,
+            "beta": config.beta,
+        },
+        "best": best_record.to_row(),
+        "iterations": logs,
+        "evaluation_count": len(records),
+        "ranking": [record.to_row() for record in sorted(records, key=lambda item: item.objective_value)],
     }
 
 
@@ -332,7 +512,7 @@ def run_grid_search(
                 directions=tuple(_normalize_state(state) for state in directions),
                 eta=tuple(float(eta_value) for _ in CHANNEL_NAMES),
             )
-            records.append(evaluator.evaluate(control, source="grid"))
+            records.append(evaluator.evaluate(control, source="grid", record_cached=True))
             evaluated += 1
         if config.max_evaluations is not None and evaluated >= config.max_evaluations:
             break
@@ -351,6 +531,7 @@ def run_grid_search(
         },
         "best": None if best is None else best.to_row(),
         "candidate_count": len(records),
+        "evaluation_count": len(records),
         "ranking": [record.to_row() for record in sorted(records, key=lambda item: item.objective_value)],
     }
 
@@ -359,22 +540,38 @@ def save_g4_outputs(
     *,
     output_root: Path,
     evaluator: G4EvaluationCache,
-    sahbo_result: dict[str, object] | None,
-    grid_result: dict[str, object] | None,
+    baseline_result: dict[str, object] | None = None,
+    random_result: dict[str, object] | None = None,
+    pure_sa_result: dict[str, object] | None = None,
+    sahbo_no_proxy_result: dict[str, object] | None = None,
+    sahbo_result: dict[str, object] | None = None,
+    grid_result: dict[str, object] | None = None,
 ) -> dict[str, object]:
     output_root.mkdir(parents=True, exist_ok=True)
     rows = [record.to_row() for record in evaluator.records]
     _save_csv(output_root / "g4_evaluation_log.csv", rows)
 
-    comparison = _build_method_comparison(sahbo_result=sahbo_result, grid_result=grid_result)
+    method_results = {
+        "baseline": baseline_result,
+        "random_search": random_result,
+        "grid_search": grid_result,
+        "pure_sa": pure_sa_result,
+        "sahbo_no_proxy": sahbo_no_proxy_result,
+        "sahbo": sahbo_result,
+    }
+    comparison = _build_method_comparison(method_results=method_results)
     payload = {
         "experiment_group": "G4",
-        "design_version": "sahbo_vs_grid_s_eta_fixed_p",
+        "design_version": "minimal_matrix_s_eta_fixed_p",
         "evaluator": {
             "baseline_config": str(evaluator.baseline_config),
             "evaluation_count": evaluator.evaluation_count,
             "fixed_behavior_parameter": "p_hat",
         },
+        "baseline": baseline_result,
+        "random_search": random_result,
+        "pure_sa": pure_sa_result,
+        "sahbo_no_proxy": sahbo_no_proxy_result,
         "sahbo": sahbo_result,
         "grid_search": grid_result,
         "method_comparison": comparison,
@@ -447,6 +644,102 @@ def proxy_score(
     )
 
 
+def _select_discrete_candidates(
+    *,
+    candidate_neighbors: list[tuple[str, ...]],
+    eta: tuple[float, ...],
+    incumbent_summary: dict[str, object],
+    top_k: int,
+    use_proxy: bool,
+    rng: np.random.Generator,
+) -> list[dict[str, object]]:
+    if not candidate_neighbors:
+        return []
+
+    retained_count = max(1, min(int(top_k), len(candidate_neighbors)))
+    if use_proxy:
+        proxy_rows = [
+            {
+                "directions": directions,
+                "proxy_value": proxy_score(
+                    directions=directions,
+                    eta=eta,
+                    incumbent_summary=incumbent_summary,
+                ),
+                "selection": "proxy",
+            }
+            for directions in candidate_neighbors
+        ]
+        proxy_rows.sort(key=lambda item: float(item["proxy_value"]))
+        return proxy_rows[:retained_count]
+
+    indices = rng.permutation(len(candidate_neighbors))[:retained_count]
+    return [
+        {
+            "directions": candidate_neighbors[int(index)],
+            "proxy_value": float(rank),
+            "selection": "random_no_proxy",
+        }
+        for rank, index in enumerate(indices, start=1)
+    ]
+
+
+def _sample_random_control(
+    *,
+    rng: np.random.Generator,
+    eta_lower_bound: float,
+    eta_upper_bound: float,
+) -> ControlVector:
+    directions = tuple(str(rng.choice(CHANNEL_STATES)) for _ in CHANNEL_NAMES)
+    while not _direction_config_has_open_channel(directions):
+        directions = tuple(str(rng.choice(CHANNEL_STATES)) for _ in CHANNEL_NAMES)
+    eta = tuple(
+        float(value)
+        for value in rng.uniform(
+            low=float(eta_lower_bound),
+            high=float(eta_upper_bound),
+            size=len(CHANNEL_NAMES),
+        )
+    )
+    return ControlVector(directions=directions, eta=eta).normalized()
+
+
+def _propose_sa_control(
+    *,
+    current: ControlVector,
+    config: PureSAConfig,
+    rng: np.random.Generator,
+    temperature: float,
+) -> ControlVector:
+    neighbors = [
+        directions
+        for directions in generate_direction_neighbors(current.directions, radius=config.neighborhood_radius)
+        if directions != current.directions and _direction_config_has_open_channel(directions)
+    ]
+    if neighbors:
+        directions = tuple(neighbors[int(rng.integers(0, len(neighbors)))])
+    else:
+        directions = current.directions
+
+    eta_current = np.array(current.eta, dtype=float)
+    temperature_scale = max(temperature / max(float(config.initial_temperature), 1.0e-12), 0.15)
+    eta_noise = rng.normal(
+        loc=0.0,
+        scale=float(config.eta_perturbation) * temperature_scale,
+        size=len(CHANNEL_NAMES),
+    )
+    eta = _project_eta_bounds(
+        eta_current + eta_noise,
+        lower_bound=config.eta_lower_bound,
+        upper_bound=config.eta_upper_bound,
+    )
+    return ControlVector(directions=directions, eta=tuple(float(value) for value in eta)).normalized()
+
+
+def _direction_config_has_open_channel(directions: tuple[str, ...]) -> bool:
+    return any(_normalize_state(state) != "CLOSED" for state in directions)
+
+
 def _continuous_block_update(
     *,
     evaluator: G4EvaluationCache,
@@ -456,6 +749,8 @@ def _continuous_block_update(
     config: SAHBOConfig,
     rng: np.random.Generator,
     iteration: int,
+    source_prefix: str,
+    start_count: int,
 ) -> tuple[ControlVector, EvaluationRecord, EvaluationRecord, dict[str, object]]:
     delta = rng.choice(np.array([-1.0, 1.0]), size=len(CHANNEL_NAMES))
     eta_current = np.array(current.eta, dtype=float)
@@ -466,12 +761,38 @@ def _continuous_block_update(
 
     plus_record = evaluator.evaluate(
         ControlVector(current.directions, tuple(float(value) for value in eta_plus)),
-        source=f"sahbo_iter{iteration}_eta_plus",
+        source=f"{source_prefix}_iter{iteration}_eta_plus",
+        record_cached=True,
     )
+    if _budget_exhausted(evaluator, config.max_evaluations, start_count=start_count):
+        log = {
+            "accepted": False,
+            "eta_plus": [float(value) for value in eta_plus],
+            "plus_objective": float(plus_record.objective_value),
+            "reason": "budget_exhausted_after_eta_plus",
+        }
+        if plus_record.objective_value < best_record.objective_value:
+            best_record = plus_record
+        return current, current_record, best_record, log
+
     minus_record = evaluator.evaluate(
         ControlVector(current.directions, tuple(float(value) for value in eta_minus)),
-        source=f"sahbo_iter{iteration}_eta_minus",
+        source=f"{source_prefix}_iter{iteration}_eta_minus",
+        record_cached=True,
     )
+    if _budget_exhausted(evaluator, config.max_evaluations, start_count=start_count):
+        for record in (plus_record, minus_record):
+            if record.objective_value < best_record.objective_value:
+                best_record = record
+        log = {
+            "accepted": False,
+            "eta_plus": [float(value) for value in eta_plus],
+            "eta_minus": [float(value) for value in eta_minus],
+            "plus_objective": float(plus_record.objective_value),
+            "minus_objective": float(minus_record.objective_value),
+            "reason": "budget_exhausted_after_eta_minus",
+        }
+        return current, current_record, best_record, log
     gradient = ((plus_record.objective_value - minus_record.objective_value) / max(2.0 * c_k, 1.0e-12)) * delta
 
     accepted = False
@@ -483,7 +804,8 @@ def _continuous_block_update(
         proposed_eta = _project_eta(eta_current - step_size * gradient, config=config)
         candidate_record = evaluator.evaluate(
             ControlVector(current.directions, tuple(float(value) for value in proposed_eta)),
-            source=f"sahbo_iter{iteration}_eta_candidate_bt{backtracks}",
+            source=f"{source_prefix}_iter{iteration}_eta_candidate_bt{backtracks}",
+            record_cached=True,
         )
         if candidate_record.objective_value <= current_record.objective_value - config.acceptance_tolerance:
             accepted = True
@@ -491,6 +813,8 @@ def _continuous_block_update(
             break
         step_size *= config.eta_backtrack_factor
         backtracks += 1
+        if _budget_exhausted(evaluator, config.max_evaluations, start_count=start_count):
+            break
 
     if accepted:
         current = ControlVector(current.directions, tuple(float(value) for value in candidate_eta)).normalized()
@@ -522,7 +846,15 @@ def _continuous_block_update(
 
 
 def _project_eta(values: np.ndarray, *, config: SAHBOConfig) -> np.ndarray:
-    return np.clip(values, float(config.eta_lower_bound), float(config.eta_upper_bound))
+    return _project_eta_bounds(
+        values,
+        lower_bound=config.eta_lower_bound,
+        upper_bound=config.eta_upper_bound,
+    )
+
+
+def _project_eta_bounds(values: np.ndarray, *, lower_bound: float, upper_bound: float) -> np.ndarray:
+    return np.clip(values, float(lower_bound), float(upper_bound))
 
 
 def _proxy_consistency_report(
@@ -636,11 +968,26 @@ def _state_to_flux_direction(state: str) -> str:
 def _short_source_label(source: str) -> str:
     normalized = source.replace(" ", "_").replace("/", "_").replace("\\", "_").lower()
     aliases = {
+        "baseline": "base",
+        "random_search": "rnd",
+        "pure_sa_init": "psi",
+        "pure_sa_candidate": "ps",
         "sahbo_init": "si",
+        "sahbo_no_proxy_init": "snpi",
         "grid": "gr",
     }
     if normalized in aliases:
         return aliases[normalized]
+    if normalized.startswith("sahbo_no_proxy_iter"):
+        compact = (
+            normalized.replace("sahbo_no_proxy_iter", "snp")
+            .replace("_discrete", "d")
+            .replace("_eta_plus", "ep")
+            .replace("_eta_minus", "em")
+            .replace("_eta_candidate", "ec")
+            .replace("_bt", "b")
+        )
+        return compact[:18]
     if normalized.startswith("sahbo_iter"):
         compact = (
             normalized.replace("sahbo_iter", "s")
@@ -659,8 +1006,13 @@ def _control_digest(control: ControlVector) -> str:
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:10]
 
 
-def _budget_exhausted(evaluator: G4EvaluationCache, max_evaluations: int | None) -> bool:
-    return max_evaluations is not None and evaluator.evaluation_count >= max_evaluations
+def _budget_exhausted(
+    evaluator: G4EvaluationCache,
+    max_evaluations: int | None,
+    *,
+    start_count: int = 0,
+) -> bool:
+    return max_evaluations is not None and evaluator.evaluation_count - start_count >= max_evaluations
 
 
 def _load_toml(path: Path) -> dict[str, object]:
@@ -751,29 +1103,18 @@ def _save_csv(path: Path, rows: list[dict[str, object]]) -> None:
 
 def _build_method_comparison(
     *,
-    sahbo_result: dict[str, object] | None,
-    grid_result: dict[str, object] | None,
+    method_results: dict[str, dict[str, object] | None],
 ) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
-    if sahbo_result is not None and isinstance(sahbo_result.get("best"), dict):
-        best = sahbo_result["best"]
+    for result in method_results.values():
+        if result is None or not isinstance(result.get("best"), dict):
+            continue
+        best = result["best"]
         rows.append(
             {
-                "method": "SA-HBO",
+                "method": result.get("method"),
                 "objective_value": best.get("objective_value"),
-                "evaluation_count": sahbo_result.get("evaluation_count"),
-                "case_id": best.get("case_id"),
-                "directions": _directions_string(best),
-                "eta": _eta_string(best),
-            }
-        )
-    if grid_result is not None and isinstance(grid_result.get("best"), dict):
-        best = grid_result["best"]
-        rows.append(
-            {
-                "method": "grid_search",
-                "objective_value": best.get("objective_value"),
-                "evaluation_count": grid_result.get("candidate_count"),
+                "evaluation_count": result.get("evaluation_count", result.get("candidate_count")),
                 "case_id": best.get("case_id"),
                 "directions": _directions_string(best),
                 "eta": _eta_string(best),

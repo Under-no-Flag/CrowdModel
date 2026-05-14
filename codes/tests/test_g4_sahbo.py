@@ -57,14 +57,21 @@ class G4SAHBOTests(unittest.TestCase):
         config_path = Path("codes/scenes/examples/g4_sahbo_vs_grid/g4.toml")
         config = _load_g4_config(config_path)
 
-        self.assertEqual(config["mode"], "both")
+        self.assertEqual(config["mode"], "matrix")
         self.assertTrue(Path(str(config["baseline_config"])).is_absolute())
         self.assertTrue(str(config["baseline_config"]).endswith("g2_multistage_directional\\run_baseline.toml") or str(config["baseline_config"]).endswith("g2_multistage_directional/run_baseline.toml"))
         self.assertTrue(Path(str(config["output_root"])).is_absolute())
+        self.assertEqual(config["workers"], 6)
+        self.assertTrue(config["visualization"]["enabled"])
+        self.assertEqual(config["visualization"]["top_n"], 12)
         self.assertIsInstance(config["simulation_overrides"]["steps"], int)
         self.assertGreater(config["simulation_overrides"]["steps"], 0)
         self.assertEqual(config["sahbo"]["initial_directions"], ("FREE", "FREE", "FREE", "FREE"))
         self.assertEqual(config["sahbo"]["initial_eta"], (8.0, 8.0, 8.0, 8.0))
+        self.assertEqual(config["sahbo_no_proxy"]["initial_directions"], ("FREE", "FREE", "FREE", "FREE"))
+        self.assertEqual(config["baseline"]["directions"], ("FREE", "FREE", "FREE", "FREE"))
+        self.assertEqual(config["random_search"]["max_evaluations"], 20)
+        self.assertEqual(config["pure_sa"]["max_evaluations"], 20)
         self.assertEqual(config["grid"]["eta_values"], (1.0, 4.0, 8.0, 12.0))
         self.assertGreaterEqual(len(config["grid"]["direction_sets"]), 3)
 
@@ -74,6 +81,13 @@ class G4SAHBOTests(unittest.TestCase):
 
         self.assertLessEqual(len(case_id), 40)
         self.assertNotIn("7p997191234", case_id)
+
+    def test_no_proxy_labels_stay_short_for_windows_paths(self) -> None:
+        control = ControlVector(("FREE", "E", "FREE", "W"), (8.0, 8.0, 8.0, 8.0)).normalized()
+        case_id = f"g4_{7:04d}_{_short_source_label('sahbo_no_proxy_iter0_eta_candidate_bt0')}_{_control_digest(control)}"
+
+        self.assertLessEqual(len(case_id), 40)
+        self.assertIn("snp", case_id)
 
 
 if __name__ == "__main__":
