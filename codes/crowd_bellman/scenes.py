@@ -70,6 +70,31 @@ class InflowModel:
 
 
 @dataclass(frozen=True)
+class ChannelGateModel:
+    """Internal channel entrance face used by capacity controls."""
+
+    gate_id: str
+    channel: str
+    side: str
+    face_axis: str
+    face_index: int
+    face_rows: np.ndarray
+    waiting_mask: np.ndarray
+
+
+@dataclass(frozen=True)
+class GateCapacitySchedule:
+    """Piecewise-constant capacity bound for one internal gate."""
+
+    gate_id: str
+    channel: str
+    side: str
+    rate: float
+    time_start: float = 0.0
+    time_end: float | None = None
+
+
+@dataclass(frozen=True)
 class CaseModel:
     """Simulation-ready case configuration.
 
@@ -91,3 +116,5 @@ class CaseModel:
     handoff_rules: tuple[DirectionHandoffRule, ...] = ()
     initial_group_density: dict[GroupKey, np.ndarray] | None = None
     inflows: tuple[InflowModel, ...] = ()
+    gates: dict[str, ChannelGateModel] | None = None
+    gate_capacity_schedules: tuple[GateCapacitySchedule, ...] = ()

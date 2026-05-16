@@ -25,8 +25,17 @@ class CaseStats:
     travel_time_cumulative: list[float] = field(default_factory=list)
     high_density_exposure_cumulative: list[float] = field(default_factory=list)
     inflow_cumulative: list[float] = field(default_factory=list)
+    cap_removed_cumulative: list[float] = field(default_factory=list)
     channel_density: dict[str, list[float]] = field(default_factory=dict)
     channel_flux_cumulative: dict[str, float] = field(default_factory=dict)
+    gate_attempted_cumulative: dict[str, float] = field(default_factory=dict)
+    gate_allowed_cumulative: dict[str, float] = field(default_factory=dict)
+    gate_actual_cumulative: dict[str, float] = field(default_factory=dict)
+    gate_rejected_cumulative: dict[str, float] = field(default_factory=dict)
+    gate_binding_steps: dict[str, int] = field(default_factory=dict)
+    gate_waiting_mass: dict[str, list[float]] = field(default_factory=dict)
+    gate_waiting_mass_cumulative: dict[str, float] = field(default_factory=dict)
+    gate_waiting_mass_peak: dict[str, float] = field(default_factory=dict)
 
 
 def init_case_stats(
@@ -34,12 +43,22 @@ def init_case_stats(
     *,
     initial_total_mass: float = 0.0,
     walkable_area: float = 0.0,
+    gate_ids: list[str] | None = None,
 ) -> CaseStats:
+    gate_ids = gate_ids or []
     return CaseStats(
         initial_total_mass=float(initial_total_mass),
         walkable_area=float(walkable_area),
         channel_density={name: [] for name in channel_names},
         channel_flux_cumulative={name: 0.0 for name in channel_names},
+        gate_attempted_cumulative={gate_id: 0.0 for gate_id in gate_ids},
+        gate_allowed_cumulative={gate_id: 0.0 for gate_id in gate_ids},
+        gate_actual_cumulative={gate_id: 0.0 for gate_id in gate_ids},
+        gate_rejected_cumulative={gate_id: 0.0 for gate_id in gate_ids},
+        gate_binding_steps={gate_id: 0 for gate_id in gate_ids},
+        gate_waiting_mass={gate_id: [] for gate_id in gate_ids},
+        gate_waiting_mass_cumulative={gate_id: 0.0 for gate_id in gate_ids},
+        gate_waiting_mass_peak={gate_id: 0.0 for gate_id in gate_ids},
     )
 
 
@@ -122,6 +141,21 @@ def channel_flux_balance_index(channel_flux_cumulative: dict[str, float]) -> flo
     if denominator <= 1.0e-12:
         return 0.0
     return float(channel_flux_variance(channel_flux_cumulative) / denominator)
+
+
+def safety_risk_density(
+    rho: np.ndarray,
+    rho_safe: float,
+    j2_metric: str = "soft",
+    j2_gamma: float = 1.0,
+) -> np.ndarray:
+    metric = j2_metric.lower()
+    if metric == "hard":
+        return (rho > rho_safe).astype(float)
+    if metric == "soft":
+        over_density = np.maximum(rho - rho_safe, 0.0) / max(float(rho_safe), 1.0e-12)
+        return np.power(over_density, float(j2_gamma))
+    raise ValueError(f"Unsupported j2_metric: {j2_metric!r}")
 
 
 def objective_terms_from_stats(stats: CaseStats) -> dict[str, float]:
@@ -211,6 +245,8 @@ def _objective_evaluation_from_terms(
         "lambda_j2": float(objective_cfg.lambda_j2),
         "lambda_j5": float(objective_cfg.lambda_j5),
         "rho_safe": float(objective_cfg.rho_safe),
+        "j2_metric": objective_cfg.j2_metric,
+        "j2_gamma": float(objective_cfg.j2_gamma),
         "use_normalized_terms": bool(objective_cfg.use_normalized_terms),
         "term_mode": "normalized" if objective_cfg.use_normalized_terms else "raw",
         "j1_scale": float(objective_cfg.j1_scale),
@@ -354,7 +390,11 @@ def record_step(
     channel_masks: dict[str, np.ndarray],
     probe_x: dict[str, int],
     inflow_total: float,
+    j2_metric: str = "soft",
+    j2_gamma: float = 1.0,
     channel_flux_directions: dict[str, str] | None = None,
+    cap_removed_total: float = 0.0,
+    gate_diagnostics: dict[str, dict[str, float | bool]] | None = None,
 ) -> None:
     cell_area = dx * dx
     walkable_rho = rho[walkable]
@@ -367,9 +407,11 @@ def record_step(
     stats.density_gradient_intensity.append(density_gradient_metric(walkable, rho, dx))
     stats.dt.append(dt)
     stats.inflow_cumulative.append(inflow_total)
+    stats.cap_removed_cumulative.append(float(cap_removed_total))
 
     travel_increment = float(np.sum(walkable_rho) * cell_area * dt)
-    exposure_increment = float(np.sum(walkable_rho > rho_safe) * cell_area * dt)
+    risk_density = safety_risk_density(walkable_rho, rho_safe, j2_metric, j2_gamma)
+    exposure_increment = float(np.sum(risk_density) * cell_area * dt)
     prev_j1 = stats.travel_time_cumulative[-1] if stats.travel_time_cumulative else 0.0
     prev_j2 = stats.high_density_exposure_cumulative[-1] if stats.high_density_exposure_cumulative else 0.0
     stats.travel_time_cumulative.append(prev_j1 + travel_increment)
@@ -385,6 +427,39 @@ def record_step(
             dt=dt,
             direction=(channel_flux_directions or {}).get(name, "E"),
         )
+
+    for gate_id, payload in (gate_diagnostics or {}).items():
+        stats.gate_attempted_cumulative.setdefault(gate_id, 0.0)
+        stats.gate_allowed_cumulative.setdefault(gate_id, 0.0)
+        stats.gate_actual_cumulative.setdefault(gate_id, 0.0)
+        stats.gate_rejected_cumulative.setdefault(gate_id, 0.0)
+        stats.gate_binding_steps.setdefault(gate_id, 0)
+        stats.gate_waiting_mass.setdefault(gate_id, [])
+        stats.gate_waiting_mass_cumulative.setdefault(gate_id, 0.0)
+        stats.gate_waiting_mass_peak.setdefault(gate_id, 0.0)
+
+        attempted_rate = float(payload.get("attempted_rate", 0.0))
+        allowed_rate = float(payload.get("allowed_rate", 0.0))
+        actual_rate = float(payload.get("actual_rate", 0.0))
+        rejected_rate = float(payload.get("rejected_rate", 0.0))
+        waiting_mass = float(payload.get("waiting_mass", 0.0))
+
+        stats.gate_attempted_cumulative[gate_id] += attempted_rate * dt
+        if np.isfinite(allowed_rate):
+            stats.gate_allowed_cumulative[gate_id] += allowed_rate * dt
+        else:
+            stats.gate_allowed_cumulative[gate_id] += actual_rate * dt
+        stats.gate_actual_cumulative[gate_id] += actual_rate * dt
+        stats.gate_rejected_cumulative[gate_id] += rejected_rate * dt
+        stats.gate_waiting_mass[gate_id].append(waiting_mass)
+        stats.gate_waiting_mass_cumulative[gate_id] += waiting_mass * dt
+        stats.gate_waiting_mass_peak[gate_id] = max(stats.gate_waiting_mass_peak[gate_id], waiting_mass)
+        if bool(payload.get("binding", False)):
+            stats.gate_binding_steps[gate_id] += 1
+
+    for gate_id in stats.gate_waiting_mass:
+        if gate_id not in (gate_diagnostics or {}):
+            stats.gate_waiting_mass[gate_id].append(0.0)
 
 
 def build_summary(
@@ -409,6 +484,12 @@ def build_summary(
         name: float(np.mean(series)) if series else 0.0
         for name, series in stats.channel_density.items()
     }
+    step_count = max(len(stats.times), 1)
+    gate_binding_time_ratio = {
+        gate_id: float(count / step_count)
+        for gate_id, count in stats.gate_binding_steps.items()
+    }
+    jb_waiting_exposure = float(sum(stats.gate_waiting_mass_cumulative.values()))
 
     summary = {
         "case_id": case_id,
@@ -416,6 +497,7 @@ def build_summary(
         "final_time": float(stats.times[-1]) if stats.times else 0.0,
         "final_sink_cumulative": float(stats.sink_cumulative[-1]) if stats.sink_cumulative else 0.0,
         "final_inflow_cumulative": float(stats.inflow_cumulative[-1]) if stats.inflow_cumulative else 0.0,
+        "final_cap_removed_cumulative": float(stats.cap_removed_cumulative[-1]) if stats.cap_removed_cumulative else 0.0,
         "mean_density_avg": float(np.mean(stats.mean_density)) if stats.mean_density else 0.0,
         "peak_density_max": float(np.max(stats.peak_density)) if stats.peak_density else 0.0,
         "velocity_discontinuity_avg": float(np.mean(stats.velocity_discontinuity)) if stats.velocity_discontinuity else 0.0,
@@ -423,13 +505,23 @@ def build_summary(
         "channel_time_mean_density": channel_time_mean_density,
         "channel_flux_cumulative": {k: float(v) for k, v in stats.channel_flux_cumulative.items()},
         "channel_flux_share": channel_share,
+        "gate_attempted_cumulative": {k: float(v) for k, v in stats.gate_attempted_cumulative.items()},
+        "gate_allowed_cumulative": {k: float(v) for k, v in stats.gate_allowed_cumulative.items()},
+        "gate_actual_cumulative": {k: float(v) for k, v in stats.gate_actual_cumulative.items()},
+        "gate_rejected_cumulative": {k: float(v) for k, v in stats.gate_rejected_cumulative.items()},
+        "gate_binding_time_ratio": gate_binding_time_ratio,
+        "gate_waiting_mass_cumulative": {k: float(v) for k, v in stats.gate_waiting_mass_cumulative.items()},
+        "gate_waiting_mass_peak": {k: float(v) for k, v in stats.gate_waiting_mass_peak.items()},
+        "jb_waiting_exposure": jb_waiting_exposure,
         "objective_terms": objective_terms,
         "objective_terms_normalized": objective_terms_normalized,
         "j1_total_travel_time": float(objective_terms["j1_total_travel_time"]),
         "j2_high_density_exposure": float(objective_terms["j2_high_density_exposure"]),
+        "j2_safety_risk": float(objective_terms["j2_high_density_exposure"]),
         "j5_channel_flux_variance": float(objective_terms["j5_channel_flux_variance"]),
         "j1_normalized": float(objective_terms_normalized["j1_total_travel_time"]),
         "j2_normalized": float(objective_terms_normalized["j2_high_density_exposure"]),
+        "j2_safety_risk_normalized": float(objective_terms_normalized["j2_high_density_exposure"]),
         "j5_normalized": float(objective_terms_normalized["j5_channel_flux_variance"]),
         "initial_total_mass": float(stats.initial_total_mass),
         "walkable_area": float(stats.walkable_area),
@@ -452,8 +544,20 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
         "density_gradient_intensity",
         "travel_time_cumulative",
         "high_density_exposure_cumulative",
+        "j2_safety_risk_cumulative",
         "inflow_cumulative",
+        "cap_removed_cumulative",
     ] + [f"channel_density_{name}" for name in stats.channel_density]
+    for gate_id in stats.gate_waiting_mass:
+        safe_gate = gate_id.replace(":", "_")
+        fieldnames.extend(
+            [
+                f"gate_waiting_mass_{safe_gate}",
+                f"gate_attempted_cumulative_{safe_gate}",
+                f"gate_actual_cumulative_{safe_gate}",
+                f"gate_rejected_cumulative_{safe_gate}",
+            ]
+        )
 
     with path.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
@@ -469,10 +573,19 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
                 "density_gradient_intensity": stats.density_gradient_intensity[idx],
                 "travel_time_cumulative": stats.travel_time_cumulative[idx],
                 "high_density_exposure_cumulative": stats.high_density_exposure_cumulative[idx],
+                "j2_safety_risk_cumulative": stats.high_density_exposure_cumulative[idx],
                 "inflow_cumulative": stats.inflow_cumulative[idx],
+                "cap_removed_cumulative": stats.cap_removed_cumulative[idx],
             }
             for name, series in stats.channel_density.items():
                 row[f"channel_density_{name}"] = series[idx]
+            for gate_id, series in stats.gate_waiting_mass.items():
+                safe_gate = gate_id.replace(":", "_")
+                row[f"gate_waiting_mass_{safe_gate}"] = series[idx] if idx < len(series) else 0.0
+                # These are final cumulative values; summary.json contains the authoritative totals.
+                row[f"gate_attempted_cumulative_{safe_gate}"] = stats.gate_attempted_cumulative.get(gate_id, 0.0)
+                row[f"gate_actual_cumulative_{safe_gate}"] = stats.gate_actual_cumulative.get(gate_id, 0.0)
+                row[f"gate_rejected_cumulative_{safe_gate}"] = stats.gate_rejected_cumulative.get(gate_id, 0.0)
             writer.writerow(row)
 
 

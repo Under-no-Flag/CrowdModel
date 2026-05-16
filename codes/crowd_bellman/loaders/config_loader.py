@@ -7,7 +7,7 @@ from ..config import ObjectiveConfig
 from ..scenes import SimulationConfig
 from ..spec.experiment_spec import RunConfigSpec
 from ..spec.population_spec import InflowGroupSpec, InitialGroupSpec, PopulationSpec
-from ..spec.route_spec import CaseRouteSpec, ControlSpec, StageSpec, TransitionTargetSpec
+from ..spec.route_spec import CapacityControlSpec, CaseRouteSpec, ControlSpec, StageSpec, TransitionTargetSpec
 from ..spec.scene_spec import ChannelSpec, NamedRegionSelectionSpec, RectRegionSpec, SceneSpec
 
 
@@ -255,8 +255,25 @@ def load_route_spec(path: Path) -> CaseRouteSpec:
             )
         )
 
+    capacity_controls: list[CapacityControlSpec] = []
+    for item in raw.get("capacity_controls", []):
+        if not isinstance(item, dict):
+            raise ValueError("capacity_controls entries must be tables")
+        time_end = item.get("time_end")
+        capacity_controls.append(
+            CapacityControlSpec(
+                channel=str(item["channel"]),
+                side=str(item["side"]),
+                rate=float(item["rate"]),
+                time_start=float(item.get("time_start", 0.0)),
+                time_end=float(time_end) if time_end is not None else None,
+                waiting_width=int(item.get("waiting_width", 6)),
+            )
+        )
+
     return CaseRouteSpec(
         case_id=str(case_table.get("case_id", "config_case")),
         title=str(case_table.get("title", "Config-driven case")),
         stages=tuple(stage_specs),
+        capacity_controls=tuple(capacity_controls),
     )

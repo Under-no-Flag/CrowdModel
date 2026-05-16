@@ -5,9 +5,17 @@ from dataclasses import dataclass, replace
 import numpy as np
 
 from ..core import DIRECTIONS, DirectionHandoffRule, TransitionRule, default_allowed_mask, tensor_from_tau
-from ..scenes import BaseScene, CaseModel, GroupModel, InflowModel, SimulationConfig
+from ..scenes import (
+    BaseScene,
+    CaseModel,
+    ChannelGateModel,
+    GateCapacitySchedule,
+    GroupModel,
+    InflowModel,
+    SimulationConfig,
+)
 from ..spec.population_spec import PopulationSpec
-from ..spec.route_spec import CaseRouteSpec, ControlSpec, StageSpec
+from ..spec.route_spec import CapacityControlSpec, CaseRouteSpec, ControlSpec, StageSpec
 from ..spec.scene_spec import SceneSpec
 
 
@@ -152,6 +160,110 @@ def _constant_direction_vector(direction_name: str) -> tuple[float, float]:
     except ValueError as exc:
         raise ValueError(f"Unknown direction name: {direction_name}") from exc
     return float(DIRECTIONS.ux[index]), float(DIRECTIONS.uy[index])
+
+
+def _normalize_gate_side(side: str) -> str:
+    normalized = str(side).lower()
+    if normalized in {"plus", "+", "east", "eastbound", "e"}:
+        return "plus"
+    if normalized in {"minus", "-", "west", "westbound", "w"}:
+        return "minus"
+    if normalized in {"both", "bidirectional", "all"}:
+        return "both"
+    raise ValueError(f"Unsupported capacity-control side: {side!r}")
+
+
+def _build_channel_gate(
+    *,
+    channel_name: str,
+    side: str,
+    channel_mask: np.ndarray,
+    walkable: np.ndarray,
+    waiting_width: int,
+) -> ChannelGateModel:
+    points = np.argwhere(channel_mask & walkable)
+    if points.size == 0:
+        raise ValueError(f"Channel {channel_name!r} is empty; cannot build capacity gate")
+
+    rows = np.unique(points[:, 0]).astype(int)
+    x_min = int(np.min(points[:, 1]))
+    x_max = int(np.max(points[:, 1]))
+    nx = int(walkable.shape[1])
+    width = max(int(waiting_width), 1)
+
+    if side == "plus":
+        face_index = x_min - 1
+        x0 = max(0, x_min - width)
+        x1 = x_min
+    elif side == "minus":
+        face_index = x_max
+        x0 = x_max + 1
+        x1 = min(nx, x_max + 1 + width)
+    else:
+        raise ValueError(f"Gate side must be plus/minus, got {side!r}")
+
+    if face_index < 0 or face_index >= nx - 1:
+        raise ValueError(
+            f"Capacity gate {channel_name}:{side} has invalid face_index={face_index} for nx={nx}"
+        )
+
+    waiting_mask = np.zeros_like(walkable, dtype=bool)
+    if x1 > x0:
+        waiting_mask[np.ix_(rows, np.arange(x0, x1, dtype=int))] = True
+    waiting_mask &= walkable
+
+    gate_id = f"{channel_name}:{side}"
+    return ChannelGateModel(
+        gate_id=gate_id,
+        channel=channel_name,
+        side=side,
+        face_axis="x",
+        face_index=face_index,
+        face_rows=rows,
+        waiting_mask=waiting_mask,
+    )
+
+
+def _compile_capacity_controls(
+    *,
+    controls: tuple[CapacityControlSpec, ...],
+    channel_masks: dict[str, np.ndarray],
+    walkable: np.ndarray,
+) -> tuple[dict[str, ChannelGateModel], tuple[GateCapacitySchedule, ...]]:
+    gates: dict[str, ChannelGateModel] = {}
+    schedules: list[GateCapacitySchedule] = []
+
+    for control in controls:
+        if control.channel not in channel_masks:
+            raise ValueError(f"Capacity control references unknown channel: {control.channel}")
+        if control.rate < 0.0:
+            raise ValueError(f"Capacity-control rate must be non-negative: {control.channel}:{control.side}")
+        if control.time_end is not None and control.time_end <= control.time_start:
+            raise ValueError(f"Capacity-control time_end must be greater than time_start: {control.channel}:{control.side}")
+
+        sides = ("plus", "minus") if _normalize_gate_side(control.side) == "both" else (_normalize_gate_side(control.side),)
+        for side in sides:
+            gate_id = f"{control.channel}:{side}"
+            if gate_id not in gates:
+                gates[gate_id] = _build_channel_gate(
+                    channel_name=control.channel,
+                    side=side,
+                    channel_mask=channel_masks[control.channel],
+                    walkable=walkable,
+                    waiting_width=control.waiting_width,
+                )
+            schedules.append(
+                GateCapacitySchedule(
+                    gate_id=gate_id,
+                    channel=control.channel,
+                    side=side,
+                    rate=float(control.rate),
+                    time_start=float(control.time_start),
+                    time_end=None if control.time_end is None else float(control.time_end),
+                )
+            )
+
+    return gates, tuple(schedules)
 
 
 def _tensor_to_region_target(
@@ -459,6 +571,12 @@ def compile_case(
     for mask in sink_masks.values():
         case_exit_mask |= mask
 
+    gates, gate_capacity_schedules = _compile_capacity_controls(
+        controls=tuple(route_spec.capacity_controls),
+        channel_masks=bundle.scene.channel_masks,
+        walkable=walkable,
+    )
+
     scene = replace(bundle.scene, initial_rho=total_initial)
     case = CaseModel(
         case_id=route_spec.case_id,
@@ -476,5 +594,7 @@ def compile_case(
         handoff_rules=tuple(handoff_rules),
         initial_group_density=initial_group_density,
         inflows=tuple(inflows),
+        gates=gates,
+        gate_capacity_schedules=gate_capacity_schedules,
     )
     return scene, case

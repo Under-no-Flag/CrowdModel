@@ -13,19 +13,23 @@ from .core import (
     build_transition_out_rate_maps,
     compute_cfl_dt,
     compute_cfl_dt_multigroup,
+    compute_face_fluxes,
     compute_total_density,
-    enforce_total_density_cap,
+    enforce_total_density_cap_with_diagnostics,
     greenshields_speed,
     precompute_step_factors,
     recover_optimal_direction,
     solve_bellman,
     update_density,
+    update_density_from_fluxes,
 )
 from .metrics import build_summary, init_case_stats, record_step, save_case_timeseries, save_json
 from .plotting import save_case_snapshot, save_timeseries_plot
 from .scenes import (
     BaseScene,
     CaseModel,
+    ChannelGateModel,
+    GateCapacitySchedule,
     GroupModel,
     InflowModel,
     SimulationConfig,
@@ -129,6 +133,87 @@ def _apply_inflows(
     return added_mass_total
 
 
+def _active_gate_rate(
+    schedules: tuple[GateCapacitySchedule, ...],
+    gate_id: str,
+    time_value: float,
+) -> float | None:
+    active_rate: float | None = None
+    for schedule in schedules:
+        if schedule.gate_id != gate_id:
+            continue
+        if time_value + 1.0e-12 < schedule.time_start:
+            continue
+        if schedule.time_end is not None and time_value >= schedule.time_end - 1.0e-12:
+            continue
+        active_rate = float(schedule.rate)
+    return active_rate
+
+
+def _apply_internal_gate_limits(
+    *,
+    fx_by_group: dict[GroupKey, np.ndarray],
+    gates: dict[str, ChannelGateModel],
+    schedules: tuple[GateCapacitySchedule, ...],
+    time_value: float,
+    dx: float,
+) -> tuple[dict[GroupKey, np.ndarray], dict[str, dict[str, float | bool]]]:
+    limited = {key: np.array(fx, copy=True) for key, fx in fx_by_group.items()}
+    diagnostics: dict[str, dict[str, float | bool]] = {}
+
+    for gate_id, gate in gates.items():
+        if gate.face_axis != "x":
+            raise ValueError(f"Only x-axis internal gates are currently supported, got {gate.face_axis!r}")
+        rate = _active_gate_rate(schedules, gate_id, time_value)
+        if rate is None:
+            continue
+
+        signed_attempt = 0.0
+        for fx in limited.values():
+            face_flux = fx[gate.face_rows, gate.face_index]
+            if gate.side == "plus":
+                signed_attempt += float(np.sum(np.maximum(face_flux, 0.0)) * dx)
+            elif gate.side == "minus":
+                signed_attempt += float(np.sum(np.maximum(-face_flux, 0.0)) * dx)
+            else:
+                raise ValueError(f"Unsupported gate side: {gate.side!r}")
+
+        if signed_attempt <= 1.0e-12 or np.isinf(rate):
+            limiter = 1.0
+        else:
+            limiter = float(min(1.0, max(rate, 0.0) / signed_attempt))
+
+        for key, fx in limited.items():
+            face_flux = fx[gate.face_rows, gate.face_index]
+            if gate.side == "plus":
+                fx[gate.face_rows, gate.face_index] = np.where(
+                    face_flux > 0.0,
+                    face_flux * limiter,
+                    face_flux,
+                )
+            else:
+                fx[gate.face_rows, gate.face_index] = np.where(
+                    face_flux < 0.0,
+                    face_flux * limiter,
+                    face_flux,
+                )
+            limited[key] = fx
+
+        actual = signed_attempt * limiter
+        rejected = max(signed_attempt - actual, 0.0)
+        diagnostics[gate_id] = {
+            "attempted_rate": signed_attempt,
+            "allowed_rate": float(rate),
+            "actual_rate": actual,
+            "rejected_rate": rejected,
+            "lambda": limiter,
+            "binding": bool(rejected > 1.0e-9),
+            "waiting_mass": 0.0,
+        }
+
+    return limited, diagnostics
+
+
 def simulate_case(
     cfg: SimulationConfig,
     scene: BaseScene,
@@ -166,9 +251,11 @@ def simulate_case(
         list(scene.channel_masks),
         initial_total_mass=initial_total_mass,
         walkable_area=walkable_area,
+        gate_ids=sorted((case.gates or {}).keys()),
     )
     sink_total = 0.0
     inflow_total = 0.0
+    cap_removed_total = 0.0
     time_value = 0.0
 
     phi_by_group = {key: np.full_like(scene.initial_rho, np.inf) for key in groups}
@@ -246,20 +333,51 @@ def simulate_case(
             )
 
         fx_sum = np.zeros((scene.initial_rho.shape[0], scene.initial_rho.shape[1] - 1), dtype=float)
+        gate_diagnostics: dict[str, dict[str, float | bool]] = {}
 
-        for key, group in groups.items():
-            rho_next, fx, _, sink_increment = update_density(
-                rho=rho_by_group[key],
-                walkable=case.walkable,
-                exit_mask=group.sink_mask,
-                vx=vx_by_group[key],
-                vy=vy_by_group[key],
+        if case.gate_capacity_schedules and case.gates:
+            fx_by_group: dict[GroupKey, np.ndarray] = {}
+            fy_by_group: dict[GroupKey, np.ndarray] = {}
+            for key in groups:
+                fx, fy = compute_face_fluxes(rho_by_group[key], vx_by_group[key], vy_by_group[key])
+                fx_by_group[key] = fx
+                fy_by_group[key] = fy
+
+            limited_fx_by_group, gate_diagnostics = _apply_internal_gate_limits(
+                fx_by_group=fx_by_group,
+                gates=case.gates,
+                schedules=case.gate_capacity_schedules,
+                time_value=time_value,
                 dx=cfg.dx,
-                dt=dt,
             )
-            rho_by_group[key] = np.clip(rho_next, 0.0, cfg.rho_max)
-            fx_sum += fx
-            sink_total += sink_increment
+
+            for key, group in groups.items():
+                rho_next, sink_increment = update_density_from_fluxes(
+                    rho=rho_by_group[key],
+                    walkable=case.walkable,
+                    exit_mask=group.sink_mask,
+                    fx=limited_fx_by_group[key],
+                    fy=fy_by_group[key],
+                    dx=cfg.dx,
+                    dt=dt,
+                )
+                rho_by_group[key] = np.clip(rho_next, 0.0, cfg.rho_max)
+                fx_sum += limited_fx_by_group[key]
+                sink_total += sink_increment
+        else:
+            for key, group in groups.items():
+                rho_next, fx, _, sink_increment = update_density(
+                    rho=rho_by_group[key],
+                    walkable=case.walkable,
+                    exit_mask=group.sink_mask,
+                    vx=vx_by_group[key],
+                    vy=vy_by_group[key],
+                    dx=cfg.dx,
+                    dt=dt,
+                )
+                rho_by_group[key] = np.clip(rho_next, 0.0, cfg.rho_max)
+                fx_sum += fx
+                sink_total += sink_increment
 
         if transitions:
             rho_by_group = apply_fixed_probability_splitting(
@@ -280,13 +398,19 @@ def simulate_case(
             rho_max=cfg.rho_max,
         )
 
-        rho_by_group = enforce_total_density_cap(
+        rho_by_group, cap_removed_increment = enforce_total_density_cap_with_diagnostics(
             rho_by_group=rho_by_group,
             rho_max=cfg.rho_max,
             walkable=case.walkable,
+            dx=cfg.dx,
         )
+        cap_removed_total += cap_removed_increment
 
         rho_tot = compute_total_density(rho_by_group)
+        if gate_diagnostics and case.gates:
+            for gate_id, payload in gate_diagnostics.items():
+                gate = case.gates[gate_id]
+                payload["waiting_mass"] = float(np.sum(rho_tot[gate.waiting_mask]) * cell_area)
         vx_weighted = np.zeros_like(scene.initial_rho)
         vy_weighted = np.zeros_like(scene.initial_rho)
         for key in groups:
@@ -315,7 +439,11 @@ def simulate_case(
             channel_masks=case.channel_masks,
             probe_x=case.probe_x,
             inflow_total=inflow_total,
+            j2_metric=objective_cfg.j2_metric,
+            j2_gamma=objective_cfg.j2_gamma,
             channel_flux_directions=channel_flux_directions,
+            cap_removed_total=cap_removed_total,
+            gate_diagnostics=gate_diagnostics,
         )
 
         if step_observer is not None:

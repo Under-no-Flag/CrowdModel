@@ -324,6 +324,8 @@ def main() -> None:
             channel_masks=case.channel_masks,
             rho_safe=float(run_spec.objective.rho_safe),
             dx=float(simulation.dx),
+            j2_metric=str(run_spec.objective.j2_metric),
+            j2_gamma=float(run_spec.objective.j2_gamma),
         )
         collectors[str(case.case_id)] = (collector, case_output_dir)
         return collector.observe

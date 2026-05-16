@@ -23,6 +23,16 @@ class TransitionTargetSpec:
 
 
 @dataclass(frozen=True)
+class CapacityControlSpec:
+    channel: str
+    side: str
+    rate: float
+    time_start: float = 0.0
+    time_end: float | None = None
+    waiting_width: int = 6
+
+
+@dataclass(frozen=True)
 class StageSpec:
     stage_id: str
     group_key: tuple[int, int]
@@ -42,3 +52,4 @@ class CaseRouteSpec:
     case_id: str
     title: str
     stages: tuple[StageSpec, ...]
+    capacity_controls: tuple[CapacityControlSpec, ...] = ()

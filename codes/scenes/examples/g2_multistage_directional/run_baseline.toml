@@ -20,9 +20,11 @@ lambda_j1 = 1.0
 lambda_j2 = 1.0
 lambda_j5 = 1.0
 rho_safe = 3.5
+j2_metric = "soft"
+j2_gamma = 1.0
 use_normalized_terms = true
 j1_scale = 1.0
-j2_scale = 1.0
+j2_scale = 0.001
 j5_scale = 1.0
 
 [scene]

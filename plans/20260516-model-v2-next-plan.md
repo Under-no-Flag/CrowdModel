@@ -227,6 +227,23 @@ G2-v2 不要求找到最优容量，而是判断是否满足优化前提：
 
 验收标准：形成可复现命令、独立结果目录、summary、图表和论文可写结论，并明确给出 G4-v2 的容量范围、候选 baseline 和是否允许进入优化的结论。
 
+执行结果（2026-05-16）：
+
+- 实验脚本：`codes/g2_capacity_response_runner.py`。
+- 复现命令：`D:\Anaconda\envs\interpreter\python.exe codes\g2_capacity_response_runner.py --output-root codes/results/g2_capacity_response --steps 600 --time-horizon 35 --bellman-every 5 --save-every 100000 --density-contour-levels off`。
+- 结果目录：`codes/results/g2_capacity_response`。
+- 总结文件：`codes/results/g2_capacity_response/g2_capacity_response_report.json`。
+- 主表：`codes/results/g2_capacity_response/g2_capacity_response_summary.csv`。
+- 论文表格草案：`codes/results/g2_capacity_response/g2_capacity_tradeoff_table.md`。
+- 图表：`g2_capacity_levels.png`、`g2_capacity_response_pareto.png`、`g2_capacity_allocation_loads.png`、`g2_waiting_mass_timeseries.png`、`g2_capacity_hotspot_migration.png`。
+- 实验矩阵已覆盖 13 个方案：no-cap 参考、high/medium/low 容量强度扫描、单入口瓶颈、同总预算容量分配、分段调度。
+- 安全指标已由硬阈值暴露更新为 `J2_soft = int[((rho-rho_safe)_+ / rho_safe)^gamma] dxdt`，当前 G2-v2 采用 `gamma=1.0`、`j2_scale=0.001`。
+- 关键响应：`J2_soft` / `J2_eval` 相对变化 `0.726902`，`J5` 相对变化 `0.284912`，`J_B` 相对变化 `0.489792`，拒绝通量相对变化 `1.391538`，说明 `q` 会引起可区分的系统响应。
+- 原始归一化 `J2_soft` 仍是平均相对超密度，数值范围约 `0.000174-0.000466`；进入标量目标时使用 `J2_eval=J2_soft/0.001`，范围约 `0.174-0.466`，已与 `J1/J5` 处于同一优化驱动量级。
+- no-cap 参考的 gate 自然尝试率已记录为 G4-v2 容量范围参考，其中 `middle:plus` 为主要受压入口，参考尝试率约 `4.25037`。
+- `max_cap_removed_relative=0.005567`，低于当前 `0.02` 阈值；cap 削减存在但相对总质量较小，后续 G4-v2 仍需保留该诊断字段。
+- `allow_g4_v2_optimization=true`：在小预算实验下，`q` 的响应差异、目标 trade-off 和容量范围足以支撑进入 G4-v2 小矩阵优化。
+
 ## 3.4 G4-v2 优化实验设计
 
 - [ ] 在 `experiments/实验设计.md` 中新增 `G4-v2 内部入口容量控制` 小节，保持旧 G4 结果不被覆盖。
@@ -244,7 +261,7 @@ G2-v2 不要求找到最优容量，而是判断是否满足优化前提：
   - 当前旧结果：`codes/results/g4_minimal_matrix`；
   - 新结果建议：`codes/results/g4_capacity_v2`。
 - [ ] 主要指标：
-  - 原有 `J1/J2/J5`；
+  - 原有 `J1/J2_soft/J5`；
   - 新增 `J_B`；
   - 可选 `J_R`；
   - `gate_attempted_rate`；
@@ -269,31 +286,33 @@ G2-v2 不要求找到最优容量，而是判断是否满足优化前提：
   - `span`
   - `waiting_region`
 - [ ] 在 `scene.toml` 增加每条通道的 `plus_gate` 和 `minus_gate`。
-- [ ] 在路线或 case 配置中增加容量控制表，支持分段常数：
+- [x] 在路线或 case 配置中增加容量控制表，支持分段常数：
   - `channel`
   - `side`
   - `time_start/time_end`
   - `rate`
-- [ ] 编译为运行时对象 `InternalGateModel` / `GateCapacitySchedule`。
+- [x] 编译为运行时对象 `ChannelGateModel` / `GateCapacitySchedule`。
+
+说明：本轮没有要求手写 `scene.toml` 中的 gate 坐标，而是先从现有 `channel` 区域自动推导 `plus/minus` 入口面和等待区，以便 G2-v2 先形成可运行结果。若论文需要精确展示 $\Sigma_c^\pm$ 的几何定义，后续仍可补显式 `ChannelGateSpec`。
 
 ### 阶段 B：通量限制器
 
-- [ ] 拆分 `update_density()`：
+- [x] 拆分 `update_density()`：
   - `compute_face_fluxes()` 保留；
   - 新增 `apply_internal_gate_limits(fx_by_group, fy_by_group, gates, schedules, time, dx)`；
   - 新增“用给定通量更新密度”的函数。
-- [ ] 在 `runner.py` 中改为先计算所有群体自由通量，再统一限流，最后更新密度。
-- [ ] 记录限流诊断量并传给 `metrics.record_step()`。
-- [ ] 增加质量守恒日志，特别是 cap 削减量。
+- [x] 在 `runner.py` 中改为先计算所有群体自由通量，再统一限流，最后更新密度。
+- [x] 记录限流诊断量并传给 `metrics.record_step()`。
+- [x] 增加质量守恒日志，特别是 cap 削减量。
 
 ### 阶段 C：指标与目标函数
 
-- [ ] 扩展 `CaseStats`：
+- [x] 扩展 `CaseStats`：
   - gate attempted/allowed/rejected cumulative；
   - waiting mass cumulative/peak；
   - binding time ratio。
-- [ ] 扩展 `ObjectiveConfig`，新增 `lambda_jb` 和 `lambda_jr`，默认 0，保证旧实验不受影响。
-- [ ] 扩展 `summary.json` 与 `timeseries.csv` 输出。
+- [x] 扩展 `ObjectiveConfig`，新增 `lambda_jb` 和 `lambda_jr`，默认 0，保证旧实验不受影响。
+- [x] 扩展 `summary.json` 与 `timeseries.csv` 输出。
 
 ### 阶段 D：G4-v2 优化器
 

@@ -455,6 +455,39 @@ def enforce_total_density_cap(
     return capped
 
 
+def enforce_total_density_cap_with_diagnostics(
+    rho_by_group: Mapping[GroupKey, np.ndarray],
+    rho_max: float,
+    walkable: np.ndarray,
+    dx: float,
+) -> tuple[dict[GroupKey, np.ndarray], float]:
+    """Apply total-density cap and return removed mass."""
+
+    rho_tot = compute_total_density(rho_by_group)
+    overflow = walkable & (rho_tot > rho_max + 1.0e-12)
+    if not np.any(overflow):
+        capped = {
+            key: np.where(walkable, np.clip(rho, 0.0, None), 0.0)
+            for key, rho in rho_by_group.items()
+        }
+        return capped, 0.0
+
+    cell_area = float(dx * dx)
+    before_mass = float(np.sum(rho_tot[overflow]) * cell_area)
+    scale = np.ones_like(rho_tot)
+    scale[overflow] = rho_max / rho_tot[overflow]
+
+    capped: dict[GroupKey, np.ndarray] = {}
+    for key, rho in rho_by_group.items():
+        result = np.clip(rho * scale, 0.0, None)
+        result[~walkable] = 0.0
+        capped[key] = result
+
+    rho_after = compute_total_density(capped)
+    after_mass = float(np.sum(rho_after[overflow]) * cell_area)
+    return capped, max(before_mass - after_mass, 0.0)
+
+
 def compute_cfl_dt(
     speed: np.ndarray,
     m11: np.ndarray,
@@ -544,6 +577,31 @@ def update_density(
     sink_mass = float(np.sum(updated[exit_mask]) * dx * dx)
     updated[exit_mask] = 0.0
     return updated, fx, fy, sink_mass
+
+
+def update_density_from_fluxes(
+    rho: np.ndarray,
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    fx: np.ndarray,
+    fy: np.ndarray,
+    dx: float,
+    dt: float,
+) -> tuple[np.ndarray, float]:
+    """Advance one density field using already-limited face fluxes."""
+
+    div_x = np.zeros_like(rho)
+    div_y = np.zeros_like(rho)
+    div_x[:, 1:-1] = (fx[:, 1:] - fx[:, :-1]) / dx
+    div_y[1:-1, :] = (fy[1:, :] - fy[:-1, :]) / dx
+
+    updated = rho - dt * (div_x + div_y)
+    updated[~walkable] = 0.0
+    updated = np.clip(updated, 0.0, None)
+
+    sink_mass = float(np.sum(updated[exit_mask]) * dx * dx)
+    updated[exit_mask] = 0.0
+    return updated, sink_mass
 
 
 def apply_fixed_probability_splitting(

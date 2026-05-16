@@ -10,7 +10,11 @@ class ObjectiveConfig:
     lambda_j1: float = 1.0
     lambda_j2: float = 1.0
     lambda_j5: float = 1.0
+    lambda_jb: float = 0.0
+    lambda_jr: float = 0.0
     rho_safe: float = 3.5
+    j2_metric: str = "soft"
+    j2_gamma: float = 1.0
     use_normalized_terms: bool = False
     j1_scale: float = 1.0
     j2_scale: float = 1.0
@@ -20,5 +24,9 @@ class ObjectiveConfig:
     def __post_init__(self) -> None:
         if self.rho_safe <= 0.0:
             raise ValueError("rho_safe must be positive")
+        if self.j2_metric.lower() not in {"hard", "soft"}:
+            raise ValueError("j2_metric must be 'hard' or 'soft'")
+        if self.j2_gamma <= 0.0:
+            raise ValueError("j2_gamma must be positive")
         if self.j1_scale <= 0.0 or self.j2_scale <= 0.0 or self.j5_scale <= 0.0:
             raise ValueError("objective normalization scales must be positive")

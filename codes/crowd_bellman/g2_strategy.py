@@ -15,7 +15,7 @@ import numpy as np
 
 from .compilers.config_compiler import compile_scene
 from .loaders.config_loader import load_run_config, load_scene_spec
-from .metrics import save_json
+from .metrics import safety_risk_density, save_json
 from .plotting import DENSITY_CMAP, DENSITY_INTERPOLATION
 
 
@@ -44,6 +44,8 @@ class G2StrategyCollector:
     channel_masks: dict[str, np.ndarray]
     rho_safe: float
     dx: float
+    j2_metric: str = "soft"
+    j2_gamma: float = 1.0
 
     def __post_init__(self) -> None:
         self.cell_area = float(self.dx * self.dx)
@@ -72,9 +74,10 @@ class G2StrategyCollector:
             self.global_peak_x = float(peak_index[1])
 
         yy, xx = np.indices(rho.shape)
-        high_density_mask = self.walkable & (rho > self.rho_safe)
+        risk_density = safety_risk_density(rho, self.rho_safe, self.j2_metric, self.j2_gamma)
+        high_density_mask = self.walkable & (risk_density > 0.0)
         if np.any(high_density_mask):
-            weights = rho[high_density_mask] * dt
+            weights = risk_density[high_density_mask] * dt
             self.hotspot_weight += float(np.sum(weights))
             self.hotspot_x_sum += float(np.sum(xx[high_density_mask] * weights))
             self.hotspot_y_sum += float(np.sum(yy[high_density_mask] * weights))
@@ -87,7 +90,9 @@ class G2StrategyCollector:
             if channel_peak >= self.channel_peak_density[channel_name]:
                 self.channel_peak_density[channel_name] = channel_peak
                 self.channel_peak_time[channel_name] = time_value
-            self.channel_high_density_exposure[channel_name] += float(np.sum(rho[active_mask] > self.rho_safe) * self.cell_area * dt)
+            self.channel_high_density_exposure[channel_name] += float(
+                np.sum(risk_density[active_mask]) * self.cell_area * dt
+            )
 
     def save_case_outputs(self, output_dir: Path) -> dict[str, object]:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -98,6 +103,8 @@ class G2StrategyCollector:
         payload = {
             "case_id": self.case_id,
             "title": self.title,
+            "j2_metric": self.j2_metric,
+            "j2_gamma": float(self.j2_gamma),
             "channel_peak_density": {name: float(value) for name, value in self.channel_peak_density.items()},
             "channel_peak_time": {name: float(value) for name, value in self.channel_peak_time.items()},
             "channel_high_density_exposure": {name: float(value) for name, value in self.channel_high_density_exposure.items()},
