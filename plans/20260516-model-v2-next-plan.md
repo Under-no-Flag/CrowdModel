@@ -244,136 +244,57 @@ G2-v2 不要求找到最优容量，而是判断是否满足优化前提：
 - `max_cap_removed_relative=0.005567`，低于当前 `0.02` 阈值；cap 削减存在但相对总质量较小，后续 G4-v2 仍需保留该诊断字段。
 - `allow_g4_v2_optimization=true`：在小预算实验下，`q` 的响应差异、目标 trade-off 和容量范围足以支撑进入 G4-v2 小矩阵优化。
 
-## 3.4 G4-v2 优化实验设计
+## 3.4 G5-v2 分层约束混合黑盒优化实现
 
-- [ ] 在 `experiments/实验设计.md` 中新增 `G4-v2 内部入口容量控制` 小节，保持旧 G4 结果不被覆盖。
-- [ ] 设计四类对照：
-  - no-cap：`q=inf`，只保留方向控制；
-  - uniform-cap：所有入口同一容量；
-  - scheduled-cap：按时间分段容量；
-  - optimized-cap：`z=(s,q)` 自动搜索。
-- [ ] 设计消融实验：
-  - 是否加入 `J_B`；
-  - `L=1/2/4` 个时间段的容量参数化；
-  - 固定 `s` 优化 `q` vs 联合优化 `s,q`；
-  - 只限进场入口 vs 进出双向入口都限。
-- [ ] 保持结果目录隔离：
-  - 当前旧结果：`codes/results/g4_minimal_matrix`；
-  - 新结果建议：`codes/results/g4_capacity_v2`。
-- [ ] 主要指标：
-  - 原有 `J1/J2_soft/J5`；
-  - 新增 `J_B`；
-  - 可选 `J_R`；
-  - `gate_attempted_rate`；
-  - `gate_allowed_rate`；
-  - `gate_rejected_rate`；
-  - `binding_time_ratio`；
-  - `waiting_mass_peak`。
+执行结果（2026-05-17）：
 
-验收标准：实验矩阵能回答“入口容量控制是否产生可解释收益，以及是否值得替换 `eta` 作为连续控制变量”。
+- 新增优化核心：`codes/crowd_bellman/g5_hcmbo.py`。
+- 新增 CLI：`codes/g5_runner.py`。
+- 实现变量：`z=(s,q)`，其中 `eta0=(8,8,8,8)` 固定，`q` 为每个 gate 的分段常数容量。
+- 实现方向--容量硬约束：
+  - `E` 只开放 `plus`；
+  - `W` 只开放 `minus`；
+  - `FREE` 同时开放 `plus/minus`，并通过 simplex 映射避免双向容量叠加；
+  - `CLOSED` 容量为 0。
+- 实现流程：
+  - all-FREE no-cap 参考估计 `qbar`；
+  - 外层方向候选生成与低保真筛选；
+  - 固定 `s` 下的可行映射 `q=T_s(x)`；
+  - RBF/LCB 风格的无依赖轻量 BO 候选生成；
+  - DFO 坐标抛光；
+  - 高保真复验；
+  - baseline、random search、HCMBO 方法对比。
+- V2 目标函数在优化器层计算：
+  - `J = lambda1*J1_eval + lambda2*J2_eval + lambda5*J5_eval + lambdaB*J_B_norm + lambdaR*J_R_norm + penalty`；
+  - 当前默认 `lambda=(1,1,1,1,0.1)`，`j2_scale=0.001`。
+- 输出文件：
+  - `G5_evaluation_log.csv`
+  - `G5_top_candidates.csv`
+  - `G5_method_comparison.csv`
+  - `G5_config_summary.json`
+  - `G5_best_control.json`
+  - `G5_capacity_profiles.png`
+  - `G5_flux_share.png`
+  - `G5_objective_trace.png`
+  - `G5_pareto_j1_j2.png`
+  - `G5_report.md`
 
-## 3.5 代码
+小矩阵复验命令：
 
-建议按低风险增量实现，不直接重写现有 G4。
+```powershell
+D:\Anaconda\envs\interpreter\python.exe codes\g5_runner.py --output-root codes/results/g5_hcmbo_v2_small --direction-candidate-limit 3 --shortlist-size 1 --initial-samples 3 --bo-iterations 1 --dfo-evaluations 0 --high-fidelity-top-k 2 --random-search-evaluations 1 --screen-steps 100 --screen-time-horizon 6 --screen-bellman-every 4 --opt-steps 240 --opt-time-horizon 14 --opt-bellman-every 4 --hf-steps 600 --hf-time-horizon 35 --hf-bellman-every 5 --save-every 100000 --density-contour-levels off
+```
 
-### 阶段 A：数据结构与配置
+结果：
 
-- [ ] 在 `scene_spec.py` 增加内部入口面定义，例如 `ChannelGateSpec`：
-  - `channel`
-  - `side = plus/minus`
-  - `axis = x/y`
-  - `face_index`
-  - `span`
-  - `waiting_region`
-- [ ] 在 `scene.toml` 增加每条通道的 `plus_gate` 和 `minus_gate`。
-- [x] 在路线或 case 配置中增加容量控制表，支持分段常数：
-  - `channel`
-  - `side`
-  - `time_start/time_end`
-  - `rate`
-- [x] 编译为运行时对象 `ChannelGateModel` / `GateCapacitySchedule`。
+- 结果目录：`codes/results/g5_hcmbo_v2_small`。
+- 高保真最优：`top=FREE,middle=FREE,lower_middle=FREE,bottom=FREE`，`q=inf`。
+- 高保真最优目标：`1.029660`。
+- 分项：`J1=0.621876`，`J2_eval=0.017620`，`J5=0.335860`，`J_B_norm=0.054303`，`J_R=0`，拒绝通量 `0`。
+- 第二个高保真候选为有限容量控制，`J1=0.596902`、`J5=0.284410` 优于 no-cap，但 `J2_eval=0.570091`、`J_B_norm=0.082251`、`J_R=1.224440`、拒绝通量 `673.657` 明显更差。
 
-说明：本轮没有要求手写 `scene.toml` 中的 gate 坐标，而是先从现有 `channel` 区域自动推导 `plus/minus` 入口面和等待区，以便 G2-v2 先形成可运行结果。若论文需要精确展示 $\Sigma_c^\pm$ 的几何定义，后续仍可补显式 `ChannelGateSpec`。
+当前结论：
 
-### 阶段 B：通量限制器
-
-- [x] 拆分 `update_density()`：
-  - `compute_face_fluxes()` 保留；
-  - 新增 `apply_internal_gate_limits(fx_by_group, fy_by_group, gates, schedules, time, dx)`；
-  - 新增“用给定通量更新密度”的函数。
-- [x] 在 `runner.py` 中改为先计算所有群体自由通量，再统一限流，最后更新密度。
-- [x] 记录限流诊断量并传给 `metrics.record_step()`。
-- [x] 增加质量守恒日志，特别是 cap 削减量。
-
-### 阶段 C：指标与目标函数
-
-- [x] 扩展 `CaseStats`：
-  - gate attempted/allowed/rejected cumulative；
-  - waiting mass cumulative/peak；
-  - binding time ratio。
-- [x] 扩展 `ObjectiveConfig`，新增 `lambda_jb` 和 `lambda_jr`，默认 0，保证旧实验不受影响。
-- [x] 扩展 `summary.json` 与 `timeseries.csv` 输出。
-
-### 阶段 D：G4-v2 优化器
-
-- [ ] 新建 `codes/crowd_bellman/g4_capacity_control.py` 或在旧 G4 中新增独立 `ControlVectorV2`，不要覆盖 `ControlVector(directions, eta)`。
-- [ ] `ControlVectorV2` 包含：
-  - `directions`
-  - `q` 或 `rates`，形状为 `C x 2 x L`
-  - `eta0` 只作为固定参数写入配置。
-- [ ] 先实现小预算随机搜索和坐标搜索，再考虑是否沿用 SA-HBO 的分块框架：
-  - 离散块：`s` 邻域搜索；
-  - 连续块：`q` 的投影随机近似或坐标扰动；
-  - 投影：保证 `s-q` 方向一致性和 `FREE` 的 `q^+ + q^- <= qbar`。
-
-阶段 D 需等 3.3 的 G2-v2 容量响应实验完成后再进入，避免在 `q` 的响应面和有效范围尚不清楚时直接做高维搜索。
-
-验收标准：旧 `g4_sahbo.py` 和旧结果可继续运行，新 G4-v2 有独立 CLI、配置和结果目录。
-
-## 3.6 论文
-
-论文不建议立即整体替换。建议分两步。
-
-第一步：作为扩展方案写入方法讨论或附录。
-
-- [ ] 在第 4 章方法中增加“内部入口容量控制扩展”小节。
-- [ ] 保留当前 `U(x)` 表示硬方向规则、`M(x)` 表示软几何引导的叙述。
-- [ ] 将 `eta` 从“优化变量”降级为“固定几何引导强度”时，要先引用敏感性验证结果。
-- [ ] 在实验章节中增加 `G2-v2：入口容量控制响应与可优化性验证`，先报告人工容量策略矩阵的响应面、目标 trade-off 和容量范围，再进入 G4-v2 优化结果。
-
-第二步：如果 G4-v2 实验通过，再替换主线。
-
-- [ ] 改写 4.7 优化变量：`z=(s,eta)` -> `z=(s,q)`。
-- [ ] 改写优化目标：`J = lambda_1 J1 + lambda_2 J2 + lambda_5 J5 + lambda_B J_B + lambda_R J_R`，其中 `lambda_R` 可取 0。
-- [ ] 改写 G4 实验：
-  - 旧 G4 作为 baseline 或消融；
-  - 新 G4-v2 作为主结果；
-  - 报告入口限流带来的排队、通过率和风险热点变化。
-- [ ] 更新图表：
-  - 入口限流机制示意图；
-  - G2-v2 容量强度响应曲线；
-  - G2-v2 同总预算容量分配对比图；
-  - `q` 时间分段示意；
-  - 限流前后等待区质量曲线；
-  - G4-v2 方法对比；
-  - 最优 `s,q` 可视化。
-
-验收标准：论文中的变量、代码配置、实验结果和图表使用同一套 `z=(s,q)` 口径，不再出现理论、代码、结果三套变量不一致。
-
-## 4. 推荐执行顺序
-
-1. **先做验证，不先改论文主线**：完成 `eta` 敏感性和单通道限流 smoke。
-2. **再实现通量限制器与指标**：把内部入口限流放进下层仿真器，并保证旧实验兼容。
-3. **先跑 G2-v2 容量响应实验**：证明 `q` 会产生可解释响应、目标之间存在 trade-off，并确定可优化容量范围。
-4. **再跑 G4-v2 小矩阵**：用独立结果目录比较 `z=(s,eta)` 与 `z=(s,q)`，并基于 G2-v2 的范围限制搜索空间。
-5. **最后改论文主线**：只有当 G2-v2 和 G4-v2 的机制、质量守恒、响应差异和目标改善都成立，才把论文主线切换到 `model v2`。
-
-## 5. 当前风险清单
-
-- `eta` 已完成小预算固定方向敏感性验证，目标函数相对变化低于 5% 阈值；但这还不是完整 G4-v2 替换依据，后续正式实验仍需报告更大预算和更多方向配置下的边界。
-- 内部入口面的几何定义如果只用 `probe_x` 近似，会不足以支撑论文中的 `Sigma_c^\pm` 表述。
-- 限流后排队可能触发 `rho_max` 裁剪，导致质量损失，需要显式记录或调整处理方式。
-- `q` 已通过机制 smoke，但尚未证明在完整行为模型下会形成足够稳定、可解释的响应面；必须先完成 G2-v2，再进入 G4-v2 优化。
-- `q` 参数维度较高，四通道、双方向、四时段就是 32 个连续变量，直接做高维黑箱优化预算会不够。
-- 如果不加入 `J_B` 或排队约束，优化器可能选择过强限流，得到管理上不可接受的方案。
-- 论文中已有 SA-HBO 和 G4 结果，切换变量会牵动第 4 章方法、第 5 章实验、图表、摘要和结论。
+- 算法和实验产物已跑通，可以进入扩预算实验。
+- 当前默认权重下，小矩阵高保真结果不支持声称“容量限流优于 no-cap”；更稳妥的论文表述是：V2 优化器已能生成可行候选并揭示效率/均衡与安全/等待之间的 trade-off。
+- 下一步应做权重敏感性和更大预算搜索，尤其是提高 `lambda5` 或降低 no-cap 基线优势时，检验有限容量方案是否能成为综合最优。

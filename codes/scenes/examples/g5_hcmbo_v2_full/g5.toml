@@ -1,0 +1,70 @@
+[g5]
+profile = "full"
+baseline_config = "../g2_multistage_directional/run_baseline.toml"
+output_root = "../../../results/g5_hcmbo_v2_full"
+seed = 23
+experiments = [
+  "main_hcmbo_full",
+  "no_dfo",
+  "no_lf_selection",
+  "no_jb",
+  "only_s_high",
+  "only_q_prior",
+  "random_search",
+]
+
+[hcmbo]
+time_segments = 4
+direction_candidate_limit = 50
+shortlist_size = 20
+screen_capacity_modes = ["high", "medium", "low"]
+initial_samples = 30
+bo_iterations = 80
+bo_candidate_pool = 80
+dfo_top_k = 1
+dfo_evaluations = 50
+dfo_initial_step = 0.25
+dfo_min_step = 0.04
+high_fidelity_top_k = 20
+random_search_evaluations = 400
+random_seed = 23
+fixed_eta = [8.0, 8.0, 8.0, 8.0]
+beta = 0.35
+qbar_multiplier = 1.2
+min_qbar = 0.2
+min_open_channels = 2
+j1_scale = 1.0
+j2_scale = 0.001
+j5_scale = 1.0
+jb_scale = 1.0
+jr_scale = 1.0
+cap_removed_relative_threshold = 0.02
+infeasible_penalty = 100.0
+
+[weights]
+lambda_j1 = 1.0
+lambda_j2 = 1.0
+lambda_j5 = 1.0
+lambda_jb = 1.0
+lambda_jr = 0.1
+
+[screen]
+steps = 120
+time_horizon = 6.0
+bellman_every = 4
+save_every = 100000
+density_contour_levels = 0
+
+[optimization]
+steps = 1600
+time_horizon = 160.0
+bellman_every = 4
+save_every = 100
+density_contour_levels = 0
+
+[high_fidelity]
+steps = 1600
+time_horizon = 160.0
+bellman_every = 5
+save_every = 100000
+density_contour_levels = 0
