@@ -1,8 +1,9 @@
 [g5]
 profile = "full"
 baseline_config = "../g2_multistage_directional/run_baseline.toml"
-output_root = "../../../results/g5_hcmbo_v2_full"
+output_root = "../../../results/g5_full_parallel"
 seed = 23
+workers = 7
 experiments = [
   "main_hcmbo_full",
   "no_dfo",

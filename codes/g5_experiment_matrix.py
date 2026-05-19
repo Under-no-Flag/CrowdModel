@@ -7,6 +7,7 @@ import math
 import sys
 import tomllib
 import traceback
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, fields, replace
 from pathlib import Path
 from typing import Callable
@@ -97,6 +98,7 @@ class LoadedMatrixConfig:
     force: bool | None = None
     fail_fast: bool | None = None
     experiments: str | None = None
+    workers: int | None = None
     profile_overrides: dict[str, object] | None = None
 
 
@@ -186,6 +188,7 @@ def load_matrix_config(path: Path) -> LoadedMatrixConfig:
         force=bool(g5_table["force"]) if "force" in g5_table else None,
         fail_fast=bool(g5_table["fail_fast"]) if "fail_fast" in g5_table else None,
         experiments=parse_experiments_config_value(experiments) if experiments is not None else None,
+        workers=int(g5_table["workers"]) if "workers" in g5_table else None,
         profile_overrides=profile_overrides,
     )
 
@@ -294,6 +297,12 @@ def main() -> None:
     parser.add_argument("--output-root", default=None)
     parser.add_argument("--baseline-config", default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Worker process count for parallel G5 matrix runs. Defaults to the number of selected experiments.",
+    )
     parser.add_argument("--force", action="store_true", help="Re-run experiments even when complete outputs exist.")
     parser.add_argument("--fail-fast", action="store_true")
     parser.add_argument(
@@ -313,7 +322,7 @@ def main() -> None:
     output_root = Path(
         args.output_root
         or loaded_config.output_root
-        or "codes/results/g5_hcmbo_v2_full"
+        or "codes/results/g5_full_parallel"
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     baseline_config = Path(args.baseline_config or loaded_config.baseline_config or DEFAULT_BASELINE_CONFIG).resolve()
@@ -321,6 +330,7 @@ def main() -> None:
     selected = parse_experiment_selection(args.experiments if args.experiments is not None else loaded_config.experiments or "", experiments)
     force = bool(args.force or loaded_config.force)
     fail_fast = bool(args.fail_fast or loaded_config.fail_fast)
+    workers = resolve_worker_count(args.workers if args.workers is not None else loaded_config.workers, len(selected))
 
     manifest: dict[str, object] = {
         "profile": profile.name,
@@ -328,54 +338,174 @@ def main() -> None:
         "baseline_config": str(baseline_config),
         "config_path": str(Path(args.config).resolve()) if args.config else None,
         "seed": seed,
+        "workers": workers,
         "argv": sys.argv,
         "experiments": [],
     }
+
+    failures = run_selected_experiments(
+        selected=selected,
+        manifest=manifest,
+        output_root=output_root,
+        profile=profile,
+        baseline_config=baseline_config,
+        force=force,
+        fail_fast=fail_fast,
+        workers=workers,
+    )
+    if failures:
+        raise SystemExit(f"G5 matrix failed for: {', '.join(failures)}")
+
+
+def resolve_worker_count(raw_workers: int | None, selected_count: int) -> int:
+    if selected_count <= 0:
+        return 1
+    if raw_workers is None:
+        return selected_count
+    return max(1, min(int(raw_workers), selected_count))
+
+
+def run_selected_experiments(
+    *,
+    selected: list[MatrixExperiment],
+    manifest: dict[str, object],
+    output_root: Path,
+    profile: MatrixProfile,
+    baseline_config: Path,
+    force: bool,
+    fail_fast: bool,
+    workers: int,
+) -> list[str]:
+    entries_by_name: dict[str, dict[str, object]] = {}
+    run_payloads: list[dict[str, object]] = []
     failures: list[str] = []
 
     for experiment in selected:
+        subdir = output_root / experiment.name
         entry = {
             "name": experiment.name,
             "description": experiment.description,
-            "output_dir": str(output_root / experiment.name),
+            "output_dir": str(subdir),
             "status": "pending",
         }
         cast_entries(manifest).append(entry)
-        write_manifest(output_root, manifest)
-        try:
-            subdir = output_root / experiment.name
-            if not force and experiment_complete(subdir):
-                payload = load_json(subdir / "G5_config_summary.json")
-                entry.update(
-                    {
-                        "status": "skipped_complete",
-                        "best_objective": nested_get(payload, "best_high_fidelity", "objective_value"),
-                        "best_case_id": nested_get(payload, "best_high_fidelity", "case_id"),
-                    }
-                )
-            else:
-                payload = experiment.runner(subdir, profile, baseline_config, force)
-                entry.update(
-                    {
-                        "status": "completed",
-                        "best_objective": nested_get(payload, "best_high_fidelity", "objective_value"),
-                        "best_case_id": nested_get(payload, "best_high_fidelity", "case_id"),
-                    }
-                )
-        except Exception as exc:
-            entry["status"] = "failed"
-            entry["error"] = str(exc)
-            entry["traceback"] = traceback.format_exc()
-            failures.append(experiment.name)
-            if fail_fast:
-                write_manifest(output_root, manifest)
-                raise
-        finally:
-            write_manifest(output_root, manifest)
+        entries_by_name[experiment.name] = entry
+        if not force and experiment_complete(subdir):
+            payload = load_json(subdir / "G5_config_summary.json")
+            entry.update(
+                {
+                    "status": "skipped_complete",
+                    "best_objective": nested_get(payload, "best_high_fidelity", "objective_value"),
+                    "best_case_id": nested_get(payload, "best_high_fidelity", "case_id"),
+                }
+            )
+        else:
+            entry["status"] = "running"
+            run_payloads.append(
+                {
+                    "name": experiment.name,
+                    "output_dir": str(subdir),
+                    "profile": profile,
+                    "baseline_config": str(baseline_config),
+                    "force": force,
+                }
+            )
+
+    write_manifest(output_root, manifest)
+    write_matrix_outputs(output_root=output_root, manifest=manifest)
+
+    if not run_payloads:
+        return failures
+
+    if workers == 1:
+        for payload in run_payloads:
+            result = run_experiment_payload(payload)
+            apply_experiment_result(
+                result=result,
+                entries_by_name=entries_by_name,
+                failures=failures,
+                output_root=output_root,
+                manifest=manifest,
+            )
+            if result.get("status") == "failed" and fail_fast:
+                raise RuntimeError(result.get("error", "G5 experiment failed"))
+        write_matrix_outputs(output_root=output_root, manifest=manifest)
+        return failures
+
+    with ProcessPoolExecutor(max_workers=workers) as executor:
+        futures = {executor.submit(run_experiment_payload, payload): str(payload["name"]) for payload in run_payloads}
+        for future in as_completed(futures):
+            name = futures[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                result = {
+                    "name": name,
+                    "status": "failed",
+                    "error": str(exc),
+                    "traceback": traceback.format_exc(),
+                }
+            apply_experiment_result(
+                result=result,
+                entries_by_name=entries_by_name,
+                failures=failures,
+                output_root=output_root,
+                manifest=manifest,
+            )
+            write_matrix_outputs(output_root=output_root, manifest=manifest)
+            if result.get("status") == "failed" and fail_fast:
+                for pending in futures:
+                    pending.cancel()
+                raise RuntimeError(result.get("error", "G5 experiment failed"))
 
     write_matrix_outputs(output_root=output_root, manifest=manifest)
-    if failures:
-        raise SystemExit(f"G5 matrix failed for: {', '.join(failures)}")
+    return failures
+
+
+def run_experiment_payload(payload: dict[str, object]) -> dict[str, object]:
+    name = str(payload["name"])
+    try:
+        by_name = {experiment.name: experiment for experiment in build_experiments()}
+        experiment = by_name[name]
+        output_dir = Path(str(payload["output_dir"]))
+        profile = payload["profile"]
+        if not isinstance(profile, MatrixProfile):
+            raise TypeError("profile payload must be a MatrixProfile")
+        result_payload = experiment.runner(
+            output_dir,
+            profile,
+            Path(str(payload["baseline_config"])),
+            bool(payload["force"]),
+        )
+        return {
+            "name": name,
+            "status": "completed",
+            "best_objective": nested_get(result_payload, "best_high_fidelity", "objective_value"),
+            "best_case_id": nested_get(result_payload, "best_high_fidelity", "case_id"),
+        }
+    except Exception as exc:
+        return {
+            "name": name,
+            "status": "failed",
+            "error": str(exc),
+            "traceback": traceback.format_exc(),
+        }
+
+
+def apply_experiment_result(
+    *,
+    result: dict[str, object],
+    entries_by_name: dict[str, dict[str, object]],
+    failures: list[str],
+    output_root: Path,
+    manifest: dict[str, object],
+) -> None:
+    name = str(result["name"])
+    entry = entries_by_name[name]
+    entry.update(result)
+    if result.get("status") == "failed" and name not in failures:
+        failures.append(name)
+    write_manifest(output_root, manifest)
 
 
 def build_experiments() -> list[MatrixExperiment]:
