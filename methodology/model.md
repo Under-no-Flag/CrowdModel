@@ -1,770 +1,195 @@
+# 基于内部入口通行速率控制的 Bellman--守恒律人群管控模型
 
-# 目标
-## 目标描述
-在上海外滩区域，游客一般可以从多个阶梯通道登上外滩观景平台。为了避免游客只从一个通道登上平台或游览完后只从一个通道离开造成拥堵，管理方通过设置不同通道的通行方向来引导游客分散登上或离开平台。
-外滩观景平台的通道从北向南依次编号为1,2,...,10分布。
-游客的一般路线，一般是从5,6号通道登上观景平台，然后向南边游览，最后可能从 8,9,10等通道离开，在下街沿回到5,6号通道前的区域，再返回南京东路步行街。
+本文模型面向外滩观景平台多通道人群管控问题。管理方可以同时设置通道方向规则和通道入口通行速率上限，用于分散上下平台流量、降低局部高密度暴露，并避免将风险集中到少数通道。
 
-管理方一般会设置4号通道只上不下，7号通道只下不上的单向通行规则，来引导游客分散登上和离开平台。
+本文将可控管控变量写为
+$$
+z=(s,q).
+$$
+其中 $s$ 表示各通道方向配置，$q$ 表示各内部通道入口的通行速率控制。几何引导强度不再作为优化变量，而是作为固定模型参数 $\eta_0$ 用于构造度量张量 $M(x;\eta_0)$。
 
-希望设计一个连续介质（宏观）人群模型，能够模拟不同通道的单向通行规则对人群流动的影响，并且能够模拟不同通道的几何引导。通过这个模型，可以评估不同管控措施对游客流动效率和安全性的影响，为管理方提供科学的决策支持。
+---
 
-## 对宏观模型的要求
+## 1. 空间、通道与人群状态
 
-- 能够模拟不同通道的单向通行规则对人群流动的影响
-- 能够模拟不同通道的几何引导
-- 能够设置游客路线，达到一个地点后前往另一个地点
+设可通行区域为 $\Omega_w\subset\Omega$，观景平台与下街沿之间共有 $C$ 条内部通道。第 $c$ 条通道的参考切向单位向量记为 $\tau_c(x)$，法向记为 $n_c(x)$，通道区域记为 $\Omega_c$。通道的两个方向分别记为参考正向 $(+)$ 与参考反向 $(-)$。
 
-## 连续介质（宏观）人群模型
-### 连续性方程（密度更新）
-
-$$\frac{\partial \rho}{\partial t} + \nabla \cdot (\rho \mathbf{v}) = 0$$
-
-
-
-其中，速度 $\mathbf{v} = f(\rho) \frac{-\nabla \phi}{|\nabla \phi|}$
-
-$f(\rho)$是速度-密度关系的函数。在Greenshields 模型中：
-
-
-$f(\rho) = v_{max}(1 - \frac{\rho}{\rho_{max}})$
-
-### 程函方程（势场更新）
-$$|\nabla \phi| = \frac{1}{f(\rho)}$$
-
-
-
-## 引入管控措施变量接口（通道通行方向控制、隔离栏位置（后续实现，现暂不考虑））
-
-如何改进Hughes 人群宏观方程，使得可以设置某些通道（通道由几何边界定义）的可通行方向
-
-### 引入度量张量 $\mathbf{M}$ 修改程函方程，实现通道几何引导（各向异性但不单向）：
-
-#### 令$\mathbf{M}(x)$ 为对称正定矩阵（可随空间变化，通道内外不同。把程函方程改成各向异性 eikonal：
-
-
-$$\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi}=\frac{1}{f(\rho)}$$
-
-对应的“最陡下降方向”也要改为$\mathbf{M}$意义下的梯度方向。所以速度场定义为：
-
-$$\mathbf{v} = f(\rho) \mathbf{u}= f(\rho) \frac{-\mathbf{M}(x)\nabla \phi}{\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi}}$$
-
-连续性方程不变
-
-#### 如何用$\mathbf{M}(x)$表达“通道”几何（让人更愿意沿通道走）
-
-假设通道区域$\mathbf{\Omega}_c$由几何边界定义，并给出通道切向单位向量场 $\tau(x)$（沿通道方向），法向 $n(x)$（垂直通道方向）。构造：
-
-$$\mathbf{M}(x)=\alpha(x) \tau \tau^{\top}+\beta(x) n n^{\top}, \quad \alpha \gg \beta(\text { 通道内 })$$
-这会显著抬高横向“代价”，让$\phi$的最短时间路径更倾向于沿$\tau$ 前进。
-
-> **代码实现**: `codes/crowd_bellman/core.py:94-107` (`tensor_from_tau`)
-> ```python
-> def tensor_from_tau(tau_x, tau_y, alpha, beta):
->     n_x = -tau_y
->     n_y = tau_x
->     m11 = alpha * tau_x * tau_x + beta * n_x * n_x
->     m12 = alpha * tau_x * tau_y + beta * n_x * n_y
->     m22 = alpha * tau_y * tau_y + beta * n_y * n_y
->     return m11, m12, m22
-> ```
-
-### 单向通行：把程函方程写成“控制约束”的 Hamilton–Jacobi
-
-把 Hughes 的“行走方向选择”从固定$\frac{-\nabla \phi}{|\nabla \phi|}$改成：
-
-在每个位置$x$，行人只能从允许的方向集合$U(x)$ 里选方向。
-
-令速度为
-$\mathbf{v}=f(\rho)\mathbf{u}$，其中
-$$\mathbf{u}(x) \in U(x), \quad |\mathbf{u}|=1$$
-
-对应的“到出口最小时间势函数”$\phi$满足
-
-$$\max _{\mathbf{u} \in U(x)}\{-f(\rho) \mathbf{u} \cdot \nabla \phi\}=1$$
-- 若 $U(x)=\{ \mathbf{u}: |\mathbf{u}|=1\}$，就退化成$|\nabla \phi| = \frac{1}{f(\rho)}$，即原始 Hughes 程函方程。
-- 若在单向通道内规定只允许沿$+\tau$走：
-$$U(x)=\{ \tau(x)\}, \quad x \in \Omega_c$$
-则上式直接变成一个“单向”线性一阶方程:
-
-
-
-$$-f(\rho) \tau(x) \cdot \nabla \phi=1 \quad \Longleftrightarrow \quad \tau(x) \cdot \nabla \phi=-\frac{1}{f(\rho)} $$
-
-然后速度方向取“达到最大值的最优控制”
-
-$$\mathbf{u}^*(x) = \text{arg} \max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \nabla \phi\},\quad \mathbf{v}=f(\rho)\mathbf{u}^*(x) $$
-
-接口层面只需要提供：
-- 通道区域指示函数 $\chi_c(x) \in \{0,1\}$
-- 通道切向$\tau(x)$
-- 通行方向标志$s_c\in \{+1,-1\}$
-
-
-
-### 整合两个修改
-
-- 势函数$\phi$ 不再解 eikonal，而解离散的 Bellman/HJB：
-
-$$\phi(x)=\min _{u \in U(x)}\left(\phi(x+\Delta x u)+\frac{\Delta x}{f(\rho)} \cdot \frac{1}{\sqrt{u^{\top} M(x) u}}\right)$$
-
-- 最优方向$\mathbf{u}^*$直接用 “使$\phi(\text{neighbor})+\text{stepCost}$ 最小的方向” 得到，严格对应argmax。
-
-> **代码实现**: `codes/crowd_bellman/core.py:132-174` (`solve_bellman`)
-> ```python
-> def solve_bellman(walkable, exit_mask, allowed_mask, speed, step_factor, f_eps):
->     phi = np.full((ny, nx), np.inf, dtype=float)
->     for y, x in np.argwhere(exit_mask & walkable):
->         phi[y, x] = 0.0  # 边界条件
->     while queue:
->         value, y, x = heappop(queue)
->         for k in range(len(DIRECTIONS.names)):
->             candidate = value + step_factor[py, px, k] / speed_safe[py, px]
->             if candidate + 1.0e-12 < phi[py, px]:
->                 phi[py, px] = candidate
-> ```
-
-
-## 游客路线设置
-多阶段 + 多候选下一目标 + 概率分流
-
-- 处于阶段 $s$ 的游客，
-- 会在若干候选路线/目标中，
-- 按概率模型选择下一步去哪里
-### 阶段 + 路线类型双指标
-把原来的阶段密度
-$$\rho_s(x,t)$$
-扩展成
-$$\rho_{s,r}(x,t),$$
-其中：
-- $s$：当前阶段；
-
-- $r$：该阶段内所选择的路线/目标类型。
-
-
-例如在“下平台离场阶段” $s=3$ 中，可以有：
-- $r=1$：去 8 号通道；
-- $r=2$：去 9 号通道；
-- $r=3$：去 10 号通道。
+人群按行为阶段与路线划分为若干子群体 $(\sigma,r)$。每个子群体具有密度
+$$
+\rho_{\sigma,r}(x,t),
+$$
 总密度为
-$$\rho(x,t)=\sum_s\sum_r \rho_{s,r}(x,t).$$
-速度函数仍然用总密度：
-$$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right).$$
-这样拥堵仍然是共享的，但不同意图人群各走各的方向。
-### 每个“阶段-路线”都有自己的势函数
-对每个 $(s,r)$，定义势函数
-$$\phi_{s,r}(x),$$
-表示“处于阶段 $s$、且计划走路线 $r$ 的游客，从 $x$ 到其当前目标的最小剩余时间”。
-对应 Bellman 方程：
-$$\phi_{s,r}(x)=
-\min_{u\in U_{s,r}(x)}
-\left(
-\phi_{s,r}(x+\Delta x\,u)
+$$
+\rho(x,t)=\sum_{\sigma,r}\rho_{\sigma,r}(x,t).
+$$
+阶段转移与路线偏好由历史数据或先验信息给定，记为固定参数 $\hat p$。本文不把 $\hat p$ 作为管控变量优化。
+
+---
+
+## 2. 密度依赖速度与固定几何引导
+
+本文采用密度依赖的自由行走速度函数，例如 Greenshields 型关系：
+$$
+f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right)_+.
+$$
+
+通道几何引导由固定度量张量描述。对通道区域内的点，可写为
+$$
+M_c(x;\eta_0)=\beta_c\left(\eta_0\,\tau_c\tau_c^\top+n_c n_c^\top\right),
+\qquad \eta_0\ge 1.
+$$
+该张量改变路径代价和最优方向，使行人更倾向于沿通道切向移动。$\eta_0$ 是模型设定或校准后的固定参数，不属于本文的优化控制变量。
+
+---
+
+## 3. 通道方向配置
+
+第 $c$ 条通道的方向状态为
+$$
+s_c\in\{+1,-1,0,\varnothing\}.
+$$
+含义如下：
+
+- $s_c=+1$：仅允许参考正向通行；
+- $s_c=-1$：仅允许参考反向通行；
+- $s_c=0$：允许双向通行；
+- $s_c=\varnothing$：通道关闭。
+
+给定 $s$ 后，可得到位置相关的允许方向集合
+$$
+U_{\sigma,r}(x;s)\subset \mathbb S^1.
+$$
+在非通道区域，$U_{\sigma,r}$ 由可通行区域边界与局部可达方向决定；在通道区域，$U_{\sigma,r}$ 还必须满足对应通道方向规则。关闭通道对应不可达或无允许步进方向。
+
+---
+
+## 4. Bellman 势函数与最优速度
+
+对每个子群体 $(\sigma,r)$，势函数 $\phi_{\sigma,r}$ 表示到当前阶段目标集的最小广义行走代价。离散形式可写为
+$$
+\phi_{\sigma,r}(x)=
+\min_{u\in U_{\sigma,r}(x;s)}
+\left[
+\phi_{\sigma,r}(x+\Delta x\,u)
 +
-\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}
-\right).$$
-最优方向：
-$$u^*_{s,r}(x)=
-\operatorname*{arg\,min}_{u\in U_{s,r}(x)}
-\left(
-\phi_{s,r}(x+\Delta x\,u)
+\Delta x\,
+\frac{1}{f(\rho(x,t))}
+\frac{1}{\sqrt{u^\top M(x;\eta_0)u}}
+\right].
+$$
+
+相应的最优方向为
+$$
+u_{\sigma,r}^*(x,t)
+\in
+\arg\min_{u\in U_{\sigma,r}(x;s)}(\cdots),
+$$
+速度场为
+$$
+v_{\sigma,r}(x,t)=f(\rho(x,t))\,u_{\sigma,r}^*(x,t).
+$$
+
+因此，方向配置 $s$ 通过允许方向集合改变可行方向，固定度量 $M(x;\eta_0)$ 通过代价结构表达通道几何引导，拥堵项 $f(\rho)$ 通过总密度耦合所有子群体。
+
+---
+
+## 5. 内部入口通行速率控制
+
+仅设置方向规则无法表达“虽然通道允许通行，但入口需要限流”的管理动作。为此，本文在通道内部入口处引入通行速率控制
+$$
+q=\{q_c^+(t),q_c^-(t)\}_{c=1}^C.
+$$
+其中 $q_c^+(t)$ 表示第 $c$ 条通道参考正向入口在时刻 $t$ 的最大允许通行速率，$q_c^-(t)$ 表示参考反向入口的最大允许通行速率。
+
+该控制是内部界面通量约束，不是外部边界入流。它限制已经在系统中的人群进入某条通道的速率。若入口需求超过控制速率，超出部分在入口上游等待或排队，不从系统中删除。
+
+### 5.1 方向与速率一致性
+
+通道方向规则与入口速率必须满足硬一致性约束：
+$$
+\begin{aligned}
+s_c=+1 &\Rightarrow q_c^-(t)=0,\\
+s_c=-1 &\Rightarrow q_c^+(t)=0,\\
+s_c=\varnothing &\Rightarrow q_c^+(t)=q_c^-(t)=0,\\
+s_c=0 &\Rightarrow q_c^+(t)+q_c^-(t)\le \bar q_c.
+\end{aligned}
+$$
+其中 $\bar q_c$ 是第 $c$ 条通道的物理或管理容量上限。
+
+### 5.2 企图通行、实际放行与等待
+
+记自由运动计算得到的入口企图通量为 $A_c^\pm(t)$。在入口速率控制下，实际允许进入通道的通量为
+$$
+\hat A_c^\pm(t)=\min\{A_c^\pm(t),q_c^\pm(t)\}.
+$$
+当 $A_c^\pm(t)>0$ 时，对穿越入口界面的数值通量施加比例因子
+$$
+\theta_c^\pm(t)=\frac{\hat A_c^\pm(t)}{A_c^\pm(t)}\in[0,1].
+$$
+实际穿越通量按 $\theta_c^\pm$ 缩放，未被放行的质量
+$$
+A_c^\pm(t)-\hat A_c^\pm(t)
+$$
+保留在入口上游，形成等待或局部排队量。这样，限流控制只改变内部通道入口通量，不破坏整体质量守恒。
+
+---
+
+## 6. 守恒律密度推进
+
+对每个子群体，密度满足守恒律
+$$
+\partial_t \rho_{\sigma,r}
 +
-\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}
-\right).$$
-速度场：
-$$\mathbf v_{s,r}(x)=f(\rho)\,u^*_{s,r}(x).$$
-
-通常第一版里可以让不同 $r$ 共享同一个 $U_s,M_s$，只改目标区即可：
-- $\phi_{3,1}$：目标是 8 号通道下口；
-- $\phi_{3,2}$：目标是 9 号通道下口；
-- $\phi_{3,3}$：目标是 10 号通道下口
-
-### 概率选择发生在什么时候
-阶段切换时选择下一路线
-例如游客到达平台南侧后，进入“离场阶段”前，按概率选择去 8、9、10 号通道之一。
-这样路线选择发生在一个明确事件点：
-“到达当前阶段目标区 $G_s$ 时”。
-若从阶段 $s$ 切换到下一阶段 $s+1$ 时，有多个候选路线 $r\in\{1,\dots,R_{s+1}\}$，则转移项写成
-$$Q_{s\to (s+1,r)}(x,t)
+\nabla\cdot\left(\rho_{\sigma,r}v_{\sigma,r}\right)
 =
-p_{s\to r}(x,t)\,\kappa_s\,\chi_{G_s}(x)\,\rho_s(x,t),$$
-其中：
-- $\kappa_s$：切换率；
-- $\chi_{G_s}(x)$：当前阶段目标区；
-- $p_{s\to r}(x,t)$：选择路线 $r$ 的概率；
-- $\sum_r p_{s\to r}(x,t)=1$。
+\mathcal T_{\sigma,r}(\rho;\hat p),
+$$
+其中 $\mathcal T_{\sigma,r}$ 表示阶段转移与路线切换项。该项由固定行为参数 $\hat p$ 决定。
 
-于是：
-$$\frac{\partial \rho_s}{\partial t}
-+\nabla\cdot(\rho_s \mathbf v_s)
-=
-- \sum_r Q_{s\to (s+1,r)},$$
-$$\frac{\partial \rho_{s+1,r}}{\partial t}
-+\nabla\cdot(\rho_{s+1,r}\mathbf v_{s+1,r})
-=
-Q_{s\to (s+1,r)} - Q_{(s+1,r)\to \cdots}.$$
+数值实现采用显式有限体积推进。普通网格边界通量由上风格式计算；内部通道入口边界通量在自由通量基础上再施加上一节的 $\theta_c^\pm$。因此，模型同时满足：
 
-### 概率模型怎么构造
+- 外部入流、内部移动、阶段转移和出口离开的一致质量账本；
+- 通道方向规则对应的不可行方向约束；
+- 入口限流导致的上游等待保留；
+- 多子群体通过总密度 $\rho$ 共享拥堵影响。
 
-#### 方式 1：固定概率
-例如在离场阶段：
-$$p_{3\to 8}=0.2,\qquad
-p_{3\to 9}=0.3,\qquad
-p_{3\to 10}=0.5.$$
-这表示进入离场阶段的人中，固定有 20%、30%、50% 分别去这些通道。
-优点是简单、稳、容易实现。
-缺点是不随拥堵和位置变化。
-适合做第一版验证。
+---
 
+## 7. 观测输出与通道流量
 
-#### 方式 2：按势值/旅行时间的 Logit 概率（后续升级，暂不考虑）
-这最适合你当前模型，因为你本来就有势函数 $\phi$，它正好代表“剩余代价”。
-设某阶段有 $R$ 条候选路线，每条路线对应一个值函数 $\phi_{s+1,r}$。
-在决策区域 $D_s$ 内，对每条候选路线定义当前代价：
-$$C_r(x)=\phi_{s+1,r}(x).$$
-然后用离散选择模型（softmax / multinomial logit）：
-$$p_{s\to r}(x)
-=
-\frac{\exp(-\theta C_r(x))}
-{\sum_{q=1}^{R}\exp(-\theta C_q(x))}.$$
-其中 $\theta>0$ 是敏感度参数：
-- $\theta$ 大：更偏向最短时间路线；
-- $\theta$ 小：选择更随机。
+仿真算子记为
+$$
+(\rho,\phi,v,B,R)=\mathcal S(z;\hat p,\eta_0),
+\qquad z=(s,q).
+$$
+其中 $B$ 表示各内部入口等待或阻塞量，$R$ 表示各通道实际累计通过量。需要区分三类量：
 
-这个非常自然，因为：
+- 控制容量 $q_c^\pm(t)$：管理方设置的最大允许通行速率；
+- 企图通量 $A_c^\pm(t)$：自由运动下希望穿越入口的通量；
+- 实际通量 $\hat A_c^\pm(t)$ 与累计通过量 $R_c$：真正穿过通道入口的通量和累计值。
 
-- $\phi$ 已经是“最小剩余时间”；
-- 越小的 $\phi$ 越有吸引力；
-拥堵会通过 $f(\rho)$ 自动影响 $\phi$，于是概率也会随拥堵变化。
+通道负载均衡、实验统计与优化目标应基于实际累计通过量 $R_c$，而不是直接基于控制容量 $q_c^\pm(t)$。
 
-#### 方式 3：加入路线偏好常数的 Logit（后续升级，暂不考虑）
-如果现实中游客并不完全按最短时间选路，还会偏好“熟悉路线”“更宽通道”“更靠近原来入口”，可以加一个吸引力常数 $b_r$：
-$$p_{s\to r}(x)
-=
-\frac{\exp\bigl(-\theta C_r(x)+b_r\bigr)}
-{\sum_q \exp\bigl(-\theta C_q(x)+b_q\bigr)}.$$
-其中 $b_r$ 可以表示：
-- 8 号通道更显眼；
-- 9 号通道更宽；
-- 10 号通道更远但景观更好。
-这会让模型更贴近外滩管理经验。
+---
 
-#### 方式 4：容量/拥堵修正概率（后续升级，暂不考虑）
-如果想让管理策略“主动分流”，还可以把候选通道当前拥堵、容量、管控强度纳入概率：
-$$C_r(x,t)=\phi_{s+1,r}(x,t)+\lambda\,\Psi_r(t),$$
-其中 $\Psi_r(t)$ 可以是：
-- 该通道附近平均密度；
-- 排队长度；
-- 实时拥堵指数。
+## 8. 管控变量与非管控参数边界
 
-于是
-$$p_{s\to r}(x,t)
-=
-\frac{\exp(-\theta C_r(x,t))}
-{\sum_q \exp(-\theta C_q(x,t))}.$$
-这就能模拟“人会避开拥挤出口”的行为。
+本文的当前管控问题只优化
+$$
+z=(s,q).
+$$
+下列量不作为当前优化变量：
 
+- $\eta_0$：固定几何引导强度，用于构造度量张量；
+- $\hat p$：固定阶段转移与路线偏好参数；
+- $\xi$ 等潜在决策区位置参数：保留为后续扩展接口。
 
-####
-# 目标
-## 目标描述
-在上海外滩区域，游客一般可以从多个阶梯通道登上外滩观景平台。为了避免游客只从一个通道登上平台或游览完后只从一个通道离开造成拥堵，管理方通过设置不同通道的通行方向来引导游客分散登上或离开平台。
-外滩观景平台的通道从北向南依次编号为1,2,...,10分布。
-游客的一般路线，一般是从5,6号通道登上观景平台，然后向南边游览，最后可能从 8,9,10等通道离开，在下街沿回到5,6号通道前的区域，再返回南京东路步行街。
+这种边界划分使管控含义更清晰：$s$ 决定通道是否允许某方向通行，$q$ 决定允许通行时入口放行多少人，$\eta_0$ 与 $\hat p$ 描述人群如何响应管控。
 
-管理方一般会设置4号通道只上不下，7号通道只下不上的单向通行规则，来引导游客分散登上和离开平台。
+---
 
-希望设计一个连续介质（宏观）人群模型，能够模拟不同通道的单向通行规则对人群流动的影响，并且能够模拟不同通道的几何引导。通过这个模型，可以评估不同管控措施对游客流动效率和安全性的影响，为管理方提供科学的决策支持。
+## 9. 与论文实验的关系
 
-## 对宏观模型的要求
+机制实验用于验证 $U(x;s)$、$M(x;\eta_0)$ 与行为阶段结构能否产生合理的方向组织、通道接近和流线响应。优化实验则在固定 $\hat p$ 与 $\eta_0$ 的条件下，比较不同 $z=(s,q)$ 对效率、安全、通道均衡、入口等待和控制平滑性的影响。
 
-- 能够模拟不同通道的单向通行规则对人群流动的影响
-- 能够模拟不同通道的几何引导
-- 能够设置游客路线，达到一个地点后前往另一个地点
-
-## 连续介质（宏观）人群模型
-### 连续性方程（密度更新）
-
-$$\frac{\partial \rho}{\partial t} + \nabla \cdot (\rho \mathbf{v}) = 0$$
-
-
-
-其中，速度 $\mathbf{v} = f(\rho) \frac{-\nabla \phi}{|\nabla \phi|}$
-
-$f(\rho)$是速度-密度关系的函数。在Greenshields 模型中：
-
-$ f(\rho) = v_{max}(1 - \frac{\rho}{\rho_{max}}) $。
-
-### 程函方程（势场更新）
-$$|\nabla \phi| = \frac{1}{f(\rho)}$$
-
-
-
-## 引入管控措施变量接口（通道通行方向控制、隔离栏位置（后续实现，现暂不考虑））
-
-如何改进Hughes 人群宏观方程，使得可以设置某些通道（通道由几何边界定义）的可通行方向
-
-### 引入度量张量 $\mathbf{M}$ 修改程函方程，实现通道几何引导（各向异性但不单向）：
-
-#### 令$\mathbf{M}(x)$ 为对称正定矩阵（可随空间变化，通道内外不同。把程函方程改成各向异性 eikonal：
-
-
-$$\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi}=\frac{1}{f(\rho)}$$
-
-对应的“最陡下降方向”也要改为$\mathbf{M}$意义下的梯度方向。所以速度场定义为：
-
-$$\mathbf{v} = f(\rho) \mathbf{u}= f(\rho) \frac{-\mathbf{M}(x)\nabla \phi}{\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi}}$$
-
-连续性方程不变
-
-#### 如何用$\mathbf{M}(x)$表达“通道”几何（让人更愿意沿通道走）
-
-假设通道区域$\mathbf{\Omega}_c$由几何边界定义，并给出通道切向单位向量场 $\tau(x)$（沿通道方向），法向 $n(x)$（垂直通道方向）。构造：
-
-$$\mathbf{M}(x)=\alpha(x) \tau \tau^{\top}+\beta(x) n n^{\top}, \quad \alpha \gg \beta(\text { 通道内 })$$
-这会显著抬高横向“代价”，让$\phi$的最短时间路径更倾向于沿$\tau$ 前进。
-
-> **代码实现**: `codes/crowd_bellman/core.py:94-107` (`tensor_from_tau`)
-> ```python
-> def tensor_from_tau(tau_x, tau_y, alpha, beta):
->     n_x = -tau_y
->     n_y = tau_x
->     m11 = alpha * tau_x * tau_x + beta * n_x * n_x
->     m12 = alpha * tau_x * tau_y + beta * n_x * n_y
->     m22 = alpha * tau_y * tau_y + beta * n_y * n_y
->     return m11, m12, m22
-> ```
-
-### 单向通行：把程函方程写成“控制约束”的 Hamilton–Jacobi
-
-把 Hughes 的“行走方向选择”从固定$\frac{-\nabla \phi}{|\nabla \phi|}$改成：
-
-在每个位置$x$，行人只能从允许的方向集合$U(x)$ 里选方向。
-
-令速度为
-$\mathbf{v}=f(\rho)\mathbf{u}$，其中
-$$\mathbf{u}(x) \in U(x), \quad |\mathbf{u}|=1$$
-
-对应的“到出口最小时间势函数”$\phi$满足
-
-$$\max _{\mathbf{u} \in U(x)}\{-f(\rho) \mathbf{u} \cdot \nabla \phi\}=1$$
-- 若 $U(x)=\{ \mathbf{u}: |\mathbf{u}|=1\}$，就退化成$|\nabla \phi| = \frac{1}{f(\rho)}$，即原始 Hughes 程函方程。
-- 若在单向通道内规定只允许沿$+\tau$走：
-$$U(x)=\{ \tau(x)\}, \quad x \in \Omega_c$$
-则上式直接变成一个“单向”线性一阶方程:
-
-
-
-$$-f(\rho) \tau(x) \cdot \nabla \phi=1 \quad \Longleftrightarrow \quad \tau(x) \cdot \nabla \phi=-\frac{1}{f(\rho)} $$
-
-然后速度方向取“达到最大值的最优控制”
-
-$$\mathbf{u}^*(x) = \text{arg} \max_{\mathbf{u} \in U(x)} \{- \mathbf{u} \cdot \nabla \phi\},\quad \mathbf{v}=f(\rho)\mathbf{u}^*(x) $$
-
-接口层面只需要提供：
-- 通道区域指示函数 $\chi_c(x) \in \{0,1\}$
-- 通道切向$\tau(x)$
-- 通行方向标志$s_c\in \{+1,-1\}$
-
-
-
-### 整合两个修改
-
-- 势函数$\phi$ 不再解 eikonal，而解离散的 Bellman/HJB：
-
-$$\phi(x)=\min _{u \in U(x)}\left(\phi(x+\Delta x u)+\frac{\Delta x}{f(\rho)} \cdot \frac{1}{\sqrt{u^{\top} M(x) u}}\right)$$
-
-- 最优方向$\mathbf{u}^*$直接用 “使$\phi(\text{neighbor})+\text{stepCost}$ 最小的方向” 得到，严格对应argmax。
-
-> **代码实现**: `codes/crowd_bellman/core.py:132-174` (`solve_bellman`)
-> ```python
-> def solve_bellman(walkable, exit_mask, allowed_mask, speed, step_factor, f_eps):
->     phi = np.full((ny, nx), np.inf, dtype=float)
->     for y, x in np.argwhere(exit_mask & walkable):
->         phi[y, x] = 0.0  # 边界条件
->     while queue:
->         value, y, x = heappop(queue)
->         for k in range(len(DIRECTIONS.names)):
->             candidate = value + step_factor[py, px, k] / speed_safe[py, px]
->             if candidate + 1.0e-12 < phi[py, px]:
->                 phi[py, px] = candidate
-> ```
-
-
-## 游客路线设置
-多阶段 + 多候选下一目标 + 概率分流
-
-- 处于阶段 $s$ 的游客，
-- 会在若干候选路线/目标中，
-- 按概率模型选择下一步去哪里
-### 阶段 + 路线类型双指标
-把原来的阶段密度
-$$\rho_s(x,t)$$
-扩展成
-$$\rho_{s,r}(x,t),$$
-其中：
-- $s$：当前阶段；
-
-- $r$：该阶段内所选择的路线/目标类型。
-
-
-例如在“下平台离场阶段” $s=3$ 中，可以有：
-- $r=1$：去 8 号通道；
-- $r=2$：去 9 号通道；
-- $r=3$：去 10 号通道。
-总密度为
-$$\rho(x,t)=\sum_s\sum_r \rho_{s,r}(x,t).$$
-速度函数仍然用总密度：
-$$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right).$$
-这样拥堵仍然是共享的，但不同意图人群各走各的方向。
-### 每个“阶段-路线”都有自己的势函数
-对每个 $(s,r)$，定义势函数
-$$\phi_{s,r}(x),$$
-表示“处于阶段 $s$、且计划走路线 $r$ 的游客，从 $x$ 到其当前目标的最小剩余时间”。
-对应 Bellman 方程：
-$$\phi_{s,r}(x)=
-\min_{u\in U_{s,r}(x)}
-\left(
-\phi_{s,r}(x+\Delta x\,u)
-+
-\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}
-\right).$$
-最优方向：
-$$u^*_{s,r}(x)=
-\operatorname*{arg\,min}_{u\in U_{s,r}(x)}
-\left(
-\phi_{s,r}(x+\Delta x\,u)
-+
-\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}
-\right).$$
-速度场：
-$$\mathbf v_{s,r}(x)=f(\rho)\,u^*_{s,r}(x).$$
-
-通常第一版里可以让不同 $r$ 共享同一个 $U_s,M_s$，只改目标区即可：
-- $\phi_{3,1}$：目标是 8 号通道下口；
-- $\phi_{3,2}$：目标是 9 号通道下口；
-- $\phi_{3,3}$：目标是 10 号通道下口
-
-### 概率选择发生在什么时候
-阶段切换时选择下一路线
-例如游客到达平台南侧后，进入“离场阶段”前，按概率选择去 8、9、10 号通道之一。
-这样路线选择发生在一个明确事件点：
-“到达当前阶段目标区 $G_s$ 时”。
-若从阶段 $s$ 切换到下一阶段 $s+1$ 时，有多个候选路线 $r\in\{1,\dots,R_{s+1}\}$，则转移项写成
-$$Q_{s\to (s+1,r)}(x,t)
-=
-p_{s\to r}(x,t)\,\kappa_s\,\chi_{G_s}(x)\,\rho_s(x,t),$$
-其中：
-- $\kappa_s$：切换率；
-- $\chi_{G_s}(x)$：当前阶段目标区；
-- $p_{s\to r}(x,t)$：选择路线 $r$ 的概率；
-- $\sum_r p_{s\to r}(x,t)=1$。
-
-于是：
-$$\frac{\partial \rho_s}{\partial t}
-+\nabla\cdot(\rho_s \mathbf v_s)
-=
-- \sum_r Q_{s\to (s+1,r)},$$
-$$\frac{\partial \rho_{s+1,r}}{\partial t}
-+\nabla\cdot(\rho_{s+1,r}\mathbf v_{s+1,r})
-=
-Q_{s\to (s+1,r)} - Q_{(s+1,r)\to \cdots}.$$
-
-### 概率模型怎么构造
-
-#### 方式 1：固定概率
-例如在离场阶段：
-$$p_{3\to 8}=0.2,\qquad
-p_{3\to 9}=0.3,\qquad
-p_{3\to 10}=0.5.$$
-这表示进入离场阶段的人中，固定有 20%、30%、50% 分别去这些通道。
-优点是简单、稳、容易实现。
-缺点是不随拥堵和位置变化。
-适合做第一版验证。
-
-
-#### 方式 2：按势值/旅行时间的 Logit 概率（后续升级，暂不考虑）
-这最适合你当前模型，因为你本来就有势函数 $\phi$，它正好代表“剩余代价”。
-设某阶段有 $R$ 条候选路线，每条路线对应一个值函数 $\phi_{s+1,r}$。
-在决策区域 $D_s$ 内，对每条候选路线定义当前代价：
-$$C_r(x)=\phi_{s+1,r}(x).$$
-然后用离散选择模型（softmax / multinomial logit）：
-$$p_{s\to r}(x)
-=
-\frac{\exp(-\theta C_r(x))}
-{\sum_{q=1}^{R}\exp(-\theta C_q(x))}.$$
-其中 $\theta>0$ 是敏感度参数：
-- $\theta$ 大：更偏向最短时间路线；
-- $\theta$ 小：选择更随机。
-
-这个非常自然，因为：
-
-- $\phi$ 已经是“最小剩余时间”；
-- 越小的 $\phi$ 越有吸引力；
-拥堵会通过 $f(\rho)$ 自动影响 $\phi$，于是概率也会随拥堵变化。
-
-#### 方式 3：加入路线偏好常数的 Logit（后续升级，暂不考虑）
-如果现实中游客并不完全按最短时间选路，还会偏好“熟悉路线”“更宽通道”“更靠近原来入口”，可以加一个吸引力常数 $b_r$：
-$$p_{s\to r}(x)
-=
-\frac{\exp\bigl(-\theta C_r(x)+b_r\bigr)}
-{\sum_q \exp\bigl(-\theta C_q(x)+b_q\bigr)}.$$
-其中 $b_r$ 可以表示：
-- 8 号通道更显眼；
-- 9 号通道更宽；
-- 10 号通道更远但景观更好。
-这会让模型更贴近外滩管理经验。
-
-#### 方式 4：容量/拥堵修正概率（后续升级，暂不考虑）
-如果想让管理策略“主动分流”，还可以把候选通道当前拥堵、容量、管控强度纳入概率：
-$$C_r(x,t)=\phi_{s+1,r}(x,t)+\lambda\,\Psi_r(t),$$
-其中 $\Psi_r(t)$ 可以是：
-- 该通道附近平均密度；
-- 排队长度；
-- 实时拥堵指数。
-
-于是
-$$p_{s\to r}(x,t)
-=
-\frac{\exp(-\theta C_r(x,t))}
-{\sum_q \exp(-\theta C_q(x,t))}.$$
-这就能模拟“人会避开拥挤出口”的行为。
-
-### 固定概率分流机制
-设阶段 $s$ 的完成目标区域为 $G_s\subset\Omega$，其指示函数为
-$$\chi_{G_s}(x)=
-\begin{cases}
-1, & x\in G_s,\\
-0, & x\notin G_s.
-\end{cases}$$
-当某阶段人群到达 $G_s$ 后，将按固定概率分配到下一阶段的不同路线群体。
-
-#### 阶段内单一路线群体转入下一阶段多路线群体
-若当前阶段 $s$ 只有一个群体，记为 $\rho_s$，而下一阶段 $s+1$ 有多个候选路线 $r=1,\dots,R_{s+1}$，则定义固定概率
-$$p_{s\to r}\ge 0,\qquad \sum_{r=1}^{R_{s+1}}p_{s\to r}=1.$$
-转移项定义为
-$$Q_{s\to (s+1,r)}(x,t)
-=
-p_{s\to r}\,\kappa_s\,\chi_{G_s}(x)\,\rho_s(x,t),$$
-其中 $\kappa_s>0$ 为阶段切换率。
-
-> **代码实现**: `codes/crowd_bellman/core.py:329-373` (`apply_fixed_probability_splitting`)
-> ```python
-> mask = rule.decision_mask & walkable
-> transferable = dt * max(rule.kappa, 0.0) * source_rho * mask.astype(float)
-> transferable = np.minimum(transferable, source_rho)  # 保证非负
-> deltas[rule.source] -= transferable
-> for target, prob in zip(rule.targets.keys(), probs):
->     deltas[target] += prob * transferable
-> ```
-于是有
-$$\frac{\partial \rho_s}{\partial t}
-+
-\nabla\cdot(\rho_s\mathbf v_s)
-=
--\sum_{r=1}^{R_{s+1}}Q_{s\to (s+1,r)},$$
-$$\frac{\partial \rho_{s+1,r}}{\partial t}
-+
-\nabla\cdot(\rho_{s+1,r}\mathbf v_{s+1,r})
-=
-Q_{s\to (s+1,r)}-Q^{\text{out}}_{s+1,r}.$$
-
-> **代码实现**: `codes/crowd_bellman/core.py:302-326` (`update_density`)
-> ```python
-> def update_density(rho, walkable, exit_mask, vx, vy, dx, dt):
->     fx, fy = compute_face_fluxes(rho, vx, vy)  # 迎风通量
->     div_x[:, 1:-1] = (fx[:, 1:] - fx[:, :-1]) / dx
->     div_y[1:-1, :] = (fy[1:, :] - fy[:-1, :]) / dx
->     updated = rho - dt * (div_x + div_y)  # 显式守恒格式
->     sink_mass = float(np.sum(updated[exit_mask]) * dx * dx)
->     updated[exit_mask] = 0.0  # sink 项处理
-> ```
-
-#### 若当前已是多路线群体
-若当前阶段也有多个群体，则每个群体都可用同样方式按固定概率继续分流。
-一般写成
-$$Q_{(s,r)\to (s+1,q)}(x,t)
-=
-p_{(s,r)\to q}\,\kappa_{s,r}\,\chi_{G_{s,r}}(x)\,\rho_{s,r}(x,t),$$
-其中
-$$p_{(s,r)\to q}\ge 0,\qquad \sum_q p_{(s,r)\to q}=1.$$
-
-
-## 当前模型总结
-
-### 1. 基础未知量
-设：
-- $\rho(x,t)$：人群密度；
-- $\rho_{s,r}(x,t)$：处于阶段 $s$、且选择路线类型 $r$ 的人群密度；
-- $\phi_{s,r}(x,t)$：对应子群体的最小剩余时间势函数；
-- $\mathbf v_{s,r}(x,t)$：对应子群体的速度场。
-- $\phi(x,t)$：到出口的最小剩余时间势函数；
-- $\mathbf v(x,t)$：人群速度场。
-
-其中：
-- $s=1,\dots,S$ 表示行为阶段；
-- $r=1,\dots,R_s$ 表示该阶段下的路线类型。
-其中 $x\in\Omega\subset\mathbb R^2$，$t\ge 0$
-
-总密度定义为
-$$\rho(x,t)=\sum_{s=1}^{S}\sum_{r=1}^{R_s}\rho_{s,r}(x,t).$$
-
-### 2. 速度大小函数
-总密度决定拥堵速度函数：
-$$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right)$$
-这里 $f(\rho)$ 依赖总密度 $\rho$，表示所有群体共同造成拥堵。
-
-> **代码实现**: `codes/crowd_bellman/core.py:71-75` (`greenshields_speed`)
-> ```python
-> def greenshields_speed(rho: np.ndarray, vmax: float, rho_max: float) -> np.ndarray:
->     speed = vmax * (1.0 - rho / rho_max)
->     return np.clip(speed, 0.0, vmax)
-> ```
-
-### 3. 每个子群体的势场方程
-对每个 $(s,r)$，定义允许方向集合 $U_{s,r}(x)$、度量张量 $M_{s,r}(x)$，并求解离散 Bellman 方程：
-$$\phi_{s,r}(x)
-=
-\min_{u\in U_{s,r}(x)}
-\left(
-\phi_{s,r}(x+\Delta x\,u)
-+
-\frac{\Delta x}{f(\rho)}\frac{1}{\sqrt{u^\top M_{s,r}(x)u}}
-\right).$$
-这表示：
-- 不同子群体可以有不同目标区；
-- 也可以共享相同的 $U$ 和 $M$，仅目标不同。
-
-### 4. 每个子群体的最优方向
-$$u_{s,r}^*(x)=\operatorname*{arg\,min}_{u\in U_{s,r}(x)}\left(\phi_{s,r}(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}\right)$$
-
-> **代码实现**: `codes/crowd_bellman/core.py:177-220` (`recover_optimal_direction`)
-> ```python
-> for k in range(len(DIRECTIONS.names)):
->     if (allowed_mask[y, x] & DIRECTIONS.bits[k]) == 0: continue
->     nyy = y + int(DIRECTIONS.dy[k])
->     nxx = x + int(DIRECTIONS.dx[k])
->     candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
->     if candidate < best_value:
->         best_value = candidate
->         best_ux = DIRECTIONS.ux[k]
->         best_uy = DIRECTIONS.uy[k]
-> ```
-### 5. 每个子群体的速度场
-$$\mathbf v_{s,r}(x)=f(\rho)\,u_{s,r}^*(x)$$
-
-> **代码实现**: `codes/crowd_bellman/runner.py:140-147`
-> ```python
-> for key in groups:
->     vx = speed * ux_by_group[key]  # speed = f(rho)
->     vy = speed * uy_by_group[key]
->     vx[~case.walkable] = 0.0
->     vy[~case.walkable] = 0.0
-> ```
-### 6. 每个子群体的密度演化
-$$\frac{\partial \rho_{s,r}}{\partial t}
-+
-\nabla\cdot(\rho_{s,r}\mathbf v_{s,r})
-=
-Q^{\text{in}}_{s,r}-Q^{\text{out}}_{s,r}$$
-### 7. 固定概率分流转移项
-$$Q_{(s,r)\to (s+1,q)}(x,t)
-=
-p_{(s,r)\to q}\,\kappa_{s,r}\,\chi_{G_{s,r}}(x)\,\rho_{s,r}(x,t),
-\qquad
-\sum_q p_{(s,r)\to q}=1.$$
-
-
-
-
-
-
-
-## 当前模型总结
-
-### 1. 基础未知量
-设：
-- $\rho(x,t)$：人群密度；
-- $\rho_{s,r}(x,t)$：处于阶段 $s$、且选择路线类型 $r$ 的人群密度；
-- $\phi_{s,r}(x,t)$：对应子群体的最小剩余时间势函数；
-- $\mathbf v_{s,r}(x,t)$：对应子群体的速度场。
-- $\phi(x,t)$：到出口的最小剩余时间势函数；
-- $\mathbf v(x,t)$：人群速度场。
-
-其中：
-- $s=1,\dots,S$ 表示行为阶段；
-- $r=1,\dots,R_s$ 表示该阶段下的路线类型。
-其中 $x\in\Omega\subset\mathbb R^2$，$t\ge 0$
-
-总密度定义为
-$$\rho(x,t)=\sum_{s=1}^{S}\sum_{r=1}^{R_s}\rho_{s,r}(x,t).$$
-
-### 2. 速度大小函数
-总密度决定拥堵速度函数：
-$$f(\rho)=v_{\max}\left(1-\frac{\rho}{\rho_{\max}}\right)$$
-这里 $f(\rho)$ 依赖总密度 $\rho$，表示所有群体共同造成拥堵。
-
-> **代码实现**: `codes/crowd_bellman/core.py:71-75` (`greenshields_speed`)
-> ```python
-> def greenshields_speed(rho: np.ndarray, vmax: float, rho_max: float) -> np.ndarray:
->     speed = vmax * (1.0 - rho / rho_max)
->     return np.clip(speed, 0.0, vmax)
-> ```
-
-### 3. 每个子群体的势场方程
-对每个 $(s,r)$，定义允许方向集合 $U_{s,r}(x)$、度量张量 $M_{s,r}(x)$，并求解离散 Bellman 方程：
-$$\phi_{s,r}(x)
-=
-\min_{u\in U_{s,r}(x)}
-\left(
-\phi_{s,r}(x+\Delta x\,u)
-+
-\frac{\Delta x}{f(\rho)}\frac{1}{\sqrt{u^\top M_{s,r}(x)u}}
-\right).$$
-这表示：
-- 不同子群体可以有不同目标区；
-- 也可以共享相同的 $U$ 和 $M$，仅目标不同。
-
-### 4. 每个子群体的最优方向
-$$u_{s,r}^*(x)=\operatorname*{arg\,min}_{u\in U_{s,r}(x)}\left(\phi_{s,r}(x+\Delta x\,u)+\frac{\Delta x}{f(\rho)}\frac1{\sqrt{u^\top M_{s,r}(x)u}}\right)$$
-
-> **代码实现**: `codes/crowd_bellman/core.py:177-220` (`recover_optimal_direction`)
-> ```python
-> for k in range(len(DIRECTIONS.names)):
->     if (allowed_mask[y, x] & DIRECTIONS.bits[k]) == 0: continue
->     nyy = y + int(DIRECTIONS.dy[k])
->     nxx = x + int(DIRECTIONS.dx[k])
->     candidate = phi[nyy, nxx] + step_factor[y, x, k] / speed_safe[y, x]
->     if candidate < best_value:
->         best_value = candidate
->         best_ux = DIRECTIONS.ux[k]
->         best_uy = DIRECTIONS.uy[k]
-> ```
-### 5. 每个子群体的速度场
-$$\mathbf v_{s,r}(x)=f(\rho)\,u_{s,r}^*(x)$$
-
-> **代码实现**: `codes/crowd_bellman/runner.py:140-147`
-> ```python
-> for key in groups:
->     vx = speed * ux_by_group[key]  # speed = f(rho)
->     vy = speed * uy_by_group[key]
->     vx[~case.walkable] = 0.0
->     vy[~case.walkable] = 0.0
-> ```
-### 6. 每个子群体的密度演化
-$$\frac{\partial \rho_{s,r}}{\partial t}
-+
-\nabla\cdot(\rho_{s,r}\mathbf v_{s,r})
-=
-Q^{\text{in}}_{s,r}-Q^{\text{out}}_{s,r}$$
-### 7. 固定概率分流转移项
-$$Q_{(s,r)\to (s+1,q)}(x,t)
-=
-p_{(s,r)\to q}\,\kappa_{s,r}\,\chi_{G_{s,r}}(x)\,\rho_{s,r}(x,t),
-\qquad
-\sum_q p_{(s,r)\to q}=1.$$
-
-
-
-
-
+因此，正式论文表述应避免把 $\eta$ 写成当前控制变量，也不应把旧的方向加几何强度搜索作为当前贡献。当前贡献是方向配置与内部入口通行速率控制的一体化 Bellman--守恒律评估器，以及围绕该评估器构建的混合变量管控优化框架。

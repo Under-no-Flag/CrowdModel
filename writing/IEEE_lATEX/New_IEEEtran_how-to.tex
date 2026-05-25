@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a bi-level optimization framework for crowd management in large pedestrian zones, integrating discrete directional constraints with anisotropic geometric guidance. The lower level employs a Hughes-type macroscopic crowd model enhanced with constrained Hamilton-Jacobi-Bellman (HJB) equations for one-way, bidirectional, and closed channel states, and then uses metric tensor fields to represent soft channel-alignment guidance within the feasible direction set. The upper level optimizes channel direction configurations and guidance intensities using a Structure-Aware Hybrid Block Optimization (SA-HBO) algorithm. Three raw physical metrics are introduced for efficiency, safety, and load balancing, and are further converted into dimensionless indicators for cross-scheme comparison and scalarization. The proposed method combines surrogate pre-screening, full simulation confirmation, and block-coordinate updates to search the mixed discrete-continuous control space. Numerical experiments demonstrate the effectiveness of the proposed approach.
+This paper presents a macroscopic crowd management framework for open urban pedestrian zones with multiple channels, staged visitor behavior, and internal entrance flow control. The lower level employs a Hughes-type Bellman--conservation-law model in which one-way, bidirectional, and closed channel states are encoded through admissible direction sets, while a fixed anisotropic metric tensor represents soft geometric channel alignment. The controllable management variable is defined as $z=(s,q)$, where $s$ denotes channel direction configurations and $q$ denotes internal channel-entrance capacity profiles. The geometric guidance strength is treated as a fixed model parameter $\eta_0$, rather than an optimized control. The upper level minimizes a scalarized objective including total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and control smoothness. A hierarchical constrained mixed-variable black-box optimization framework is developed to search the direction-capacity control space under expensive high-fidelity simulations. Numerical experiments on a four-channel waterfront-platform scenario validate the model mechanisms, the necessity of multi-stage behavior modeling, and the performance of the proposed optimizer in a completed horizontal comparison.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -52,9 +52,9 @@ Among various urban crowd gathering scenarios, open scenic areas, waterfront vie
 
 Existing large-scale event security management practices typically integrate system dynamics, system coupling, and system safety theory, combined with high-risk zone delineation and historical crowd behavior patterns, to formulate a series of control measures \cite{RN2176,RN1663}. These measures include deploying security personnel at critical locations, erecting temporary barriers for isolation and diversion, implementing one-way passage on key channels, and applying batch release in core areas \cite{RN2181,RN1978}. For instance, during major holidays, the Shanghai Bund area adopts batch release, passage direction regulation, south-entry north-exit routing, and reduction of head-on conflicts \cite{RN2129}; similarly, Nanluoguxiang main street in Beijing implements one-way passage measures (south entry, north exit) during peak periods \cite{RN2130}, consistent in control mechanism with the Shanghai Bund approach.
 
-However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}. First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of different passage direction configurations, geometric guidance intensities, and phase-dependent behavioral preferences. Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}. Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations. Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
+However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}. First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of passage direction settings, entrance release capacities, and phase-dependent behavioral preferences. Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--entrance flow control--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}. Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations. Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
 
-To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, geometric guidance, and multi-stage route behavior, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set, and an anisotropic metric tensor characterizes the cost differences between axial and lateral movement, simulating pedestrian pre-alignment and streamline reorganization near passages. At the optimization level, this paper distinguishes ``controllable management variables'' (passage direction configuration and geometric guidance intensity) from ``exogenous behavioral parameters'' (visitor route diversion preferences identified from historical data). Based on this boundary, total travel time, high-density exposure time, and channel cumulative flow variance are adopted as efficiency, safety, and load balancing indicators, forming a scalarized optimization problem under fixed weights. A simplified instance of the Structure-Aware Hybrid Block Optimization framework (SA-HBO) is designed to solve this problem, exploiting the discrete neighborhood structure of passage direction variables and the continuous nature of geometric guidance variables through surrogate pre-screening, full simulation confirmation, and acceptance/rejection mechanisms.
+To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, fixed geometric guidance, multi-stage route behavior, and internal entrance capacity control, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation-law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set; and a fixed anisotropic metric tensor $M(x;\eta_0)$ characterizes geometric channel alignment. We further introduce internal entrance capacity variables $q_c^\pm(t)$ to distinguish attempted entrance flow from actually admitted flow, so that excessive demand remains as upstream waiting rather than disappearing from the system. At the optimization level, the controllable variable is $z=(s,q)$, whereas visitor route preferences $\hat p$ and the geometric guidance parameter $\eta_0$ are fixed model inputs. The scalarized objective combines total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and capacity-control smoothness. A hierarchical constrained mixed-variable black-box optimization framework (HCMBO) is designed to solve this direction-capacity problem under limited high-fidelity simulation budgets.
 
 The main contributions of this paper are as follows.
 
@@ -63,9 +63,9 @@ The main contributions of this paper are as follows.
 
 \item A Bellman--conservation law coupled model integrating passage constraints and geometric guidance is constructed. The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic metric tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
 
-\item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, channel flow variance).
+\item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, realized channel-flow variance, entrance waiting, and control smoothness).
 
-\item A structure-aware optimization framework for controllable passage configuration is designed, jointly optimizing passage direction configuration and geometric guidance intensity under fixed historically identified preference parameters through discrete neighborhood search, continuous local search, and surrogate pre-screening with acceptance/rejection mechanisms.
+\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction-capacity variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance. The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
 \end{enumerate}
 
 \section{Related Work}
@@ -93,7 +93,7 @@ To overcome non-physical behaviors such as supersonic information propagation th
 
 Beyond the classical Hughes-type framework, extensions have incorporated control and guidance mechanisms relevant to crowd management. Anisotropic formulations using metric tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}, allowing for continuous geometric guidance without explicit prohibition. Constrained Hamilton-Jacobi-Bellman (HJB) formulations have been employed to model strict directional constraints such as one-way corridors, with the Bellman optimality principle providing a natural framework for unifying anisotropic geometric guidance with discrete directional constraints.
 
-Despite these advances, existing approaches often treat control parameters as fixed or manually tuned. The bi-level optimization of discrete channel direction configurations combined with continuous guidance intensities remains underexplored, particularly for large-scale urban pedestrian zones with multiple behavioral stages and heterogeneous route choices.
+Despite these advances, existing approaches often treat control parameters as fixed or manually tuned. The joint optimization of discrete channel direction configurations and internal entrance capacity profiles remains underexplored, particularly for large-scale urban pedestrian zones with multiple behavioral stages and heterogeneous route choices.
 
 \section{Macroscopic Crowd Dynamics Model}
 \label{sec:model}
@@ -270,6 +270,33 @@ The density evolution for each sub-population includes advection and transition 
 \end{equation}
 where $Q^{\text{in}}_{s,r}$ is inflow from the previous stage and $Q^{\text{out}}_{s,r}$ is outflow to the next stage.
 
+\subsection{Internal Entrance Capacity Control}
+
+In addition to direction rules, managers may need to restrict how many pedestrians are admitted into an open channel during each time period. For channel $c$, we introduce entrance capacity controls
+\begin{equation}
+q=\{q_c^+(t), q_c^-(t)\}_{c=1}^{C},
+\label{eq:q_control}
+\end{equation}
+where the superscripts $+$ and $-$ denote the reference forward and reverse entrances. These controls constrain internal interface fluxes; they are not external boundary inflows.
+
+The direction state and entrance capacity must satisfy hard consistency constraints:
+\begin{equation}
+\begin{aligned}
+s_c=+1 &\Rightarrow q_c^-(t)=0,\\
+s_c=-1 &\Rightarrow q_c^+(t)=0,\\
+s_c=\varnothing &\Rightarrow q_c^+(t)=q_c^-(t)=0,\\
+s_c=0 &\Rightarrow q_c^+(t)+q_c^-(t)\le \bar q_c.
+\end{aligned}
+\label{eq:direction_capacity_consistency}
+\end{equation}
+
+Let $A_c^\pm(t)$ be the attempted entrance flux induced by the unconstrained finite-volume update. The actually admitted flux is
+\begin{equation}
+\hat A_c^\pm(t)=\min\{A_c^\pm(t),q_c^\pm(t)\}.
+\label{eq:admitted_flux}
+\end{equation}
+The crossing flux at the internal entrance is scaled by $\hat A_c^\pm(t)/A_c^\pm(t)$ when $A_c^\pm(t)>0$. The blocked part remains upstream and is recorded as entrance waiting or queueing mass, preserving the mass balance of the conservation-law update.
+
 \section{Numerical Solution}
 \label{sec:numerical}
 
@@ -284,80 +311,84 @@ We discretize the domain using a uniform two-dimensional grid, with the control 
 \end{equation}
 The time step satisfies the CFL stability condition.
 
-\textbf{Evaluation Oracle.} For any given control configuration $z = (s, \eta)$, the simulation workflow constitutes a lower-level evaluation operator:
+\textbf{Evaluation Oracle.} For any feasible control configuration $z=(s,q)$, the simulation workflow constitutes a lower-level evaluation operator:
 \begin{equation}
-(\rho, \phi, \mathbf{v}) = \mathcal{S}(z; \hat{p}),
+(\rho,\phi,\mathbf v,B,R)=\mathcal S(z;\hat p,\eta_0),
 \label{eq:simulation_oracle}
 \end{equation}
-where $\hat{p}$ represents fixed route preference parameters identified from historical data. This operator provides the foundation for subsequent control optimization.
+where $\hat p$ represents fixed route preference parameters, $\eta_0$ is the fixed geometric guidance parameter, $B$ records entrance waiting, and $R$ records realized cumulative channel throughput. This operator provides the foundation for subsequent control optimization.
 
 \section{Control Evaluation Metrics}
 \label{sec:metrics}
 
-We distinguish between behavior validation metrics (for verifying model mechanisms) and control evaluation metrics (for assessing policy impacts). This section focuses on the latter.
+We distinguish between behavior validation metrics and control evaluation metrics. Behavior validation metrics include direction consistency, approach-angle distributions, and channel capture domains. Control evaluation metrics assess policy impacts under fixed $\hat p$ and $\eta_0$.
 
-\subsection{Efficiency Metric: Total Travel Time}
+\subsection{Efficiency, Safety, and Balance}
 
 For simulation horizon $[0,T]$, the total travel time metric is:
 \begin{equation}
-J_1(z \mid \hat{p}) = \int_0^T \int_{\Omega} \rho(x,t) \, dx \, dt.
+J_1(z) = \int_0^T \int_{\Omega_w} \rho(x,t) \, dx \, dt.
 \label{eq:j1}
 \end{equation}
-
-This measures aggregate dwell time of the crowd, providing a stable basis for comparing different control strategies.
-
-\subsection{Safety Metric: High-Density Exposure Time}
-
-Let $\rho_{\text{safe}}$ be the safe density threshold. The exposure time metric is:
+The high-density exposure metric is:
 \begin{equation}
-J_2(z \mid \hat{p}) = \int_0^T \int_{\Omega} \mathbf{1}_{\rho(x,t) > \rho_{\text{safe}}} \, dx \, dt.
+J_2(z) = \int_0^T \int_{\Omega_w} \mathbf{1}_{\rho(x,t) > \rho_{\text{safe}}} \, dx \, dt.
 \label{eq:j2}
 \end{equation}
-
-This captures cumulative space-time exposure to dangerous crowding conditions, reflecting management concerns about sustained congestion risks.
-
-\subsection{Balance Metric: Channel Flow Variance}
-
-Let $q_c(t)$ be the flux through channel $c$ at time $t$, with cumulative flow $F_c = \int_0^T q_c(t) \, dt$. The load balancing metric is:
+Let $R_c(T)=\int_0^T(\hat A_c^+(t)+\hat A_c^-(t))\,dt$ be the realized cumulative throughput of channel $c$. The load-balancing metric is:
 \begin{equation}
-J_3(z \mid \hat{p}) = \text{Var}(F_1, \dots, F_m).
-\label{eq:j3}
+J_5(z) = \operatorname{Var}(R_1(T), \dots, R_C(T)).
+\label{eq:j5}
 \end{equation}
+This metric is based on realized throughput $R_c$, not directly on the capacity control $q_c^\pm(t)$.
 
-Lower variance indicates more even distribution of traffic across channels, reducing risk concentration and improving facility utilization.
+\subsection{Entrance Waiting and Control Smoothness}
+
+Entrance waiting is penalized by
+\begin{equation}
+J_B(z)=\int_0^T\sum_{c=1}^{C}\left(B_c^+(t)+B_c^-(t)\right)\,dt.
+\label{eq:jb}
+\end{equation}
+If explicit queues are not stored, the blocked demand $(A_c^\pm-\hat A_c^\pm)_+$ can be used as an equivalent waiting proxy.
+
+For piecewise-constant capacity profiles, smoothness is measured by
+\begin{equation}
+J_R(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right].
+\label{eq:jr}
+\end{equation}
 
 \subsection{Dimensionless Normalization}
 
-Because $J_1$, $J_2$, and $J_3$ have different physical units and numerical scales, we further define normalized indicators for policy comparison and optimization. Let $M_{\text{tot}} = M_{\text{init}} + M_{\text{in}}$ denote the total evaluated crowd mass, let $|\Omega_w|$ be the walkable area, and let $F = \sum_{c=1}^m F_c$ be the total cumulative channel flow. We define
+All terms are normalized before weighting. Let $M_{\text{tot}} = M_{\text{init}} + M_{\text{in}}$ denote the total evaluated crowd mass, let $|\Omega_w|$ be the walkable area, and let $R_{\text{tot}} = \sum_{c=1}^C R_c(T)$. We define
 \begin{equation}
-\tilde{J}_1(z \mid \hat{p}) = \frac{J_1(z \mid \hat{p})}{M_{\text{tot}} T},
+\tilde{J}_1(z) = \frac{J_1(z)}{M_{\text{tot}} T},
 \label{eq:j1_norm}
 \end{equation}
 \begin{equation}
-\tilde{J}_2(z \mid \hat{p}) = \frac{J_2(z \mid \hat{p})}{|\Omega_w| T},
+\tilde{J}_2(z) = \frac{J_2(z)}{|\Omega_w| T},
 \label{eq:j2_norm}
 \end{equation}
 and
 \begin{equation}
-\tilde{J}_3(z \mid \hat{p}) =
-\frac{\text{Var}(F_1, \dots, F_m)}{F^2 (m-1)/m^2}
+\tilde{J}_5(z) =
+\frac{\text{Var}(R_1, \dots, R_C)}{R_{\text{tot}}^2 (C-1)/C^2}
 =
-\frac{m^2}{m-1}\text{Var}(p_1, \dots, p_m),
-\label{eq:j3_norm}
+\frac{C^2}{C-1}\text{Var}(r_1, \dots, r_C),
+\label{eq:j5_norm}
 \end{equation}
-where $p_c = F_c/F$. The normalized metrics are dimensionless, with $\tilde{J}_2 \in [0,1]$ and $\tilde{J}_3 \in [0,1]$.
+where $r_c=R_c/R_{\text{tot}}$. Waiting and smoothness terms are normalized by fixed reference scales, giving $\tilde J_B$ and $\tilde J_R$.
 
 \subsection{Scalarized Optimization Objective}
 
-Given weights $(\lambda_1, \lambda_2, \lambda_3)$, the scalarized objective is:
+Given weights $(\lambda_1,\lambda_2,\lambda_5,\lambda_B,\lambda_R)$, the scalarized objective is:
 \begin{equation}
-J(z \mid \hat{p}) = \lambda_1 \tilde{J}_1(z \mid \hat{p}) + \lambda_2 \tilde{J}_2(z \mid \hat{p}) + \lambda_3 \tilde{J}_3(z \mid \hat{p}),
+J(z) = \lambda_1 \tilde{J}_1(z) + \lambda_2 \tilde{J}_2(z) + \lambda_5 \tilde{J}_5(z) + \lambda_B \tilde{J}_B(z) + \lambda_R \tilde{J}_R(z),
 \label{eq:scalarized}
 \end{equation}
 
 with the optimization problem:
 \begin{equation}
-\min_{z \in \mathcal{Z}} J(z \mid \hat{p}).
+\min_{z \in \mathcal{Z}} J(z), \qquad z=(s,q).
 \label{eq:optimization}
 \end{equation}
 
@@ -368,95 +399,44 @@ Our algorithm solves this scalarized problem for fixed weights, rather than dire
 
 \subsection{Control Variable Definition}
 
-We distinguish controllable variables from exogenous behavioral parameters:
+The controllable management variable is $z=(s,q)$. The direction block is
+\begin{equation}
+s=(s_1,\ldots,s_C),\qquad s_c\in\{-1,0,+1,\varnothing\},
+\end{equation}
+and the capacity block is $q=\{q_c^+(t),q_c^-(t)\}_{c=1}^C$. In implementation, $q$ is represented by a low-dimensional vector $x$ through a direction-aware mapping
+\begin{equation}
+q=T_s(x),\qquad x\in[0,1]^d.
+\label{eq:capacity_parameterization}
+\end{equation}
+The mapping applies direction masks, capacity upper bounds, closure constraints, and smoothness restrictions.
 
-\textbf{Controllable variables}:
+\subsection{Hierarchical Constrained Mixed-Variable Optimization}
+
+Treating this as an unconstrained black-box optimization ignores the hierarchical structure between direction rules and entrance capacities. We use HCMBO, a hierarchical constrained mixed-variable black-box optimization framework with five core components:
 \begin{enumerate}
-\item \textit{Channel direction configuration} $s = (s_1, \dots, s_C)$, where $s_c \in \{-1, 0, +1,\varnothing\}$ indicates reverse one-way, bidirectional, forward one-way, or closed state for channel $c$.
-\item \textit{Geometric guidance intensity} $\eta = (\eta_1, \dots, \eta_C)$, where $\eta_c = \alpha_c / \beta_c \geq 1$ is the anisotropy ratio.
+\item direction-candidate generation and filtering;
+\item direction-aware capacity parameterization $q=T_s(x)$;
+\item constrained surrogate or finite-budget black-box search over $x$;
+\item derivative-free local refinement for promising candidates;
+\item uniform high-fidelity re-evaluation for final ranking.
 \end{enumerate}
 
-Thus the optimization variable is $z = (s, \eta)$.
+\subsection{Direction Candidate Filtering}
 
-\textbf{Exogenous parameters}: Route preference parameters $\hat{p}$ are identified from historical data and fixed during optimization. Decision region locations are reserved for future extension.
+The outer level generates a set $\mathcal S_{\mathrm{cand}}$ of direction configurations and removes candidates that violate operational constraints, connectivity requirements, or the direction-capacity consistency in \eqref{eq:direction_capacity_consistency}. The retained set provides interpretable discrete alternatives for the inner capacity optimization.
 
-\subsection{Structure-Aware Hybrid Block Optimization}
+\subsection{Capacity Search and High-Fidelity Recheck}
 
-Treating this as a black-box optimization ignores three key structures: mixed discrete-continuous variables, the expensive multi-group simulation structure, and the different roles of discrete direction settings and continuous guidance intensities.
+For a fixed direction configuration $s$, the inner level optimizes $x$ in $q=T_s(x)$. The search may use Bayesian optimization, evolutionary search, or another finite-budget derivative-free method, but all candidates are passed through the same feasibility-preserving map $T_s$. Promising candidates can be refined locally, after which all finalists are re-evaluated under the same high-fidelity simulator. The paper reports only high-fidelity recheck results.
 
-We propose Structure-Aware Hybrid Block Optimization (SA-HBO), with four core components:
-\begin{enumerate}
-\item Discrete block neighborhood search for channel directions;
-\item Surrogate pre-screening to reduce full simulations;
-\item Full simulation confirmation for retained candidates;
-\item Continuous block projected stochastic approximation for guidance intensities.
-\end{enumerate}
+\subsection{Compared Methods}
 
-\subsection{Discrete Block Update}
-
-Fixing continuous variables $\eta^k$, the discrete subproblem at iteration $k$ is:
-\begin{equation}
-s^{k+1/2} \approx \arg\min_{s \in \mathcal{S}} J(s, \eta^k \mid \hat{p}).
-\label{eq:discrete_subproblem}
-\end{equation}
-
-Define the neighborhood of current configuration $s^k$ as:
-\begin{equation}
-\mathcal{N}(s^k) = \left\{s : \|s - s^k\|_0 \leq \nu\right\},
-\label{eq:neighborhood}
-\end{equation}
-where $\nu$ is the maximum number of simultaneously flipped channels (typically 1 or 2).
-
-\textit{Surrogate pre-screening}: To reduce full simulations, construct a local surrogate for each candidate $s' \in \mathcal{N}(s^k)$:
-\begin{equation}
-\widehat{J}(s', \eta^k) = \mu_1 \widehat{J}_1^{\text{local}} + \mu_2 \widehat{J}_2^{\text{local}} + \mu_3 \widehat{J}_3^{\text{flow}},
-\label{eq:surrogate}
-\end{equation}
-where the local metrics approximate density changes, exposure changes, and flow redistribution. Select top $K$ candidates by surrogate value for full PDE simulation.
-
-\subsection{Continuous Block Update}
-
-Fixing discrete variables $s^{k+1/2}$, solve for $\eta$:
-\begin{equation}
-\eta^{k+1} \approx \arg\min_{\eta \in \mathcal{H}} J(s^{k+1/2}, \eta \mid \hat{p}),
-\label{eq:continuous_subproblem}
-\end{equation}
-with feasible set $\mathcal{H} = \{\eta : \eta_c \geq 1\}$.
-
-Since gradients are unavailable analytically, we use projected stochastic approximation. Generate Rademacher perturbation $\Delta_{\eta}^k \in \{-1, +1\}^C$, construct two-sided perturbations $\eta_{\pm}^k = \eta^k \pm c_k \Delta_{\eta}^k$, and project to feasible set. The stochastic gradient estimate is:
-\begin{equation}
-\widehat{g}_{\eta}^k = \frac{J(s^{k+1/2}, \tilde{\eta}_+^k \mid \hat{p}) - J(s^{k+1/2}, \tilde{\eta}_-^k \mid \hat{p})}{2c_k} \odot (\Delta_{\eta}^k)^{-1}.
-\label{eq:stochastic_gradient}
-\end{equation}
-
-The candidate update is:
-\begin{equation}
-\eta_{\text{cand}}^{k+1} = \Pi_{\mathcal{H}}\left(\eta^k - \alpha_k D_{\eta}^{-1} \widehat{g}_{\eta}^k\right),
-\label{eq:eta_candidate}
-\end{equation}
-with diagonal preconditioner $D_{\eta}$.
-
-\textit{Acceptance/Rejection}: Compare candidate objective $J_{\text{cand}}$ with current $J_{\text{cur}}$. Accept if $J_{\text{cand}} \leq J_{\text{cur}} - \varepsilon_{\text{acc}}$; otherwise reject and optionally backtrack. Maintain best solution $z_{\text{best}}$ throughout.
-
-\subsection{Algorithm Summary}
-
-\begin{enumerate}
-\item Initialize potentials and density, compute $J(z^0 \mid \hat{p})$, set $z_{\text{best}} = z^0$.
-\item For each iteration:
-  \begin{itemize}
-  \item \textit{Discrete update}: Generate neighborhood, screen with surrogate, evaluate top candidates with full simulation, select $s^{k+1/2}$.
-  \item \textit{Continuous update}: Generate perturbations, compute stochastic gradient, generate candidate, accept/reject to obtain $\eta^{k+1}$.
-  \item \textit{State update}: Set $z^{k+1} = (s^{k+1/2}, \eta^{k+1})$, compute objective, update $z_{\text{best}}$ if improved.
-  \end{itemize}
-\item Return $z^{\star} = z_{\text{best}}$.
-\end{enumerate}
-
-Stopping criteria include: small objective change, no discrete variable change for consecutive iterations, or maximum iteration/simulation/time limits.
+The horizontal comparison includes Random Search, Pure SA (Pure Simulated Annealing), Enum-DE (Enumeration plus Differential Evolution), TPE-Mixed BO (Tree-structured Parzen Estimator based mixed-variable Bayesian optimization), and HCMBO. Pure SA refers to simulated annealing and should not be confused with the obsolete structure-aware block search used in earlier drafts.
 
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-This section presents numerical experiments to validate the proposed model mechanisms, control strategies, and optimization framework. The experiments use a four-channel scenario, which is a simplified abstraction of the Bund waterfront viewing-platform environment. One side of the platform contains the initial crowd region and entry boundary, the other side contains the viewing and exit region, and a central wall contains four representative passages: upper, middle, lower-middle, and lower passages. This abstraction preserves the essential spatial structure while reducing the actual passage system to four controllable channels, so that mechanism validation, strategy enumeration, and optimization search can be conducted in a finite and interpretable parameter space. The experiments follow a progressive logic: local mechanism validation is first conducted on the four-channel setting; the analysis then extends to multi-channel, multi-stage control strategies, behavior-layer validation, and finally joint optimization over channel direction and geometric guidance intensity.
+This section presents numerical experiments to validate the proposed model mechanisms, control responses, behavior layer, and direction-capacity optimization framework. The experiments use a four-channel scenario, which is a simplified abstraction of the Bund waterfront viewing-platform environment. One side of the platform contains the initial crowd region and entry boundary, the other side contains the viewing and exit region, and a central wall contains four representative passages: upper, middle, lower-middle, and lower passages. The experiments follow a progressive logic: local mechanism validation is first conducted on the four-channel setting; the analysis then extends to multi-channel, multi-stage direction responses, behavior-layer validation, and finally horizontal optimization comparison over $z=(s,q)$.
 
 \subsection{Experimental Setup}
 \label{sec:setup}
@@ -472,7 +452,7 @@ The four-channel scenic-platform scenario is used as the common basis for mechan
 \label{fig:experiment_scene}
 \end{figure}
 
-Numerical parameters are set as follows: grid resolution $128\times96$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, and safety density threshold $\rho_{\text{safe}}=3.5$. The mechanism validation experiment (G1) and the behavior-layer validation experiment (G3) use a time horizon of $T=140$, while the control strategy comparison experiment (G2) and the optimal control search experiment (G4) use a multi-stage continuous-flow horizon of $T=240$.
+Numerical parameters are set as follows: grid resolution $128\times96$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, and safety density threshold $\rho_{\text{safe}}=3.5$. The capacity-control horizontal comparison uses $1600$ high-fidelity steps, a time horizon of $T=160$, and Bellman updates every five simulation steps.
 
 \subsection{Mechanism Validation}
 \label{sec:mechanism}
@@ -643,30 +623,47 @@ The direct spatial mechanism behind these objective differences is the redistrib
 
 Fig.~\ref{fig:g2_spatial_mechanism}(B) further shows that directional control changes not only total flow allocation but also the spatial location of risk exposure. Hotspot locations are visualized in the true scene coordinate system and on the same feasible-domain and obstacle background as the density maps. Upper-channel-dominant or middle-closure configurations shift hotspots upward; middle-channel dominance places hotspots near the central passage; and lower-middle or bottom involvement shifts hotspots downward. Hence, the variations in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$ are not merely abstract numerical differences, but arise from coupled changes in channel-load redistribution, local safety exposure, and hotspot migration.
 
-The G2 experiment therefore supports the need for subsequent optimization from three perspectives. First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum. Second, the direction variable is combinatorial, and the 13 cases here are only an interpretable slice rather than an exhaustive enumeration. Third, the full control problem must also optimize the continuous geometric guidance strength $\eta$. The resulting problem is therefore a mixed discrete-continuous, simulation-driven optimization problem with expensive evaluations, motivating the automated search procedure introduced later.
+The G2 experiment therefore supports the need for subsequent optimization from three perspectives. First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum. Second, the direction variable is combinatorial, and the 13 cases here are only an interpretable slice rather than an exhaustive enumeration. Third, the full control problem also includes the continuous internal entrance capacity profile $q$. The resulting problem is therefore a mixed discrete-continuous, simulation-driven optimization problem with expensive evaluations, motivating the automated search procedure introduced later.
 
-\subsection{Multi-Stage Flow Validation Experiments}
+\subsection{Behavior-Layer Necessity}
 \label{sec:multistage_exp}
 
-This subsection validates the multi-stage behavior chain and probabilistic splitting mechanism. The experiments compare single-stage approximations against full multi-stage models to demonstrate how stage transitions and fixed-probability splitting alter density evolution and exit load distribution.
+The behavior-layer experiment compares a single-stage approximation, a multi-stage model with uniform preferences, and a multi-stage model with heterogeneous fixed preferences. The single-stage approximation over-directs pedestrians to the middle channel, while the multi-stage models shift exit demand mainly toward the lower-middle and lower channels. The comparison shows that omitting the stage chain and route preferences can distort channel-load assessment and policy ranking. Therefore, $\hat p$ is treated as a fixed exogenous behavior parameter in the optimization experiment.
 
-Detailed results and analysis will be presented in the full version of this paper.
-
-\subsection{Optimal Control Parameter Search}
+\subsection{Horizontal Optimization Comparison}
 \label{sec:optimal}
 
-This subsection presents the first-version automated parameter search results. The search enumerates discrete strategy variables, performs coarse grid search on guidance intensity $\eta$, and searches over fixed splitting probability candidates to identify optimal control configurations under different objective weight combinations $(\lambda_1, \lambda_2, \lambda_3)$.
+The completed horizontal comparison evaluates baseline prior best, Random Search, Pure SA, Enum-DE, TPE-Mixed BO, and HCMBO under the same high-fidelity setting. The result root is \texttt{codes/results/g6\_horizontal\_comparison}. Five seeds are used: $11$, $23$, $37$, $51$, and $73$.
 
-Detailed results and analysis will be presented in the full version of this paper.
+\begin{table*}[!t]
+\centering
+\caption{High-Fidelity Best Results in the Direction-Capacity Optimization Comparison}
+\label{tab:g6_summary}
+\footnotesize
+\begin{tabular}{lrrrrrr}
+\hline
+Method & Mean objective & Std. & Best & Worst & Feasible rate & Best seed \\
+\hline
+baseline\_prior\_best & 5.4774 & 0.0000 & 5.4774 & 5.4774 & 0\% & 11 \\
+random\_search & 3.0112 & 0.1319 & 2.8821 & 3.2287 & 40\% & 51 \\
+pure\_sa & 2.9248 & 0.1386 & 2.7468 & 3.1049 & 60\% & 73 \\
+enum\_de & 3.0597 & 0.1932 & 2.7329 & 3.2500 & 40\% & 23 \\
+hcmbo\_proposed & 2.8848 & 0.1491 & 2.7002 & 3.0427 & 80\% & 37 \\
+tpe\_mixed\_bo & \textbf{2.7403} & 0.2475 & \textbf{2.5180} & 3.1345 & 80\% & 23 \\
+\hline
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:g6_summary} shows that TPE-Mixed BO obtains the lowest mean objective and the best single-seed objective among all reported methods. HCMBO outperforms Random Search, Pure SA, and Enum-DE in mean objective, and shares the highest feasible rate of $80\%$ with TPE-Mixed BO. The current paper figure set excludes TPE-Mixed BO to focus on interpretable structured baselines; under this retained-method subset, HCMBO has the lowest mean objective and the highest feasible rate.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presents a bi-level optimization framework for crowd channel management that combines discrete directional constraints with anisotropic geometric guidance. The proposed SA-HBO algorithm exploits problem structure through surrogate pre-screening, full simulation confirmation, and block coordinate updates to handle the expensive simulation-based optimization efficiently.
+This paper presents a Bellman--conservation-law crowd management framework for open pedestrian zones with channel direction configuration and internal entrance capacity control. The current controllable variable is $z=(s,q)$; the geometric guidance parameter $\eta_0$ and route preference parameter $\hat p$ are fixed model inputs. The proposed HCMBO framework exploits the direction-capacity hierarchy and uses high-fidelity rechecks for final ranking.
 
-The numerical experiments validate that: (1) geometric guidance $M(x)$ and directional constraints $U(x)$ authentically alter local crowd behaviors; (2) the combined model exhibits stable sensitivity to configuration changes; (3) directional constraints effectively suppress counter-flow and head-on conflicts under bidirectional demand. These findings establish the foundation for subsequent strategy optimization studies.
+The numerical experiments validate that: (1) fixed geometric guidance $M(x;\eta_0)$ and directional constraints $U(x;s)$ alter local crowd behaviors in interpretable ways; (2) directional configurations induce nontrivial efficiency--safety--balance trade-offs; (3) multi-stage behavior modeling is necessary for reliable channel-load assessment; and (4) in the completed horizontal comparison, HCMBO is the best retained structured method when TPE is excluded from the figure set, while TPE-Mixed BO obtains the lowest mean objective in the full method table.
 
-Future work will extend to full multi-objective optimization, sensitivity analysis under demand perturbations, and calibration against real-world observation data.
+Future work will extend to larger real-world geometries, online demand estimation, multi-weight Pareto analysis, and calibration against field observations.
 
 \balance
 
