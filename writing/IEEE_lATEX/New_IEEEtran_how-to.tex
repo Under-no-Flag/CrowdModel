@@ -27,7 +27,7 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a macroscopic crowd management framework for open urban pedestrian zones with multiple channels, staged visitor behavior, and internal entrance flow control. The lower level employs a Hughes-type Bellman--conservation-law model in which one-way, bidirectional, and closed channel states are encoded through admissible direction sets, while a fixed anisotropic metric tensor represents soft geometric channel alignment. The controllable management variable is defined as $z=(s,q)$, where $s$ denotes channel direction configurations and $q$ denotes internal channel-entrance capacity profiles. The geometric guidance strength is treated as a fixed model parameter $\eta_0$, rather than an optimized control. The upper level minimizes a scalarized objective including total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and control smoothness. A hierarchical constrained mixed-variable black-box optimization framework is developed to search the direction-capacity control space under expensive high-fidelity simulations. Numerical experiments on a four-channel waterfront-platform scenario validate the model mechanisms, the necessity of multi-stage behavior modeling, and the performance of the proposed optimizer in a completed horizontal comparison.
+This paper presents a macroscopic crowd management framework for open urban pedestrian zones with multiple channels, staged visitor behavior, and internal entrance flow control. The lower level employs a Hughes-type Bellman--conservation-law model in which one-way, bidirectional, and closed channel states are encoded through admissible direction sets, while a fixed anisotropic metric tensor represents soft geometric channel alignment. The controllable management variable is defined as $z=(s,q)$, where $s$ denotes channel direction configurations and $q$ denotes internal channel-entrance capacity profiles. The geometric guidance strength is treated as a fixed model parameter $\eta_0$, rather than an optimized control. The upper level minimizes a scalarized objective including total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and control smoothness. A hierarchical constrained mixed-variable black-box optimization framework is developed to search the direction-capacity control space under expensive high-fidelity simulations. The final HCMBO mainline allocates its finite budget to direction-wise structured capacity search and local refinement, while random search is retained only as an external baseline. Numerical experiments on a four-channel waterfront-platform scenario validate the model mechanisms, the necessity of multi-stage behavior modeling, and the performance of the proposed optimizer in horizontal and focused comparisons.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -65,7 +65,7 @@ The main contributions of this paper are as follows.
 
 \item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, realized channel-flow variance, entrance waiting, and control smoothness).
 
-\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction-capacity variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance. The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
+\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction-capacity variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance. The final HCMBO mainline removes auxiliary internal random search and concentrates the budget on direction-wise structured capacity optimization. The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
 \end{enumerate}
 
 \section{Related Work}
@@ -427,7 +427,7 @@ The outer level generates a set $\mathcal S_{\mathrm{cand}}$ of direction config
 
 \subsection{Capacity Search and High-Fidelity Recheck}
 
-For a fixed direction configuration $s$, the inner level optimizes $x$ in $q=T_s(x)$. The search may use Bayesian optimization, evolutionary search, or another finite-budget derivative-free method, but all candidates are passed through the same feasibility-preserving map $T_s$. Promising candidates can be refined locally, after which all finalists are re-evaluated under the same high-fidelity simulator. The paper reports only high-fidelity recheck results.
+For a fixed direction configuration $s$, the inner level optimizes $x$ in $q=T_s(x)$. The search may use Bayesian optimization, evolutionary search, or another finite-budget derivative-free method, but all candidates are passed through the same feasibility-preserving map $T_s$. The final HCMBO mainline uses the whole optimization budget for this direction-wise structured capacity search and derivative-free local refinement. It does not include an auxiliary internal random-search phase; random search is used only as a separate comparison method. All finalists are re-evaluated under the same high-fidelity simulator, and the paper reports only high-fidelity recheck results.
 
 \subsection{Compared Methods}
 
@@ -654,16 +654,34 @@ tpe\_mixed\_bo & \textbf{2.7403} & 0.2475 & \textbf{2.5180} & 3.1345 & 80\% & 23
 \end{tabular}
 \end{table*}
 
-Table~\ref{tab:g6_summary} shows that TPE-Mixed BO obtains the lowest mean objective and the best single-seed objective among all reported methods. HCMBO outperforms Random Search, Pure SA, and Enum-DE in mean objective, and shares the highest feasible rate of $80\%$ with TPE-Mixed BO. The current paper figure set excludes TPE-Mixed BO to focus on interpretable structured baselines; under this retained-method subset, HCMBO has the lowest mean objective and the highest feasible rate.
+Table~\ref{tab:g6_summary} shows that the G6 implementation of HCMBO outperforms Random Search, Pure SA, and Enum-DE in mean objective, and shares the highest feasible rate of $80\%$ with TPE-Mixed BO. However, TPE-Mixed BO obtains the lowest mean objective and the best single-seed objective in this five-seed table. A post-hoc source audit further showed that the useful HCMBO candidates mainly came from direction-wise structured capacity search rather than auxiliary internal random search. Therefore, the final HCMBO mainline removes the internal random-search phase.
+
+Table~\ref{tab:g7c_summary} reports the focused comparison after this mainline update. Under seed $23$, budget $B=400$, top-$10$ high-fidelity rechecks, $1600$ simulation steps, and time horizon $160$, the updated HCMBO obtains a lower high-fidelity objective than the current TPE-style mixed BO baseline. Since this focused comparison uses one representative seed, it is used as direct evidence for the mainline update rather than as a claim of multi-seed statistical dominance.
+
+\begin{table}[!t]
+\centering
+\caption{Focused Comparison After the HCMBO Mainline Update}
+\label{tab:g7c_summary}
+\footnotesize
+\begin{tabular}{lrrrr}
+\hline
+Method & Best objective & Feasible rate & $J_2$ & Gate rejected \\
+\hline
+HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & 2545.508 \\
+TPE-Mixed BO & 2.5180 & 100\% & 1.6948 & 2815.208 \\
+HCMBO queue-aware & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} \\
+\hline
+\end{tabular}
+\end{table}
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presents a Bellman--conservation-law crowd management framework for open pedestrian zones with channel direction configuration and internal entrance capacity control. The current controllable variable is $z=(s,q)$; the geometric guidance parameter $\eta_0$ and route preference parameter $\hat p$ are fixed model inputs. The proposed HCMBO framework exploits the direction-capacity hierarchy and uses high-fidelity rechecks for final ranking.
+This paper presents a Bellman--conservation-law crowd management framework for open pedestrian zones with channel direction configuration and internal entrance capacity control. The current controllable variable is $z=(s,q)$; the geometric guidance parameter $\eta_0$ and route preference parameter $\hat p$ are fixed model inputs. The proposed HCMBO framework exploits the direction-capacity hierarchy, concentrates the optimization budget on structured capacity search rather than internal random search, and uses high-fidelity rechecks for final ranking.
 
-The numerical experiments validate that: (1) fixed geometric guidance $M(x;\eta_0)$ and directional constraints $U(x;s)$ alter local crowd behaviors in interpretable ways; (2) directional configurations induce nontrivial efficiency--safety--balance trade-offs; (3) multi-stage behavior modeling is necessary for reliable channel-load assessment; and (4) in the completed horizontal comparison, HCMBO is the best retained structured method when TPE is excluded from the figure set, while TPE-Mixed BO obtains the lowest mean objective in the full method table.
+The numerical experiments validate that: (1) fixed geometric guidance $M(x;\eta_0)$ and directional constraints $U(x;s)$ alter local crowd behaviors in interpretable ways; (2) directional configurations induce nontrivial efficiency--safety--balance trade-offs; (3) multi-stage behavior modeling is necessary for reliable channel-load assessment; and (4) HCMBO outperforms Random Search, Pure SA, and Enum-DE in the multi-seed horizontal comparison, while the updated HCMBO mainline obtains a lower high-fidelity objective than the current TPE-style mixed BO baseline in the focused seed-$23$ comparison.
 
-Future work will extend to larger real-world geometries, online demand estimation, multi-weight Pareto analysis, and calibration against field observations.
+Future work will extend to larger real-world geometries, more random seeds, stronger official TPE/SMAC baselines, online demand estimation, multi-weight Pareto analysis, and calibration against field observations.
 
 \balance
 
