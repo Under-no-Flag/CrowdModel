@@ -1,0 +1,10 @@
+[g7e]
+profile = "full"
+output_root = "../../../results/g7e_hcmbo_ablation"
+control_config = "../g5_hcmbo_v2_small/g5.toml"
+search_config = "../g7_hcmbo_variant_ablation/g7.toml"
+workers = 4
+control_workers = 3
+search_workers = 4
+force = false
+fail_fast = false
