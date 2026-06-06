@@ -1,0 +1,4 @@
+interface:
+  display_name: "English Journal Experiment Writing"
+  short_description: "Rewrite experimental sections in English journal style"
+  default_prompt: "Rewrite this experimental section in a formal journal style while preserving data, equations, figures, and claim boundaries."
