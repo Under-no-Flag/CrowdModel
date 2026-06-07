@@ -7,6 +7,12 @@
 \renewcommand{\familydefault}{\sfdefault}
 \usetikzlibrary{arrows.meta,calc,positioning,shadings}
 
+% Step 1 design note for thesis-figure-skill.
+% Complex five-zone horizontal framework, W x H = 14.91 x 10.55 logical cm.
+% Visual flow: fixed inputs -> controls -> lower-level simulator -> performance -> optimizer.
+% The simulator is the hero zone: it embeds stage blocks, formula cues, and output mini-viz.
+% Polish targets: aligned headers, bounded text, uniform math/text scale, and readable feedback loop.
+
 \definecolor{navy}{RGB}{0,57,122}
 \definecolor{blue}{RGB}{20,98,181}
 \definecolor{lineblue}{RGB}{0,57,122}
@@ -20,12 +26,13 @@
   smallbox/.style={rounded corners=0.06cm, draw=blue, line width=0.011cm, fill=white},
   titletext/.style={font=\bfseries\fontsize{10.8}{12.4}\selectfont, text=black, align=center},
   headtext/.style={font=\bfseries\fontsize{5.35}{6.2}\selectfont, text=white, align=center, execute at begin node={\everymath{\scriptstyle}}},
-  bodytext/.style={font=\fontsize{4.25}{5.15}\selectfont, text=black, align=left, execute at begin node={\everymath{\scriptstyle}}},
-  smalltext/.style={font=\fontsize{3.35}{4.05}\selectfont, text=black, align=left, execute at begin node={\everymath{\scriptstyle}}},
-  tinytext/.style={font=\fontsize{2.95}{3.55}\selectfont, text=black, align=left, execute at begin node={\everymath{\scriptstyle}}},
+  bodytext/.style={font=\bfseries\fontsize{4.25}{5.15}\selectfont, text=black, align=left, execute at begin node={\everymath{\scriptstyle}}},
+  smalltext/.style={font=\fontsize{3.45}{4.15}\selectfont, text=black, align=left, execute at begin node={\everymath{\scriptscriptstyle}}},
+  tinytext/.style={font=\fontsize{3.25}{3.90}\selectfont, text=black, align=left, execute at begin node={\everymath{\scriptscriptstyle}}},
   labelblue/.style={font=\bfseries\fontsize{4.85}{5.65}\selectfont, text=navy, align=center, execute at begin node={\everymath{\scriptstyle}}},
   arrow/.style={-{Stealth[length=0.18cm,width=0.20cm]}, line width=0.045cm, draw=black},
   flowarrow/.style={-{Stealth[length=0.13cm,width=0.15cm]}, line width=0.018cm, draw=lineblue},
+  downflow/.style={-{Stealth[length=0.070cm,width=0.085cm]}, line width=0.014cm, draw=lineblue},
 }
 
 \tikzset{
@@ -105,11 +112,36 @@
   \draw[header] (#1,#2+#4-#5) rectangle ++(#3,#5);
   \node[headtext, text width=#3 cm] at (#1+#3/2,#2+#4-#5/2) {#6};
 }
+\newcommand{\BoxAnchors}[5]{%
+  \coordinate (#1-sw) at (#2,#3);
+  \coordinate (#1-se) at (#2+#4,#3);
+  \coordinate (#1-nw) at (#2,#3+#5);
+  \coordinate (#1-ne) at (#2+#4,#3+#5);
+  \coordinate (#1-west) at (#2,#3+#5/2);
+  \coordinate (#1-east) at (#2+#4,#3+#5/2);
+  \coordinate (#1-south) at (#2+#4/2,#3);
+  \coordinate (#1-north) at (#2+#4/2,#3+#5);
+  \coordinate (#1-center) at (#2+#4/2,#3+#5/2);
+}
+\newcommand{\PanelWithHeaderNamed}[7]{%
+  \PanelWithHeader{#2}{#3}{#4}{#5}{#6}{#7}
+  \BoxAnchors{#1}{#2}{#3}{#4}{#5}
+}
+\newcommand{\PanelWithHeaderNamedStyled}[8]{%
+  \draw[panel,#8] (#2,#3) rectangle ++(#4,#5);
+  \draw[header] (#2,#3+#5-#6) rectangle ++(#4,#6);
+  \node[headtext, text width=#4 cm] at (#2+#4/2,#3+#5-#6/2) {#7};
+  \BoxAnchors{#1}{#2}{#3}{#4}{#5}
+}
 \newcommand{\PanelHeaderOnly}[6]{%
   \draw[header] (#1,#2+#4-#5) rectangle ++(#3,#5);
   \node[headtext, text width=#3 cm] at (#1+#3/2,#2+#4-#5/2) {#6};
 }
 \newcommand{\SmallBox}[4]{\draw[box] (#1,#2) rectangle ++(#3,#4);}
+\newcommand{\SmallBoxNamed}[5]{%
+  \SmallBox{#2}{#3}{#4}{#5}
+  \BoxAnchors{#1}{#2}{#3}{#4}{#5}
+}
 \newcommand{\TextBox}[6]{%
   \draw[box] (#1,#2) rectangle ++(#3,#4);
   \node[bodytext, anchor=north west, text width=#5 cm, align=left]
@@ -120,6 +152,10 @@
   \node[tinytext, anchor=north west, text width=#5 cm, align=left]
     at (#1+0.08,#2+#4-0.07) {#6};
 }
+\newcommand{\StageBoxNamed}[7]{%
+  \StageBox{#2}{#3}{#4}{#5}{#6}{#7}
+  \BoxAnchors{#1}{#2}{#3}{#4}{#5}
+}
 \newcommand{\OutputBox}[6]{%
   \draw[smallbox] (#1,#2) rectangle ++(#3,#4);
   \node[smalltext, anchor=west, text width=#5 cm, align=left]
@@ -127,152 +163,196 @@
 }
 \newcommand{\Bullet}[3]{%
   \fill[black] (#1,#2) circle (0.043);
-  \node[bodytext, anchor=west, text width=#3 cm] at (#1+0.17,#2)
+  \node[bodytext, anchor=west, text width=#3 cm] at (#1+0.03,#2)
 }
 \newcommand{\StepBox}[5]{%
-  \draw[box] (#1,#2) rectangle ++(2.18,0.76);
+  \draw[box] (#1,#2) rectangle ++(2.02,0.76);
   \fill[navy] (#1+0.23,#2+0.38) circle (0.14);
   \node[font=\bfseries\fontsize{6.2}{7.0}\selectfont, text=white] at (#1+0.23,#2+0.38) {#3};
-  \node[bodytext, anchor=west, text width=1.48cm, align=center] at (#1+0.55,#2+0.39) {#4};
+  \node[bodytext, anchor=west, text width=2.30cm, align=left] at (#1+0.3,#2+0.39) {#4};
+}
+\newcommand{\StepBoxNamed}[5]{%
+  \StepBox{#2}{#3}{#4}{#5}{}
+  \BoxAnchors{#1}{#2}{#3}{1.82}{0.76}
 }
 
 \begin{document}
 \begin{tikzpicture}[scale=1.27, transform shape]
-  \path[use as bounding box] (0,0) rectangle (14.91,10.55);
-  \fill[white] (0,0) rectangle (14.91,10.55);
+  \def\sideW{2.23}
+  \def\simW{5.90}
+  \def\mainGap{0.24}
+  \def\mainY{2.34}
+  \def\mainH{7.30}
+  \pgfmathsetmacro{\colOneX}{0.04}
+  \pgfmathsetmacro{\colTwoX}{\colOneX+\sideW+\mainGap}
+  \pgfmathsetmacro{\simX}{\colTwoX+\sideW+\mainGap}
+  \pgfmathsetmacro{\colFourX}{\simX+\simW+\mainGap}
+  \pgfmathsetmacro{\colFiveX}{\colFourX+\sideW+\mainGap}
+  \pgfmathsetmacro{\canvasW}{\colFiveX+\sideW+0.08}
+  \pgfmathsetmacro{\figCenter}{\canvasW/2}
+  \pgfmathsetmacro{\bottomX}{\figCenter-6.03}
 
-  \node[titletext] at (7.455,10.18) {Method Framework for Joint Direction and Entrance-Rate Optimization};
+  \path[use as bounding box] (0,0) rectangle (\canvasW,10.55);
+  \fill[white] (0,0) rectangle (\canvasW,10.55);
+
+%  \node[titletext] at (\figCenter,10.18) {Method Framework for Joint Direction and Entrance-Rate Optimization};
 
   % Column 1
-  \PanelWithHeader{0.12}{2.35}{1.68}{7.28}{0.76}{1. Scenario and\\Fixed Inputs}
-  \Bullet{0.27}{7.45}{1.25}{Walkable domain\\$\Omega_w$ and channel\\geometry};
-  \Bullet{0.27}{6.36}{1.25}{Obstacles and\\internal entrances};
-  \Bullet{0.27}{5.50}{1.25}{Fixed behavioral\\preference $\hat{\mathbf{p}}$};
-  \Bullet{0.27}{4.61}{1.25}{Fixed geometric\\guidance\\parameter $\eta_0$};
+  \PanelWithHeaderNamed{col1}{\colOneX}{\mainY}{\sideW}{\mainH}{0.76}{1. Scenario and\\Fixed Inputs}
+  \begin{scope}[shift={(col1-sw)}]
+    \Bullet{0.36}{5.11}{1.45}{Walkable domain\\$\Omega_w$ and channel\\geometry};
+    \Bullet{0.36}{4.02}{1.45}{Obstacles and\\internal entrances};
+    \Bullet{0.36}{3.16}{1.45}{Fixed behavioral\\preference $\hat{\mathbf{p}}$};
+    \Bullet{0.36}{2.27}{1.45}{Fixed geometric\\guidance\\parameter $\eta_0$};
+  \end{scope}
 
   % Column 2
-  \PanelWithHeader{1.95}{2.34}{2.18}{7.30}{0.62}{2. Control Variables}
-  \TextBox{2.06}{6.78}{1.96}{1.82}{1.66}
-    {\textbf{Direction configuration $\mathbf{s}$}\\[0.08cm]
-    +1: forward one-way\\
-    -1: reverse one-way\\
-    0: bidirectional\\
-    $\emptyset$: closed};
-  \TextBox{2.06}{4.94}{1.96}{1.42}{1.66}
-    {\textbf{Entrance-rate control $\mathbf{q}$}\\[0.12cm]
-    Piecewise admissible\\rates $q_c^+(t), q_c^-(t)$};
-  \SmallBox{1.96}{3.75}{2.16}{0.90}
-  \node[labelblue, text width=1.86cm] at (3.04,4.22) {Joint control variable\\[0.06cm]$\mathbf{z}=(\mathbf{s},\mathbf{q})$};
+  \PanelWithHeaderNamed{col2}{\colTwoX}{\mainY}{\sideW}{\mainH}{0.76}{2. Control Variables}
+  \begin{scope}[shift={(col2-sw)}]
+    \TextBox{0.11}{4.44}{1.81}{1.82}{1.53}
+      {\textbf{Direction\\configuration $\mathbf{s}$}\\[0.08cm]
+      +1: forward one-way\\
+      -1: reverse one-way\\
+      0: bidirectional\\
+      $\emptyset$: closed};
+    \TextBox{0.11}{2.60}{1.81}{1.42}{1.53}
+      {\textbf{Entrance-rate control $\mathbf{q}$}\\[0.12cm]
+      Piecewise admissible\\rates $q_c^+(t), q_c^-(t)$};
+    \SmallBoxNamed{joint-control}{0.01}{1.41}{2.01}{0.90}
+    \node[labelblue, text width=1.76cm] at (1.015,1.88) {Joint control variable\\[0.06cm]$\mathbf{z}=(\mathbf{s},\mathbf{q})$};
+  \end{scope}
 
   % Column 3 main simulator
-  \draw[panel, fill=pale] (4.30,2.31) rectangle ++(5.90,7.33);
-  \PanelHeaderOnly{4.30}{2.31}{5.90}{7.33}{0.76}
-    {3. Lower-level Bellman-Conservation Crowd Dynamics Simulator\\$S(\mathbf{z};\hat{\mathbf{p}},\eta_0)$}
+  \PanelWithHeaderNamedStyled{sim-panel}{\simX}{\mainY}{\simW}{\mainH}{0.76}
+    {3. Lower-level Bellman-Conservation Crowd Dynamics Simulator\\$S(\mathbf{z};\hat{\mathbf{p}},\eta_0)$}{fill=pale}
+  \begin{scope}[shift={(sim-panel-sw)}]
+    \def\ix{0.13}
+    \def\iw{0.65}
+    \def\tw{2.36}
+    \def\tx{0.88}
+    \foreach \y/\picname in {5.575/gridicon,4.675/curveicon,3.785/diricon,2.895/contouricon,2.035/cubeicon,1.175/gateicon,0.315/spliticon}{
+      \draw[smallbox] (\ix,\y) rectangle ++(\iw,0.65);
+      \pic at (\ix+0.325,\y+0.325) {\picname};
+    }
 
-  \def\ix{4.43}
-  \def\iw{0.65}
-  \def\tw{2.36}
-  \def\tx{5.18}
-  \foreach \y/\picname in {7.90/gridicon,7.03/curveicon,6.16/diricon,5.29/contouricon,4.42/cubeicon,3.55/gateicon,2.68/spliticon}{
-    \draw[smallbox] (\ix,\y) rectangle ++(\iw,0.65);
-    \pic at (\ix+0.325,\y+0.325) {\picname};
-  }
-  \foreach \y in {7.74,6.87,6.00,5.13,4.26,3.39}{
-    \draw[flowarrow] (6.32,\y)--(6.32,\y-0.17);
-  }
+    \StageBoxNamed{stage-a}{\tx}{5.50}{2.36}{0.80}{2.18}
+      {\textbf{(a) Multi-stage / multi-route density}\\
+       decomposition\\[-0.01cm]
+       $\rho=\sum_o\sum_r\rho_{o,r}$};
+    \StageBoxNamed{stage-b}{\tx}{4.64}{2.36}{0.72}{2.18}
+      {\textbf{(b) Total density and speed update}\\
+       Density-dependent speed\\
+       $f(\rho)$ decreases with $\rho$};
+    \StageBoxNamed{stage-c}{\tx}{3.72}{2.36}{0.78}{2.18}
+      {\textbf{(c) Direction constraints and guidance}\\
+       Allowed directions $\mathcal{U}(x;\mathbf{s})$\\
+       Anisotropic metric $M(x;\eta_0)$};
+    \StageBoxNamed{stage-d}{\tx}{2.86}{2.36}{0.72}{2.18}
+      {\textbf{(d) Constrained Bellman equation}\\
+       Compute potential and optimal direction};
+    \StageBoxNamed{stage-e}{\tx}{2.00}{2.36}{0.72}{2.18}
+      {\textbf{(e) Finite-volume conservation update}\\
+       Advance $\rho_{o,r}$ using upwind fluxes};
+    \StageBoxNamed{stage-f}{\tx}{1.14}{2.36}{0.72}{2.18}
+      {\textbf{(f) Internal entrance flux control}\\
+       Actual flux capped by $q_c^\pm(t)$};
+    \StageBoxNamed{stage-g}{\tx}{0.28}{2.36}{0.72}{2.18}
+      {\textbf{(g) Stage transition update}\\
+       Route switching governed by $\hat{\mathbf{p}}$};
 
-  \StageBox{\tx}{7.84}{2.36}{0.80}{2.16}
-    {\textbf{(a) Multi-stage / multi-route density}\\
-     decomposition\\[-0.01cm]
-     $\rho=\sum_o\sum_r\rho_{o,r}$};
-  \StageBox{\tx}{6.98}{2.36}{0.72}{2.16}
-    {\textbf{(b) Total density and speed update}\\
-     Density-dependent speed\\
-     $f(\rho)$ decreases with $\rho$};
-  \StageBox{\tx}{6.06}{2.36}{0.78}{2.16}
-    {\textbf{(c) Direction constraints and guidance}\\
-     Allowed directions $\mathcal{U}(x;\mathbf{s})$\\
-     Anisotropic metric $M(x;\eta_0)$};
-  \StageBox{\tx}{5.20}{2.36}{0.72}{2.16}
-    {\textbf{(d) Constrained Bellman equation}\\
-     Compute potential and optimal direction};
-  \StageBox{\tx}{4.34}{2.36}{0.72}{2.16}
-    {\textbf{(e) Finite-volume conservation update}\\
-     Advance $\rho_{o,r}$ using upwind fluxes};
-  \StageBox{\tx}{3.48}{2.36}{0.72}{2.16}
-    {\textbf{(f) Internal entrance flux control}\\
-     Actual flux capped by $q_c^\pm(t)$};
-  \StageBox{\tx}{2.62}{2.36}{0.72}{2.16}
-    {\textbf{(g) Stage transition update}\\
-     Route switching governed by $\hat{\mathbf{p}}$};
+    \draw[downflow] (stage-a-south)--(stage-b-north);
+    \draw[downflow] (stage-b-south)--(stage-c-north);
+    \draw[downflow] (stage-c-south)--(stage-d-north);
+    \draw[downflow] (stage-d-south)--(stage-e-north);
+    \draw[downflow] (stage-e-south)--(stage-f-north);
+    \draw[downflow] (stage-f-south)--(stage-g-north);
 
-  \draw[blue, line width=0.020cm]
-    (7.56,5.32)--(7.72,5.32)--(7.72,5.18)--(7.96,5.58)--
-    (7.72,5.98)--(7.72,5.84)--(7.56,5.84)--cycle;
+    % Simulation outputs
+    \draw[smallbox] (3.72,0.50) rectangle ++(2.00,5.80);
+    \BoxAnchors{sim-outputs}{3.72}{0.50}{2.00}{5.80}
+    \draw[smallbox, fill=lightblue] (3.72,5.68) rectangle ++(2.00,0.62);
+    \node[labelblue] at (4.72,5.99) {Simulation Outputs};
+    \foreach \cy/\picname in {5.15/heaticon,4.48/contouricon,3.81/velocityicon,3.08/peopleicon,2.15/barsicon}{
+      \draw[smallbox] (3.80,\cy-0.29) rectangle ++(0.63,0.58);
+      \pic at (4.115,\cy) {\picname};
+    }
+    \OutputBox{4.50}{4.84}{1.12}{0.62}{1.04}{Density field\\$\rho(x,t)$}
+    \OutputBox{4.50}{4.17}{1.12}{0.62}{1.04}{Potential field\\$\phi(x,t)$}
+    \OutputBox{4.50}{3.50}{1.12}{0.62}{1.04}{Velocity field\\$\mathbf{v}(x,t)$}
+    \OutputBox{4.50}{2.77}{1.12}{0.62}{1.04}{Entrance waiting\\blocking $B$}
+    \OutputBox{4.50}{1.84}{1.12}{0.62}{1.04}{Channel\\cumulative\\throughput $R_c$}
 
-  % Simulation outputs
-  \draw[smallbox] (8.02,2.80) rectangle ++(2.00,5.80);
-  \draw[smallbox, fill=lightblue] (8.02,7.98) rectangle ++(2.00,0.62);
-  \node[labelblue] at (9.02,8.29) {Simulation Outputs};
-  \foreach \y/\picname in {7.20/heaticon,6.55/contouricon,5.88/velocityicon,5.18/peopleicon,4.26/barsicon}{
-    \draw[smallbox] (8.10,\y) rectangle ++(0.63,0.58);
-    \pic at (8.415,\y+0.29) {\picname};
-  }
-  \OutputBox{8.80}{7.16}{1.12}{0.62}{0.94}{Density field\\$\rho(x,t)$}
-  \OutputBox{8.80}{6.50}{1.12}{0.62}{0.94}{Potential field\\$\phi(x,t)$}
-  \OutputBox{8.80}{5.83}{1.12}{0.62}{0.94}{Velocity field\\$\mathbf{v}(x,t)$}
-  \OutputBox{8.80}{5.10}{1.12}{0.62}{0.94}{Entrance waiting\\blocking $B$}
-  \OutputBox{8.80}{4.17}{1.12}{0.62}{0.94}{Channel cumulative\\throughput $R_c$}
+    \coordinate (sim-output-arrow-left) at ($(stage-d-east)+(0.02,0)$);
+    \coordinate (sim-output-arrow-neck) at ($(stage-d-east)+(0.18,0)$);
+    \coordinate (sim-output-arrow-tip) at ($(sim-outputs-west)+(-0.06,0)$ |- stage-d-east);
+    \draw[blue, line width=0.020cm]
+      ($(sim-output-arrow-left)+(0,-0.24)$)--
+      ($(sim-output-arrow-neck)+(0,-0.24)$)--
+      ($(sim-output-arrow-neck)+(0,-0.38)$)--
+      (sim-output-arrow-tip)--
+      ($(sim-output-arrow-neck)+(0,0.38)$)--
+      ($(sim-output-arrow-neck)+(0,0.24)$)--
+      ($(sim-output-arrow-left)+(0,0.24)$)--cycle;
+  \end{scope}
 
   % Column 4 performance evaluation
-  \PanelWithHeader{10.34}{2.34}{1.86}{7.30}{0.84}{4. Performance\\Evaluation}
-  \fill[black] (10.48,7.92) circle (0.035);
-  \node[bodytext, anchor=west, text width=1.30cm] at (10.62,7.92) {\textbf{Efficiency:} $J_1$\\{\fontsize{4.0}{4.8}\selectfont(total travel time)}};
-  \fill[black] (10.48,7.17) circle (0.035);
-  \node[bodytext, anchor=west, text width=1.30cm] at (10.62,7.17) {\textbf{Safety:} $J_2$\\{\fontsize{4.0}{4.8}\selectfont(high-density exposure)}};
-  \fill[black] (10.48,6.38) circle (0.035);
-  \node[bodytext, anchor=west, text width=1.38cm] at (10.62,6.38) {\textbf{Load balance:}\\$J_5=\mathrm{Var}(R_1,$\\$\ldots,R_C)$};
-  \fill[black] (10.48,5.57) circle (0.035);
-  \node[bodytext, anchor=west, text width=1.32cm] at (10.62,5.57) {\textbf{Entrance waiting:} $J_B$};
-  \fill[black] (10.48,5.08) circle (0.035);
-  \node[bodytext, anchor=west, text width=1.32cm] at (10.62,5.08) {\textbf{Control smoothness:} $J_R$};
-  \draw[blue, line width=0.020cm, -{Stealth[length=0.25cm,width=0.24cm]}] (11.28,4.62)--(11.28,4.08);
-  \draw[smallbox] (10.39,3.23) rectangle ++(1.76,0.95);
-  \node[font=\bfseries\fontsize{3.35}{4.0}\selectfont, text=navy, align=center, text width=1.58cm]
-    at (11.27,3.84) {Standardized\\weighted objective};
-  \node[font=\fontsize{4.0}{4.8}\selectfont, align=center, text=black, text width=1.55cm]
-    at (11.27,3.46)
-    {$J(\mathbf{z})=\sum_k\lambda_k\tilde J_k$};
+  \PanelWithHeaderNamed{col4}{\colFourX}{\mainY}{\sideW}{\mainH}{0.76}{4. Performance\\Evaluation}
+  \begin{scope}[shift={(col4-sw)}]
+    \fill[black] (0.14,5.58) circle (0.035);
+    \node[bodytext, anchor=west, text width=1.58cm] at (0.28,5.58) {\textbf{Efficiency:} $J_1$\\{\fontsize{4.0}{4.8}\selectfont(total travel time)}};
+    \fill[black] (0.14,4.83) circle (0.035);
+    \node[bodytext, anchor=west, text width=1.58cm] at (0.28,4.83) {\textbf{Safety:} $J_2$\\{\fontsize{4.0}{4.8}\selectfont(high-density exposure)}};
+    \fill[black] (0.14,4.04) circle (0.035);
+    \node[bodytext, anchor=west, text width=1.58cm] at (0.28,4.04) {\textbf{Load balance:}\\$J_5=\mathrm{Var}(R_1,$\\$\ldots,R_C)$};
+    \fill[black] (0.14,3.23) circle (0.035);
+    \node[bodytext, anchor=west, text width=1.58cm] at (0.28,3.23) {\textbf{Entrance waiting:} $J_B$};
+    \fill[black] (0.14,2.74) circle (0.035);
+    \node[bodytext, anchor=west, text width=1.58cm] at (0.28,2.74) {\textbf{Control}\\\textbf{smoothness:} $J_R$};
+    \SmallBoxNamed{objective-box}{0.11}{0.89}{1.81}{0.95}
+    \node[font=\bfseries\fontsize{3.35}{4.0}\selectfont, text=navy, align=center, text width=1.62cm]
+      at (1.015,1.50) {Standardized\\weighted objective};
+    \node[font=\fontsize{4.0}{4.8}\selectfont, align=center, text=black, text width=1.60cm]
+      at (1.015,1.12)
+      {$J(\mathbf{z})=\sum_k\lambda_k\tilde J_k$};
+    \draw[blue, line width=0.020cm, -{Stealth[length=0.25cm,width=0.24cm]}]
+      ($(objective-box-north)+(0,0.55)$)--(objective-box-north);
+  \end{scope}
 
   % Column 5 upper optimizer
-  \PanelWithHeader{12.39}{2.34}{2.39}{7.30}{1.35}{5. Upper-level\\HCMBO Optimizer\\Hierarchical Constrained\\Mixed-variable Black-box\\Optimization}
-  \StepBox{12.50}{7.25}{1}{Generate feasible\\direction candidates $\mathbf{s}_{\rm cand}$}{}
-  \StepBox{12.50}{6.29}{2}{Direction-aware capacity\\mapping $q=T_{\mathbf{s}}(x)$}{}
-  \StepBox{12.50}{5.33}{3}{Structured search in\\$\mathbf{x}\in[0,1]^d$}{}
-  \StepBox{12.50}{4.37}{4}{Multi-fidelity simulation-\\based evaluation}{}
-  \StepBox{12.50}{3.41}{5}{High-fidelity re-evaluation\\and final selection $\mathbf{z}^{*}$}{}
-  \draw[arrow, line width=0.025cm] (13.58,7.21)--(13.58,7.10);
-  \draw[arrow, line width=0.025cm] (13.58,6.25)--(13.58,6.14);
-  \draw[arrow, line width=0.025cm] (13.58,5.29)--(13.58,5.18);
-  \draw[arrow, line width=0.025cm] (13.58,4.33)--(13.58,4.22);
-  \draw[lineblue, dashed, line width=0.018cm] (12.43,3.02)--(14.74,3.02);
-  \node[font=\bfseries\itshape\fontsize{4.85}{5.6}\selectfont, text=navy, align=center, text width=2.12cm]
-    at (13.58,2.70) {Best control policy under\\limited simulation budget};
+  \PanelWithHeaderNamed{col5}{\colFiveX}{\mainY}{\sideW}{\mainH}{0.76}{5. Upper-level\\HCMBO Optimizer}
+  \begin{scope}[shift={(col5-sw)}]
+    \StepBoxNamed{opt-step-1}{0.10}{5.54}{1}{Generate feasible\\direction candidates\\$\mathbf{s}_{\rm cand}$}
+    \StepBoxNamed{opt-step-2}{0.10}{4.58}{2}{Direction-aware\\capacity mapping\\$q=T_{\mathbf{s}}(x)$}
+    \StepBoxNamed{opt-step-3}{0.10}{3.62}{3}{Structured search in\\$\mathbf{x}\in[0,1]^d$}
+    \StepBoxNamed{opt-step-4}{0.10}{2.66}{4}{Multi-fidelity\\simulation-based\\evaluation}
+    \StepBoxNamed{opt-step-5}{0.10}{1.70}{5}{High-fidelity\\re-evaluation and\\final selection\\$\mathbf{z}^{*}$}
+    \draw[arrow, line width=0.025cm] (opt-step-1-south)--(opt-step-2-north);
+    \draw[arrow, line width=0.025cm] (opt-step-2-south)--(opt-step-3-north);
+    \draw[arrow, line width=0.025cm] (opt-step-3-south)--(opt-step-4-north);
+    \draw[arrow, line width=0.025cm] (opt-step-4-south)--(opt-step-5-north);
+    \draw[lineblue, dashed, line width=0.018cm] (0.04,0.74)--(1.99,0.74);
+    \node[font=\bfseries\itshape\fontsize{4.05}{4.35}\selectfont, text=navy, align=center, text width=1.78cm]
+      at (1.015,0.30) {Best control\\policy under\\limited simulation\\budget};
+  \end{scope}
 
   % Inter-column arrows
-  \draw[arrow] (1.80,6.03)--(1.95,6.03);
-  \draw[arrow] (4.13,6.03)--(4.30,6.03);
-  \draw[arrow] (10.20,6.03)--(10.34,6.03);
-  \draw[arrow] (12.20,6.03)--(12.39,6.03);
+  \draw[arrow] (col1-east)--(col2-west);
+  \draw[arrow] (col2-east)--(sim-panel-west);
+  \draw[arrow] (sim-panel-east)--(col4-west);
+  \draw[arrow] (col4-east)--(col5-west);
 
   % Feedback loop
-  \draw[arrow, rounded corners=0.05cm] (13.58,2.34)--(13.58,1.47)--(3.04,1.47)--(3.04,3.75);
-  \node[font=\bfseries\fontsize{9.5}{11}\selectfont, text=black] at (7.65,1.74) {update $\mathbf{z}=(\mathbf{s},\mathbf{q})$};
+  \coordinate (feedback-rail) at (0,1.47);
+  \coordinate (feedback-right) at (col5-south |- feedback-rail);
+  \coordinate (feedback-left) at (joint-control-south |- feedback-rail);
+  \coordinate (feedback-label) at ($(feedback-left)!0.50!(feedback-right)+(0,0.27)$);
+  \draw[arrow, rounded corners=0.05cm] (col5-south)--(feedback-right)--(feedback-left)--(joint-control-south);
+  \node[font=\bfseries\fontsize{9.5}{11}\selectfont, text=black] at (feedback-label) {update $\mathbf{z}=(\mathbf{s},\mathbf{q})$};
 
   % Bottom statement
-  \draw[box] (1.42,0.38) rectangle ++(12.06,0.95);
+  \draw[box] (\bottomX,0.38) rectangle ++(12.06,0.95);
   \node[font=\bfseries\itshape\fontsize{7.9}{9.3}\selectfont, text=navy, align=center, text width=11.4cm]
-    at (7.45,0.86)
+    at (\figCenter,0.86)
     {Direction rules change feasible motion directions, while entrance-rate control changes admissible channel inflow;\\
      both are jointly optimized through simulation-based feedback.};
 
