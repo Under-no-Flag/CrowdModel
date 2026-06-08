@@ -165,6 +165,14 @@ where $s$ denotes the discrete direction states of the channels, and $q$ denotes
 The behavioral preference parameter $\hat p$ and the geometric guidance parameter $\eta_0$ are treated as fixed model inputs.
 For a given control variable $z$, the lower-level simulator returns density fields, velocity fields, entrance waiting, and realized channel throughputs.
 The upper-level optimizer then evaluates efficiency, safety, load balance, waiting, and smoothness metrics, and searches for a better control policy under a limited simulation budget.
+The overall method framework is shown in Fig.~\ref{fig:method_framework}.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{../images/framework/method_framework_tikz.pdf}
+\caption{Method framework for joint direction and entrance-rate optimization. Fixed scenario inputs, behavioral preferences, and geometric guidance parameters define the lower-level Bellman--conservation-law crowd simulator. The controllable direction configuration and entrance-rate profile are jointly evaluated by efficiency, safety, load-balance, waiting, and smoothness objectives, and are updated by the upper-level HCMBO optimizer.}
+\label{fig:method_framework}
+\end{figure*}
 
 The key modeling assumption is that direction rules and entrance capacities should be optimized jointly.
 The direction configuration $s$ changes the local feasible direction set, whereas the entrance capacity $q$ changes the realized admitted flux at channel entrances.
@@ -372,34 +380,34 @@ R_c(T)=\int_0^T(\hat A_c^+(t)+\hat A_c^-(t))\,dt
 be the realized cumulative throughput of channel $c$.
 The channel load imbalance is
 \begin{equation}
-J_5(z) = \operatorname{Var}(R_1(T), \dots, R_C(T)).
-\label{eq:j5}
+J_3(z) = \operatorname{Var}(R_1(T), \dots, R_C(T)).
+\label{eq:j3}
 \end{equation}
 
 \subsubsection{Entrance Waiting and Control Smoothness}
 
 Entrance waiting is penalized as
 \begin{equation}
-J_B(z)=\int_0^T\sum_{c=1}^{C}\left(B_c^+(t)+B_c^-(t)\right)\,dt.
-\label{eq:jb}
+J_4(z)=\int_0^T\sum_{c=1}^{C}\left(B_c^+(t)+B_c^-(t)\right)\,dt.
+\label{eq:j4}
 \end{equation}
 For piecewise-constant capacity profiles, smoothness is measured by
 \begin{equation}
-J_R(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right].
-\label{eq:jr}
+J_5(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right].
+\label{eq:j5}
 \end{equation}
 Here $k$ indexes the capacity-control time segment.
-$J_B$ discourages excessive entrance metering that creates upstream queues, while $J_R$ discourages abrupt high-frequency changes in capacity profiles.
+$J_4$ discourages excessive entrance metering that creates upstream queues, while $J_5$ discourages abrupt high-frequency changes in capacity profiles.
 
 \subsubsection{Standardized Scalar Objective}
 
 Because the evaluation terms have different units and magnitudes, they are standardized before weighting:
 \[
-\tilde J_1,\quad \tilde J_2,\quad \tilde J_5,\quad \tilde J_B,\quad \tilde J_R.
+\tilde J_1,\quad \tilde J_2,\quad \tilde J_3,\quad \tilde J_4,\quad \tilde J_5.
 \]
-Given weights $\lambda=(\lambda_1,\lambda_2,\lambda_5,\lambda_B,\lambda_R)$, the scalarized objective is
+Given weights $\lambda=(\lambda_1,\ldots,\lambda_5)$, the scalarized objective is
 \begin{equation}
-J(z) = \lambda_1 \tilde{J}_1(z) + \lambda_2 \tilde{J}_2(z) + \lambda_5 \tilde{J}_5(z) + \lambda_B \tilde{J}_B(z) + \lambda_R \tilde{J}_R(z),
+J(z) = \sum_{k=1}^{5}\lambda_k\tilde{J}_k(z),
 \label{eq:scalarized}
 \end{equation}
 and the optimization problem is
@@ -667,7 +675,7 @@ Case indices are retained only as configuration identifiers and are not mixed wi
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary.png}
-\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_5$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions. (C) Objective summary heatmap, with only the best value in each objective dimension annotated.}
+\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_3$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions. (C) Objective summary heatmap, with only the best value in each objective dimension annotated.}
 \label{fig:g2_control_tradeoff}
 \end{figure*}
 
@@ -680,10 +688,10 @@ If an exposure-weighted centroid falls inside an obstacle due to averaging over 
 \label{fig:g2_spatial_mechanism}
 \end{figure*}
 
-Fig.~\ref{fig:g2_control_tradeoff} shows that different direction settings produce stable and clearly separated changes in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$.
-Using the aggregated normalized objective $\tilde{J}=\tilde{J}_1+\tilde{J}_2+\tilde{J}_5$, C8 (SR-LM, EEWE) obtains the lowest value, $\tilde{J}=0.5102$.
+Fig.~\ref{fig:g2_control_tradeoff} shows that different direction settings produce stable and clearly separated changes in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_3$.
+Using the aggregated normalized objective $\tilde{J}=\tilde{J}_1+\tilde{J}_2+\tilde{J}_3$, C8 (SR-LM, EEWE) obtains the lowest value, $\tilde{J}=0.5102$.
 The baseline C1 is close, with $\tilde{J}=0.5145$, but achieves the lowest safety exposure, $\tilde{J}_2=0.00785$.
-C9 (SR-B) gives the best load-balancing term, $\tilde{J}_5=0.1138$, while C3 (SE-M) gives the best efficiency term, $\tilde{J}_1=0.3141$, at the cost of higher safety exposure and load imbalance.
+C9 (SR-B) gives the best load-balancing term, $\tilde{J}_3=0.1138$, while C3 (SE-M) gives the best efficiency term, $\tilde{J}_1=0.3141$, at the cost of higher safety exposure and load imbalance.
 
 \begin{table*}[!t]
 \centering
@@ -692,7 +700,7 @@ C9 (SR-B) gives the best load-balancing term, $\tilde{J}_5=0.1138$, while C3 (SE
 \footnotesize
 \begin{tabular}{c c c c c c c l}
 \hline
-Case & Policy & Code & $\tilde{J}_1$ & $\tilde{J}_2$ & $\tilde{J}_5$ & $\tilde{J}$ & Main characteristic \\
+Case & Policy & Code & $\tilde{J}_1$ & $\tilde{J}_2$ & $\tilde{J}_3$ & $\tilde{J}$ & Main characteristic \\
 \hline
 C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure; close to the best aggregate objective \\
 C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency; risk concentrates near the middle channel \\
@@ -715,7 +723,7 @@ C9 has load shares of $0$, $30.0\%$, $33.7\%$, and $36.3\%$, which explains its 
 Fig.~\ref{fig:g2_spatial_mechanism}(B) further shows that directional control changes not only total flow allocation but also the spatial location of risk exposure.
 Hotspot locations are visualized in the true scene coordinate system and on the same feasible-domain and obstacle background as the density maps.
 Upper-channel-dominant or middle-closure configurations shift hotspots upward; middle-channel dominance places hotspots near the central passage; and lower-middle or bottom involvement shifts hotspots downward.
-Hence, the variations in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$ are not merely abstract numerical differences, but arise from coupled changes in channel-load redistribution, local safety exposure, and hotspot migration.
+Hence, the variations in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_3$ are not merely abstract numerical differences, but arise from coupled changes in channel-load redistribution, local safety exposure, and hotspot migration.
 
 The G2 experiment therefore supports the need for subsequent optimization from three perspectives.
 First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum.
