@@ -674,18 +674,9 @@ Case indices are retained only as configuration identifiers and are not mixed wi
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary.png}
-\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_3$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions. (C) Objective summary heatmap, with only the best value in each objective dimension annotated.}
+\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
+\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_3$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions.}
 \label{fig:g2_control_tradeoff}
-\end{figure*}
-
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_spatial_mechanism_summary.png}
-\caption{Spatial mechanism behind directional-control responses. (A) Channel-load distribution across the 13 representative cases, with annotations retained only for major loaded channels. (B) Hotspot migration over the same scene background used in the density maps.
-Marker size represents local exposure intensity, and color indicates the policy family.
-If an exposure-weighted centroid falls inside an obstacle due to averaging over separated high-density regions, it is mapped to the nearest walkable cell for visualization.}
-\label{fig:g2_spatial_mechanism}
 \end{figure*}
 
 Fig.~\ref{fig:g2_control_tradeoff} shows that different direction settings produce stable and clearly separated changes in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_3$.
@@ -714,16 +705,6 @@ C9 & SR-B & EEEW & 0.4377 & 0.01344 & \textbf{0.1138} & 0.5649 & Most balanced c
 
 These results indicate that perturbing the direction variable $s$ does not produce a monotonic improvement pattern, nor does any single configuration dominate all three objectives.
 The non-dominated set contains C1, C3, C4, C6, C8, and C9, confirming that the four-channel multi-stage scenario already forms a nontrivial multi-objective response structure.
-
-The direct spatial mechanism behind these objective differences is the redistribution of channel loads and high-density hotspots.
-As shown in Fig.~\ref{fig:g2_spatial_mechanism}(A), the baseline C1 concentrates flow mainly in the middle and lower-middle channels, with shares of $34.0\%$ and $47.2\%$, respectively.
-C8 has channel-load shares of $0.6\%$, $47.6\%$, $32.0\%$, and $19.7\%$, maintaining a low aggregate objective while still assigning the largest burden to the middle channel.
-C9 has load shares of $0$, $30.0\%$, $33.7\%$, and $36.3\%$, which explains its best load-balancing term but weaker efficiency.
-
-Fig.~\ref{fig:g2_spatial_mechanism}(B) further shows that directional control changes not only total flow allocation but also the spatial location of risk exposure.
-Hotspot locations are visualized in the true scene coordinate system and on the same feasible-domain and obstacle background as the density maps.
-Upper-channel-dominant or middle-closure configurations shift hotspots upward; middle-channel dominance places hotspots near the central passage; and lower-middle or bottom involvement shifts hotspots downward.
-Hence, the variations in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_3$ are not merely abstract numerical differences, but arise from coupled changes in channel-load redistribution, local safety exposure, and hotspot migration.
 
 The G2 experiment therefore supports the need for subsequent optimization from three perspectives.
 First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum.

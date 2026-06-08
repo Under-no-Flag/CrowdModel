@@ -442,7 +442,7 @@ def _build_capacity_cases(ref_rates: dict[str, float], *, duration: float) -> li
                     (0.75, 1.0, {"*": 0.65}),
                 ],
             ),
-            description="Four low-jump capacity segments for J_R comparison.",
+            description="Four low-jump capacity segments for control-smoothness comparison.",
         ),
     ]
 
@@ -585,6 +585,11 @@ def _write_csv(path: Path, rows: list[dict[str, object]]) -> None:
         writer.writerows(rows)
 
 
+def _read_csv_rows(path: Path) -> list[dict[str, object]]:
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        return list(csv.DictReader(handle))
+
+
 def _non_dominated(rows: list[dict[str, object]]) -> list[str]:
     ids: list[str] = []
     metrics = ("j1", "j2", "j5", "jb")
@@ -607,35 +612,70 @@ def _save_capacity_levels_plot(path: Path, rows: list[dict[str, object]]) -> Non
     selected = [row for row in rows if row["case_id"] in {"g2v2_q_inf", "g2v2_q_high", "g2v2_q_medium", "g2v2_q_low"}]
     order = {"g2v2_q_inf": 0, "g2v2_q_high": 1, "g2v2_q_medium": 2, "g2v2_q_low": 3}
     selected.sort(key=lambda row: order[str(row["case_id"])])
-    labels = ["inf", "high", "medium", "low"]
-    fig, ax1 = plt.subplots(1, 1, figsize=(8.2, 4.8), dpi=160)
+    labels = ["no limit", "high", "medium", "low"]
+    fig, ax1 = plt.subplots(1, 1, figsize=(8.8, 5.3), dpi=180)
     x = np.arange(len(selected))
-    for metric in ("j1", "j2", "j5"):
-        ax1.plot(x, [float(row[metric]) for row in selected], marker="o", label=metric)
+    metric_labels = {"j1": r"$\tilde J_1$", "j2_eval": r"$\tilde J_2^{eval}$", "j5": r"$\tilde J_3$"}
+    colors = {"j1": "#355C7D", "j2_eval": "#C06C84", "j5": "#6C5B7B"}
+    for metric in ("j1", "j2_eval", "j5"):
+        ax1.plot(x, [float(row[metric]) for row in selected], marker="o", label=metric_labels[metric])
+        ax1.lines[-1].set_color(colors[metric])
     ax1.set_xticks(x)
     ax1.set_xticklabels(labels)
     ax1.set_ylabel("normalized objective term")
-    ax1.set_title("Capacity-level response")
+    ax1.set_xlabel("internal entrance rate upper-bound level")
+    ax1.set_title("Entrance-rate upper-bound response")
     ax1.grid(alpha=0.25)
     ax2 = ax1.twinx()
-    ax2.plot(x, [float(row["jb"]) for row in selected], color="tab:red", marker="s", label="J_B")
-    ax2.set_ylabel("waiting exposure J_B")
+    ax2.plot(x, [float(row["gate_rejected"]) for row in selected], color="#D95F02", marker="s", label="unreleased demand")
+    ax2.set_ylabel("unreleased attempted flow")
     lines, labels_left = ax1.get_legend_handles_labels()
     lines2, labels_right = ax2.get_legend_handles_labels()
-    ax1.legend(lines + lines2, labels_left + labels_right, frameon=False, loc="best")
-    fig.tight_layout()
-    fig.savefig(path)
+    ax1.legend(
+        lines + lines2,
+        labels_left + labels_right,
+        frameon=False,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.28),
+        ncol=4,
+        fontsize=8,
+    )
+    fig.tight_layout(rect=(0.0, 0.14, 1.0, 1.0))
+    fig.savefig(path, bbox_inches="tight")
     plt.close(fig)
 
 
 def _save_pareto_plot(path: Path, rows: list[dict[str, object]], non_dominated_ids: list[str]) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(7.4, 5.4), dpi=160)
+    fig, ax = plt.subplots(1, 1, figsize=(8.8, 5.8), dpi=180)
     jb_values = np.array([float(row["jb"]) for row in rows], dtype=float)
+    family_markers = {
+        "reference": "o",
+        "level_scan": "s",
+        "single_bottleneck": "D",
+        "allocation": "^",
+        "schedule": "P",
+    }
+    label_by_id = {
+        "g2v2_q_inf": "no limit",
+        "g2v2_q_low": "low",
+        "g2v2_bottleneck_middle_entry": "mid bottleneck",
+        "g2v2_allocation_edge_priority": "edge alloc.",
+        "g2v2_schedule_smooth_l4": "smooth schedule",
+    }
+    label_offsets = {
+        "g2v2_q_inf": (-76, -10),
+        "g2v2_q_low": (12, -20),
+        "g2v2_bottleneck_middle_entry": (10, -20),
+        "g2v2_allocation_edge_priority": (8, -16),
+        "g2v2_schedule_smooth_l4": (-74, -16),
+    }
     for row in rows:
-        marker = "D" if row["case_id"] in non_dominated_ids else "o"
+        case_id = str(row["case_id"])
+        family = str(row["family"])
+        marker = family_markers.get(family, "o")
         ax.scatter(
             float(row["j1"]),
-            float(row["j2"]),
+            float(row["j2_eval"]),
             c=[float(row["jb"])],
             cmap="magma",
             vmin=float(jb_values.min()),
@@ -646,15 +686,29 @@ def _save_pareto_plot(path: Path, rows: list[dict[str, object]], non_dominated_i
             linewidths=0.8,
             alpha=0.88,
         )
-        if row["case_id"] in non_dominated_ids:
-            ax.annotate(str(row["case_id"]).replace("g2v2_", ""), (float(row["j1"]), float(row["j2"])), fontsize=7)
-    ax.set_xlabel("J1 normalized")
-    ax.set_ylabel("J2 normalized")
-    ax.set_title("G2-v2 capacity trade-off projection")
+        if case_id in label_by_id:
+            ax.annotate(
+                label_by_id[case_id],
+                (float(row["j1"]), float(row["j2_eval"])),
+                xytext=label_offsets[case_id],
+                textcoords="offset points",
+                fontsize=7,
+                arrowprops={"arrowstyle": "-", "lw": 0.5, "color": "0.35"},
+                bbox={"boxstyle": "round,pad=0.15", "fc": "white", "ec": "0.75", "alpha": 0.86},
+            )
+    ax.set_xlabel(r"$\tilde J_1$")
+    ax.set_ylabel(r"$\tilde J_2^{eval}$")
+    ax.set_title("Entrance-rate strategy trade-off projection")
     ax.grid(alpha=0.25)
+    ax.margins(x=0.05, y=0.09)
     colorbar = fig.colorbar(ax.collections[0], ax=ax)
-    colorbar.set_label("J_B waiting exposure")
-    fig.tight_layout()
+    colorbar.set_label(r"$J_4$ waiting exposure")
+    handles = [
+        ax.scatter([], [], marker=marker, color="white", edgecolors="black", label=family.replace("_", " "))
+        for family, marker in family_markers.items()
+    ]
+    ax.legend(handles=handles, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.16), fontsize=7, ncol=5)
+    fig.tight_layout(rect=(0.0, 0.08, 1.0, 1.0))
     fig.savefig(path)
     plt.close(fig)
 
@@ -663,30 +717,43 @@ def _save_allocation_loads(path: Path, rows: list[dict[str, object]]) -> None:
     selected = [row for row in rows if str(row["family"]) == "allocation"]
     if not selected:
         return
-    labels = [str(row["case_id"]).replace("g2v2_allocation_", "") for row in selected]
+    labels = [str(row["case_id"]).replace("g2v2_allocation_", "").replace("_", "\n") for row in selected]
     x = np.arange(len(selected))
-    width = 0.18
-    fig, ax = plt.subplots(1, 1, figsize=(9.0, 4.8), dpi=160)
+    width = 0.17
+    fig, ax = plt.subplots(1, 1, figsize=(9.2, 5.0), dpi=180)
+    channel_labels = {
+        "top": "top",
+        "middle": "middle",
+        "lower_middle": "lower-mid",
+        "bottom": "bottom",
+    }
     for idx, channel in enumerate(CHANNEL_NAMES):
         ax.bar(
             x + (idx - 1.5) * width,
             [float(row[f"flux_share_{channel}"]) for row in selected],
             width=width,
-            label=channel,
+            label=channel_labels[channel],
         )
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, rotation=20, ha="right")
+    ax.set_xticklabels(labels)
     ax.set_ylabel("channel flux share")
-    ax.set_title("Same-budget allocation response")
+    ax.set_title("Same-budget entrance-rate allocation")
     ax.grid(axis="y", alpha=0.25)
-    ax.legend(frameon=False)
+    ax.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, 1.02), ncol=4, fontsize=8)
+    ax.set_ylim(0.0, 1.05)
     fig.tight_layout()
     fig.savefig(path)
     plt.close(fig)
 
 
 def _save_waiting_timeseries(path: Path, output_root: Path, case_ids: list[str]) -> None:
-    fig, ax = plt.subplots(1, 1, figsize=(8.6, 4.8), dpi=160)
+    fig, ax = plt.subplots(1, 1, figsize=(9.0, 5.0), dpi=180)
+    label_map = {
+        "g2v2_q_inf": "no limit",
+        "g2v2_q_medium": "medium",
+        "g2v2_q_low": "low",
+        "g2v2_schedule_front_loaded": "front-loaded",
+    }
     for case_id in case_ids:
         ts_path = output_root / case_id / "timeseries.csv"
         if not ts_path.exists():
@@ -700,15 +767,34 @@ def _save_waiting_timeseries(path: Path, output_root: Path, case_ids: list[str])
                 times.append(float(row["time"]))
                 waiting.append(sum(float(row[column]) for column in gate_columns))
         if times:
-            ax.plot(times, waiting, label=case_id.replace("g2v2_", ""))
+            ax.plot(times, waiting, label=label_map.get(case_id, case_id.replace("g2v2_", "")), linewidth=1.8)
     ax.set_xlabel("time")
-    ax.set_ylabel("sum gate waiting mass")
-    ax.set_title("Waiting mass response")
+    ax.set_ylabel("total upstream waiting mass")
+    ax.set_title("Upstream waiting response")
     ax.grid(alpha=0.25)
-    ax.legend(frameon=False, fontsize=8)
-    fig.tight_layout()
+    ax.legend(frameon=False, fontsize=8, loc="upper center", bbox_to_anchor=(0.5, 1.02), ncol=4)
+    fig.tight_layout(rect=(0.0, 0.0, 1.0, 0.94))
     fig.savefig(path)
     plt.close(fig)
+
+
+def _redraw_from_existing_outputs(output_root: Path) -> None:
+    summary_csv = output_root / "g2_capacity_response_summary.csv"
+    if not summary_csv.exists():
+        raise FileNotFoundError(f"Missing summary CSV for redraw-only mode: {summary_csv}")
+    rows = _read_csv_rows(summary_csv)
+    non_dominated_ids = _non_dominated(rows)
+    for row in rows:
+        row["is_non_dominated"] = str(row["case_id"]) in non_dominated_ids
+    _save_capacity_levels_plot(output_root / "g2_capacity_levels.png", rows)
+    _save_pareto_plot(output_root / "g2_capacity_response_pareto.png", rows, non_dominated_ids)
+    _save_allocation_loads(output_root / "g2_capacity_allocation_loads.png", rows)
+    _save_waiting_timeseries(
+        output_root / "g2_waiting_mass_timeseries.png",
+        output_root,
+        ["g2v2_q_inf", "g2v2_q_medium", "g2v2_q_low"],
+    )
+    _write_tradeoff_table(output_root / "g2_capacity_tradeoff_table.md", rows, non_dominated_ids)
 
 
 def _save_hotspot_plot(path: Path, rows: list[dict[str, object]]) -> None:
@@ -744,7 +830,7 @@ def _save_hotspot_plot(path: Path, rows: list[dict[str, object]]) -> None:
 def _write_tradeoff_table(path: Path, rows: list[dict[str, object]], non_dominated_ids: list[str]) -> None:
     sorted_rows = sorted(rows, key=lambda row: (str(row["family"]), str(row["case_id"])))
     lines = [
-        "| case | family | J1 | J2 soft | J2 eval | J5 | J_B | rejected | binding | cap removed | non-dominated |",
+        "| case | family | J1 | J2 soft | J2 eval | J3 | J4 | unreleased | binding | cap removed | non-dominated |",
         "|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|",
     ]
     for row in sorted_rows:
@@ -783,10 +869,20 @@ def main() -> None:
         default="off",
         help="Comma-separated density contour values, an integer count, or 'off'.",
     )
+    parser.add_argument(
+        "--redraw-only",
+        action="store_true",
+        help="Regenerate figures and tables from existing CSV/timeseries outputs without running simulations.",
+    )
     args = parser.parse_args()
 
     output_root = Path(args.output_root).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    if args.redraw_only:
+        _redraw_from_existing_outputs(output_root)
+        print(f"Redrew G2-v2 capacity response figures from existing outputs: {output_root}")
+        return
+
     simulation_overrides = {
         "steps": args.steps,
         "save_every": args.save_every,
@@ -834,7 +930,7 @@ def main() -> None:
     _save_waiting_timeseries(
         output_root / "g2_waiting_mass_timeseries.png",
         output_root,
-        ["g2v2_q_inf", "g2v2_q_medium", "g2v2_q_low", "g2v2_schedule_front_loaded"],
+        ["g2v2_q_inf", "g2v2_q_medium", "g2v2_q_low"],
     )
     _save_hotspot_plot(output_root / "g2_capacity_hotspot_migration.png", rows)
     _write_tradeoff_table(output_root / "g2_capacity_tradeoff_table.md", rows, non_dominated_ids)

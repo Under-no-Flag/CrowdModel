@@ -17,7 +17,7 @@ from .plotting import DENSITY_CMAP, DENSITY_INTERPOLATION, DensityContourLevels,
 
 
 CHANNEL_NAMES = ("top", "middle", "lower_middle", "bottom")
-CHANNEL_COLORS = ["#4C78A8", "#F58518", "#54A24B", "#B279A2"]
+CHANNEL_COLORS = ["#2C5C8A", "#C65A3A", "#3A8F64", "#7C6AAE"]
 
 
 def _crop_bounds(mask: np.ndarray, pad: int = 4) -> tuple[int, int, int, int]:

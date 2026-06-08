@@ -32,9 +32,9 @@ METHOD_LABELS = {
 METHOD_COLORS = {
     "baseline_prior_best": "#8C8C8C",
     "random_search": "#C44E52",
-    "pure_sa": "#55A868",
+    "pure_sa": "#4C78A8",
     "enum_de": "#E69F00",
-    "hcmbo_proposed": "#4C78A8",
+    "hcmbo_proposed": "#55A868",
     "tpe_mixed_bo": "#8172B3",
 }
 TERM_COLORS = {
@@ -150,9 +150,15 @@ def _save_paper_best_objective(path: Path, seed_rows: list[dict[str, object]]) -
     ax.barh(y, means, height=0.58, color=colors, alpha=0.86)
     for index, method in enumerate(methods):
         values = np.array(_seed_values(seed_rows, method), dtype=float)
-        jitter = np.linspace(-0.13, 0.13, values.size) if values.size > 1 else np.array([0.0])
-        ax.scatter(values, np.full(values.size, y[index]) + jitter, s=28, color="#222222", alpha=0.75, zorder=3)
-        ax.text(means[index], y[index] + 0.24, f"mean {means[index]:.3f}", va="center", fontsize=8.4)
+        if values.size:
+            value_min = float(np.min(values))
+            value_max = float(np.max(values))
+            median = float(np.median(values))
+            ax.hlines(y[index], value_min, value_max, color="#303030", linewidth=1.2, alpha=0.72, zorder=3)
+            ax.vlines([value_min, value_max], y[index] - 0.12, y[index] + 0.12, color="#303030", linewidth=1.2, alpha=0.72, zorder=3)
+            ax.vlines(median, y[index] - 0.18, y[index] + 0.18, color="#FFFFFF", linewidth=2.0, alpha=0.95, zorder=4)
+            ax.vlines(median, y[index] - 0.18, y[index] + 0.18, color="#303030", linewidth=0.75, alpha=0.85, zorder=5)
+        ax.text(means[index] + 0.03, y[index] + 0.24, f"mean {means[index]:.3f}", va="center", fontsize=8.4)
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
     ax.invert_yaxis()
@@ -215,13 +221,28 @@ def _save_paper_objective_feasibility(
     seed_rows: list[dict[str, object]],
 ) -> Path:
     rows = _method_summary_rows(method_rows, seed_rows)
-    fig, ax = plt.subplots(1, 1, figsize=(6.9, 4.6), dpi=PAPER_DPI)
+    fig, (ax, ax_base) = plt.subplots(
+        1,
+        2,
+        figsize=(7.4, 4.3),
+        dpi=PAPER_DPI,
+        sharey=True,
+        gridspec_kw={"width_ratios": (4.2, 1.0), "wspace": 0.08},
+    )
+    label_offsets = {
+        "hcmbo_proposed": (10, 5),
+        "pure_sa": (10, -1),
+        "random_search": (-58, -18),
+        "enum_de": (12, -18),
+        "baseline_prior_best": (-78, 12),
+    }
     for row in rows:
         method = str(row.get("method"))
         mean_obj = _float(row.get("mean_best_hf_objective"))
         feasible_rate = _float(row.get("feasible_rate"))
         spread = max(_float(row.get("std_best_hf_objective")), 0.02)
-        ax.scatter(
+        target_ax = ax_base if method == "baseline_prior_best" else ax
+        target_ax.scatter(
             [mean_obj],
             [feasible_rate],
             s=520 * spread + 80,
@@ -229,20 +250,40 @@ def _save_paper_objective_feasibility(
             edgecolor="#222222",
             linewidth=0.7,
             alpha=0.86,
+            zorder=3,
         )
-        ax.annotate(
+        target_ax.annotate(
             _method_label(method).replace("\n", " "),
             xy=(mean_obj, feasible_rate),
-            xytext=(7, 5),
+            xytext=label_offsets.get(method, (7, 5)),
             textcoords="offset points",
             fontsize=8.7,
+            arrowprops={"arrowstyle": "-", "lw": 0.55, "color": "0.35"} if method in {"random_search", "enum_de", "baseline_prior_best"} else None,
+            bbox={"boxstyle": "round,pad=0.12", "fc": "white", "ec": "none", "alpha": 0.82},
+            zorder=4,
         )
-    ax.set_title("Objective-feasibility trade-off")
-    ax.set_xlabel("Mean best high-fidelity objective")
+
+    ax.set_title("Optimizer region", fontsize=10.5, pad=6)
+    ax_base.set_title("Prior", fontsize=10.5, pad=6)
+    fig.suptitle("Objective-feasibility trade-off", y=0.965, fontsize=12.0)
+    fig.supxlabel("Mean best high-fidelity objective, lower is better", y=0.055, fontsize=10.0)
     ax.set_ylabel("Feasible seed rate")
     ax.set_ylim(-0.05, 1.05)
-    ax.grid(True, alpha=0.24)
-    return _save_paper_figure(fig, path)
+    ax.set_xlim(2.76, 3.18)
+    ax_base.set_xlim(5.40, 5.56)
+    ax.set_xticks([2.8, 2.9, 3.0, 3.1])
+    ax_base.set_xticks([5.48])
+    ax_base.tick_params(axis="y", left=False, labelleft=False)
+    for current_ax in (ax, ax_base):
+        current_ax.grid(True, alpha=0.24)
+        current_ax.set_axisbelow(True)
+    ax.spines["right"].set_visible(False)
+    ax_base.spines["left"].set_visible(False)
+    break_kwargs = {"marker": [(-1, -0.6), (1, 0.6)], "markersize": 8, "linestyle": "none", "color": "0.25", "mec": "0.25", "mew": 1.0, "clip_on": False}
+    ax.plot([1, 1], [0, 1], transform=ax.transAxes, **break_kwargs)
+    ax_base.plot([0, 0], [0, 1], transform=ax_base.transAxes, **break_kwargs)
+    fig.subplots_adjust(left=0.11, right=0.98, top=0.84, bottom=0.18, wspace=0.08)
+    return _save_paper_figure(fig, path, tight=False)
 
 
 def _save_paper_best_terms(path: Path, best_rows: list[dict[str, object]]) -> Path:
@@ -278,6 +319,7 @@ def _save_paper_convergence(path: Path, curve_rows: list[dict[str, object]]) -> 
         grouped[(method, int(seed_value))].append(row)
     methods = [method for method in _methods_present(curve_rows) if method != "baseline_prior_best"]
     fig, ax = plt.subplots(1, 1, figsize=(7.6, 4.8), dpi=PAPER_DPI)
+    plotted_series: list[dict[str, object]] = []
     for method in methods:
         seed_series = []
         max_eval = 0
@@ -304,11 +346,30 @@ def _save_paper_convergence(path: Path, curve_rows: list[dict[str, object]]) -> 
         color = _method_color(method)
         ax.plot(x_grid, mean, color=color, linewidth=1.9, label=_method_label(method).replace("\n", " "))
         ax.fill_between(x_grid, q25, q75, color=color, alpha=0.16, linewidth=0)
+        plotted_series.append({"method": method, "x": x_grid, "mean": mean, "q25": q25, "q75": q75, "color": color})
     ax.set_title("Best-so-far convergence")
     ax.set_xlabel("Optimization evaluations")
     ax.set_ylabel("Best objective so far")
     ax.grid(True, alpha=0.24)
-    ax.legend(frameon=False, fontsize=8.4)
+    ax.legend(frameon=False, fontsize=8.4, loc="upper right")
+    if plotted_series:
+        axins = ax.inset_axes([0.52, 0.42, 0.43, 0.36])
+        for series in plotted_series:
+            x_grid = np.asarray(series["x"], dtype=int)
+            mean = np.asarray(series["mean"], dtype=float)
+            q25 = np.asarray(series["q25"], dtype=float)
+            q75 = np.asarray(series["q75"], dtype=float)
+            color = str(series["color"])
+            axins.plot(x_grid, mean, color=color, linewidth=1.45)
+            axins.fill_between(x_grid, q25, q75, color=color, alpha=0.12, linewidth=0)
+        axins.set_xlim(240, 400)
+        axins.set_ylim(2.65, 3.35)
+        axins.set_title("Final-stage detail", fontsize=8.2, pad=2)
+        axins.set_xticks([250, 300, 350, 400])
+        axins.set_yticks([2.7, 2.9, 3.1, 3.3])
+        axins.tick_params(labelsize=7.2)
+        axins.grid(True, alpha=0.22)
+        ax.indicate_inset_zoom(axins, edgecolor="0.42", alpha=0.75)
     return _save_paper_figure(fig, path)
 
 
@@ -366,14 +427,14 @@ def _save_paper_control_profiles(path: Path, best_rows: list[dict[str, object]],
                     ax.text(x, y, f"{value:.2g}", ha="center", va="center", fontsize=7.0, color=color)
     for ax in axes_array[len(selected) :]:
         ax.set_axis_off()
-    fig.suptitle("Best-solution capacity profiles", y=0.965, fontsize=12.0)
+    fig.suptitle("Best-solution entrance-rate profiles", y=0.965, fontsize=12.0)
     for ax in axes[-1, :]:
         if ax.has_data():
             ax.set_xlabel("Gate segment")
     if image is not None:
         cbar_ax = fig.add_axes([0.89, 0.17, 0.020, 0.64])
         cbar = fig.colorbar(image, cax=cbar_ax)
-        cbar.set_label("Capacity q")
+        cbar.set_label("Rate upper bound q")
     return _save_paper_figure(fig, path, tight=False)
 
 
@@ -522,7 +583,7 @@ def _save_visual_summary(
             "| `g6_paper_objective_feasibility` | Jointly show scalar performance and feasibility. | HCMBO combines low objective with a high feasible-seed rate. |",
             "| `g6_paper_best_terms` | Explain which objective terms drive each method's best case. | Method differences are mainly visible through density and residual penalty terms, not only J1. |",
             "| `g6_paper_convergence` | Compare optimization progress under the same budget. | The curve separates final quality from search efficiency over the 400-evaluation budget. |",
-            "| `g6_paper_control_profiles` | Show the actual best capacity-control structure. | HCMBO's best policy is interpretable as segment-wise gate capacity allocation plus channel directions. |",
+            "| `g6_paper_control_profiles` | Show the actual best entrance-rate control structure. | HCMBO's best policy is interpretable as segment-wise entrance-rate allocation plus channel directions. |",
             "| `g6_paper_paired_delta` | Use paired seeds to quantify improvement relative to HCMBO. | Positive deltas indicate seeds where HCMBO improves over the comparator. |",
             "| `g6_paper_feasible_rate` | Present feasibility as a standalone robustness metric. | HCMBO and the strongest retained baselines are separable by feasible best-case rate. |",
             "",

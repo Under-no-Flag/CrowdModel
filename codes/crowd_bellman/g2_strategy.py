@@ -34,6 +34,10 @@ CHANNEL_LOAD_CMAP = LinearSegmentedColormap.from_list(
         (1.0, "#045A8D"),
     ],
 )
+J3_COLOR_CMAP = LinearSegmentedColormap.from_list(
+    "j3_load_balance",
+    [(0.0, "#F7F3E8"), (0.35, "#D7E4C2"), (0.7, "#5E9E9B"), (1.0, "#4B3F8F")],
+)
 
 
 @dataclass
@@ -305,14 +309,14 @@ def _control_meaning(row: dict[str, object]) -> str:
 
 def _family_color(family: str) -> str:
     if family == "baseline":
-        return "black"
+        return "#202020"
     if family == "single_entry":
-        return "#F58518"
+        return "#C65A3A"
     if family == "single_return":
-        return "#4C78A8"
+        return "#2C5C8A"
     if family == "one_closed":
-        return "#54A24B"
-    return "gray"
+        return "#3A8F64"
+    return "#7A7A7A"
 
 
 def _family_label(family: str) -> str:
@@ -440,7 +444,7 @@ def _save_pareto_plot(path: Path, rows: list[dict[str, object]]) -> None:
     ax.set_title("Three-Objective Pareto Projection")
     ax.grid(alpha=0.18)
     cbar = fig.colorbar(scatter_for_colorbar, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label(r"$\tilde J_5$")
+    cbar.set_label(r"$\tilde J_3$")
     legend_handles = [
         Line2D([0], [0], marker="D", color="none", markerfacecolor="0.65", markeredgecolor="0.2", label="Non-dominated"),
         Line2D([0], [0], marker="o", color="none", markerfacecolor="0.65", markeredgecolor="0.2", label="Dominated"),
@@ -518,7 +522,7 @@ def _save_hotspot_plot(path: Path, rows: list[dict[str, object]]) -> None:
 def _draw_design_matrix(ax: plt.Axes, rows: list[dict[str, object]]) -> None:
     rows = _sorted_rows(rows)
     mapping = {"E": 0, "W": 1, "F": 2, "X": 3}
-    colors = ["#D98C3A", "#5B7FA6", "#D9D9D9", "#3A3A3A"]
+    colors = ["#C65A3A", "#2C5C8A", "#F0E8D8", "#2F2F2F"]
     matrix = np.asarray(
         [[mapping[_direction_symbol(row.get(f"direction_{channel_name}"))] for channel_name in CHANNEL_NAMES] for row in rows],
         dtype=int,
@@ -550,7 +554,7 @@ def _draw_pareto_projection(ax: plt.Axes, fig: plt.Figure, rows: list[dict[str, 
             float(row["j1"]),
             float(row["j2"]),
             c=[float(row["j5"])],
-            cmap="viridis",
+            cmap=J3_COLOR_CMAP,
             vmin=float(j5_values.min()),
             vmax=float(j5_values.max()),
             s=float(sizes[idx]),
@@ -567,7 +571,7 @@ def _draw_pareto_projection(ax: plt.Axes, fig: plt.Figure, rows: list[dict[str, 
     ax.set_title("Pareto projection", fontsize=10, pad=8)
     _set_publication_axes(ax, grid=True)
     cbar = fig.colorbar(scatter_for_colorbar, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label(r"$\tilde J_5$")
+    cbar.set_label(r"$\tilde J_3$")
     cbar.outline.set_visible(False)
     cbar.ax.tick_params(labelsize=8, length=0)
 
@@ -575,7 +579,7 @@ def _draw_pareto_projection(ax: plt.Axes, fig: plt.Figure, rows: list[dict[str, 
 def _draw_objective_heatmap(ax: plt.Axes, rows: list[dict[str, object]]) -> None:
     rows = sorted(rows, key=_objective_sum)
     metrics = ("j1", "j2", "j5", "objective_sum")
-    labels = (r"$\tilde J_1$", r"$\tilde J_2$", r"$\tilde J_5$", r"$\tilde J$")
+    labels = (r"$\tilde J_1$", r"$\tilde J_2$", r"$\tilde J_3$", r"$\tilde J$")
     values = np.asarray([[float(row[metric]) if metric != "objective_sum" else _objective_sum(row) for metric in metrics] for row in rows], dtype=float)
     mins = values.min(axis=0)
     maxs = values.max(axis=0)
