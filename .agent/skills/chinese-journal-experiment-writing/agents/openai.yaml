@@ -1,0 +1,4 @@
+interface:
+  display_name: "中文期刊实验写作"
+  short_description: "将过程性实验记录改写为中文期刊论文实验章节并约束结论边界"
+  default_prompt: "将这个实验章节改写为中文期刊论文风格，保留数据、公式、图表和结论边界。"

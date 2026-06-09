@@ -13,6 +13,13 @@ import numpy as np
 from .metrics import save_json
 
 
+CASE_COLORS = {
+    "case_u_bidirectional_baseline": "#202020",
+    "case_u_bidirectional_middle_rule": "#C65A3A",
+}
+BAR_COLORS = ["#2C5C8A", "#C65A3A", "#7C6AAE"]
+
+
 @dataclass
 class BidirectionalUCollector:
     case_id: str
@@ -259,8 +266,9 @@ def _save_bidirectional_line_plot(path: Path, validation_summaries: list[dict[st
             continue
         time_west, west_share = _sample_series(samples, case_id, "middle_westbound_share")
         time_counter, counterflow = _sample_series(samples, case_id, "middle_counterflow_mass")
-        axes[0].plot(time_west, west_share, linewidth=1.8, label=_case_label(case_id))
-        axes[1].plot(time_counter, counterflow, linewidth=1.8, label=_case_label(case_id))
+        color = CASE_COLORS.get(case_id, "#7A7A7A")
+        axes[0].plot(time_west, west_share, linewidth=1.9, color=color, label=_case_label(case_id))
+        axes[1].plot(time_counter, counterflow, linewidth=1.9, color=color, label=_case_label(case_id))
     axes[0].set_title("Middle-Channel Reverse-Flow Ratio")
     axes[0].set_ylabel("westbound mass share")
     axes[1].set_title("Middle-Channel Counterflow Intensity")
@@ -301,9 +309,27 @@ def _save_plot(path: Path, rows: list[dict[str, object]]) -> None:
     width = 0.25
 
     fig, axes = plt.subplots(1, 2, figsize=(11, 4.8), dpi=150)
-    axes[0].bar(x - width, [float(row.get("middle_westbound_share") or 0.0) for row in rows], width=width, label="middle westbound share")
-    axes[0].bar(x, [float(row.get("middle_counterflow_mass_time") or 0.0) for row in rows], width=width, label="counterflow mass-time")
-    axes[0].bar(x + width, [float(row.get("middle_head_on_cell_time") or 0.0) for row in rows], width=width, label="head-on cell-time")
+    axes[0].bar(
+        x - width,
+        [float(row.get("middle_westbound_share") or 0.0) for row in rows],
+        width=width,
+        color=BAR_COLORS[0],
+        label="middle westbound share",
+    )
+    axes[0].bar(
+        x,
+        [float(row.get("middle_counterflow_mass_time") or 0.0) for row in rows],
+        width=width,
+        color=BAR_COLORS[1],
+        label="counterflow mass-time",
+    )
+    axes[0].bar(
+        x + width,
+        [float(row.get("middle_head_on_cell_time") or 0.0) for row in rows],
+        width=width,
+        color=BAR_COLORS[2],
+        label="head-on cell-time",
+    )
     axes[0].set_title("Middle-channel counterflow suppression")
     axes[0].set_xticks(x)
     axes[0].set_xticklabels(labels, rotation=10)
@@ -311,8 +337,20 @@ def _save_plot(path: Path, rows: list[dict[str, object]]) -> None:
     axes[0].legend()
 
     bar_width = 0.35
-    axes[1].bar(x - bar_width / 2, [float(row.get("middle_eastbound_share") or 0.0) for row in rows], width=bar_width, label="middle eastbound")
-    axes[1].bar(x + bar_width / 2, [float(row.get("middle_westbound_share") or 0.0) for row in rows], width=bar_width, label="middle westbound")
+    axes[1].bar(
+        x - bar_width / 2,
+        [float(row.get("middle_eastbound_share") or 0.0) for row in rows],
+        width=bar_width,
+        color=BAR_COLORS[0],
+        label="middle eastbound",
+    )
+    axes[1].bar(
+        x + bar_width / 2,
+        [float(row.get("middle_westbound_share") or 0.0) for row in rows],
+        width=bar_width,
+        color=BAR_COLORS[1],
+        label="middle westbound",
+    )
     axes[1].set_title("Directional split inside middle channel")
     axes[1].set_xticks(x)
     axes[1].set_xticklabels(labels, rotation=10)

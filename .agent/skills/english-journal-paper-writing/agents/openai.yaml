@@ -1,0 +1,4 @@
+interface:
+  display_name: "English Journal Paper Writing"
+  short_description: "High quality English journal paper drafting and revision"
+  default_prompt: "Rewrite or draft this manuscript section in high-quality English journal style while preserving technical meaning, data, equations, citations, and claim boundaries."

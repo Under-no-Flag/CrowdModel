@@ -16,7 +16,7 @@
 
 \begin{document}
 
-\title{…… Massive Crowd Management in Urban Pedestrian Zones}
+\title{Macroscopic Crowd Control with Direction Constraints and Entrance-Rate Control for Urban Pedestrian Zones}
 
 \author{Author Name
 \thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
@@ -27,7 +27,17 @@
 \maketitle
 
 \begin{abstract}
-This paper presents a macroscopic crowd management framework for open urban pedestrian zones with multiple channels, staged visitor behavior, and internal entrance flow control. The lower level employs a Hughes-type Bellman--conservation-law model in which one-way, bidirectional, and closed channel states are encoded through admissible direction sets, while a fixed anisotropic metric tensor represents soft geometric channel alignment. The controllable management variable is defined as $z=(s,q)$, where $s$ denotes channel direction configurations and $q$ denotes internal channel-entrance capacity profiles. The geometric guidance strength is treated as a fixed model parameter $\eta_0$, rather than an optimized control. The upper level minimizes a scalarized objective including total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and control smoothness. A hierarchical constrained mixed-variable black-box optimization framework is developed to search the direction-capacity control space under expensive high-fidelity simulations. The final HCMBO mainline allocates its finite budget to direction-wise structured capacity search and local refinement, while random search is retained only as an external baseline. Numerical experiments on a four-channel waterfront-platform scenario validate the model mechanisms, the necessity of multi-stage behavior modeling, and the performance of the proposed optimizer in horizontal and focused comparisons.
+Open scenic areas and major event venues often face challenges of intersecting pedestrian flows, rapid propagation of local congestion risks, and suboptimal experience-based control schemes.
+To address these issues, this paper proposes a macroscopic crowd dynamics modeling and optimization framework for fine-grained large-scale crowd management.
+Building upon the Hughes continuum framework, the proposed model couples pedestrian route choice with density conservation laws to characterize multi-stage and multi-route crowd movements.
+Local admissible direction sets are employed to represent operational rules, including one-way, two-way, and closed channel states, while fixed anisotropic metric tensors describe the geometric guidance induced by channel layouts.
+Furthermore, internal channel entrance capacity control is introduced, enabling the formulation of strategies that simultaneously specify permitted travel directions and time-varying release intensities.
+We construct a comprehensive evaluation and optimization framework that integrates direction configuration, entrance capacity, actual channel load, entrance waiting time, and control smoothness.
+A novel Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm is designed to jointly optimize discrete channel directions and continuous capacity strategies under fixed behavioral preferences and geometric guidance parameters.
+Experiments conducted on a simplified scenic-platform scenario demonstrate that the proposed macroscopic model effectively captures the complex interactions among multi-stage behaviors, channel geometric guidance, and direction constraints.
+Evaluated against a composite objective encompassing total travel time, high-density exposure, actual channel-load imbalance, and other relevant indicators, repeated experiments reveal that HCMBO attains the lowest mean objective value of 2.6338.
+This represents an approximately 3.9\% improvement over the second-best Tree-structured Parzen Estimator (TPE)-based mixed Bayesian optimization method, and consistently outperforms baseline algorithms such as random search, simulated annealing, and differential evolution.
+Ultimately, the proposed methodology provides a quantitative, interpretable, and effective decision-support tool for crowd routing and entrance flow control in open public spaces.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -37,11 +47,21 @@ Crowd dynamics, macroscopic modeling, channel optimization, Hamilton-Jacobi-Bell
 \section{Introduction}
 \label{sec:introduction}
 
-\IEEEPARstart{L}{arge-scale} crowd gathering risks not only threaten individual safety but may also escalate into stampede incidents that disrupt social order and public security; the effectiveness of crowd management directly tests urban governance capacity and the modernization level of social safety governance systems \cite{RN2147,RN1998}. With the increasing frequency of high-density pedestrian activities such as holiday tourism, urban public events, commercial district promotions, New Year celebrations, and major sports events, core urban areas must accommodate pedestrian demands far exceeding daily levels within short time windows, posing enormous challenges for on-site organization, passage management, risk early warning, and emergency dispatch \cite{RN2154,RN1193,RN673}. Against this backdrop, scientific modeling, numerical simulation, and optimization methods for formulating and evaluating crowd control strategies---improving the efficiency of large-scale event organization and reducing local congestion risks---have become critical scientific problems demanding urgent breakthroughs in social safety and urban governance \cite{RN1226,RN2059}.
+\IEEEPARstart{L}{arge-scale} crowd gathering risks not only threaten individual safety but may also escalate into stampede incidents that disrupt social order and public security; the effectiveness of crowd management directly tests urban governance capacity and the modernization level of social safety governance systems \cite{RN2147,RN1998}.
+With the increasing frequency of high-density pedestrian activities such as holiday tourism, urban public events, commercial district promotions, New Year celebrations, and major sports events, core urban areas must accommodate pedestrian demands far exceeding daily levels within short time windows, posing enormous challenges for on-site organization, passage management, risk early warning, and emergency dispatch \cite{RN2154,RN1193,RN673}.
+Against this backdrop, scientific modeling, numerical simulation, and optimization methods for formulating and evaluating crowd control strategies---improving the efficiency of large-scale event organization and reducing local congestion risks---have become critical scientific problems demanding urgent breakthroughs in social safety and urban governance \cite{RN1226,RN2059}.
 
-Crowds in large-scale events constitute typical complex systems. Numerous individuals with heterogeneous desired speeds, destinations, and route preferences interact through multi-scale, nonlinear mechanisms in confined spaces, generating spatiotemporal patterns at the collective level \cite{RN1100,RN1193}. Macroscopically, these patterns manifest as destination-oriented flow, passage convergence, bottleneck queuing, exit competition, and directional responses to control regulations \cite{RN2056,RN2102}; microscopically, individuals are influenced by surrounding density, visible paths, obstacle boundaries, and guidance facilities \cite{RN2174}. For open scenic areas, crowd behavior additionally exhibits pronounced phase dependence: visitors may first move toward the viewing platform, then tour along the main viewing direction, and subsequently choose different exit passages based on preferences \cite{RN2302}. These characteristics of multi-stage, multi-route coexistence with shared congestion mean that traditional static capacity analysis or single shortest-path models cannot adequately support refined management decisions.
+Crowds in large-scale events constitute typical complex systems.
+Numerous individuals with heterogeneous desired speeds, destinations, and route preferences interact through multi-scale, nonlinear mechanisms in confined spaces, generating spatiotemporal patterns at the collective level \cite{RN1100,RN1193}.
+Macroscopically, these patterns manifest as destination-oriented flow, passage convergence, bottleneck queuing, exit competition, and directional responses to control regulations \cite{RN2056,RN2102}; microscopically, individuals are influenced by surrounding density, visible paths, obstacle boundaries, and guidance facilities \cite{RN2174}.
+For open scenic areas, crowd behavior additionally exhibits pronounced phase dependence: visitors may first move toward the viewing platform, then tour along the main viewing direction, and subsequently choose different exit passages based on preferences \cite{RN2302}.
+These characteristics of multi-stage, multi-route coexistence with shared congestion mean that traditional static capacity analysis or single shortest-path models cannot adequately support refined management decisions.
 
-Among various urban crowd gathering scenarios, open scenic areas, waterfront viewing platforms, and historic commercial districts are highly representative. Unlike enclosed venues such as stadiums and subway stations with well-defined boundaries \cite{RN761,RN2194}, such areas consist of open spaces, main tourist corridors, multiple lateral connecting passages, and return flow lines; visitors typically undergo a continuous behavioral chain of ``entry--touring along the main corridor--choosing passages to leave--returning'' \cite{RN2301}, with crowd movement governed jointly by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303,RN2301}. Taking the Shanghai Nanjing East Road--Bund area as a concrete example, visitors approach the Bund from Nanjing East Road, ascend to the viewing platform via multiple stepped passages, tour along the waterfront, then exit through several southern passages and return along lower streets. This scenario can be abstracted as the typical ``waterfront platform--multi-stepped passage'' crowd flow scenario. In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas. Fig.~\ref{fig:bund_scene} shows the large-scale crowd at the Shanghai Nanjing East Road--Bund scenario during a holiday period.
+Among various urban crowd gathering scenarios, open scenic areas, waterfront viewing platforms, and historic commercial districts are highly representative.
+Unlike enclosed venues such as stadiums and subway stations with well-defined boundaries \cite{RN761,RN2194}, such areas consist of open spaces, main tourist corridors, multiple lateral connecting passages, and return flow lines; visitors typically undergo a continuous behavioral chain of ``entry--touring along the main corridor--choosing passages to leave--returning'' \cite{RN2301}, with crowd movement governed jointly by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303,RN2301}.
+Taking the Shanghai Nanjing East Road--Bund area as a concrete example, visitors approach the Bund from Nanjing East Road, ascend to the viewing platform via multiple stepped passages, tour along the waterfront, then exit through several southern passages and return along lower streets.
+This scenario can be abstracted as the typical ``waterfront platform--multi-stepped passage'' crowd flow scenario.
+In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas. Fig.~\ref{fig:bund_scene} shows the large-scale crowd at the Shanghai Nanjing East Road--Bund scenario during a holiday period.
 
 \begin{figure}[!t]
 \centering
@@ -50,22 +70,36 @@ Among various urban crowd gathering scenarios, open scenic areas, waterfront vie
 \label{fig:bund_scene}
 \end{figure}
 
-Existing large-scale event security management practices typically integrate system dynamics, system coupling, and system safety theory, combined with high-risk zone delineation and historical crowd behavior patterns, to formulate a series of control measures \cite{RN2176,RN1663}. These measures include deploying security personnel at critical locations, erecting temporary barriers for isolation and diversion, implementing one-way passage on key channels, and applying batch release in core areas \cite{RN2181,RN1978}. For instance, during major holidays, the Shanghai Bund area adopts batch release, passage direction regulation, south-entry north-exit routing, and reduction of head-on conflicts \cite{RN2129}; similarly, Nanluoguxiang main street in Beijing implements one-way passage measures (south entry, north exit) during peak periods \cite{RN2130}, consistent in control mechanism with the Shanghai Bund approach.
+Existing large-scale event security management practices typically integrate system dynamics, system coupling, and system safety theory, combined with high-risk zone delineation and historical crowd behavior patterns, to formulate a series of control measures \cite{RN2176,RN1663}.
+These measures include deploying security personnel at critical locations, erecting temporary barriers for isolation and diversion, implementing one-way passage on key channels, and applying batch release in core areas \cite{RN2181,RN1978}.
+For instance, during major holidays, the Shanghai Bund area adopts batch release, passage direction regulation, south-entry north-exit routing, and reduction of head-on conflicts \cite{RN2129}; similarly, Nanluoguxiang main street in Beijing implements one-way passage measures (south entry, north exit) during peak periods \cite{RN2130}, consistent in control mechanism with the Shanghai Bund approach.
 
-However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}. First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of passage direction settings, entrance release capacities, and phase-dependent behavioral preferences. Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--entrance flow control--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}. Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations. Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
+However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}.
+First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of passage direction settings, entrance release capacities, and phase-dependent behavioral preferences.
+Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--entrance flow control--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}.
+Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations.
+Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
 
-To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, fixed geometric guidance, multi-stage route behavior, and internal entrance capacity control, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario. At the modeling level, this paper constructs a Bellman--conservation-law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set; and a fixed anisotropic metric tensor $M(x;\eta_0)$ characterizes geometric channel alignment. We further introduce internal entrance capacity variables $q_c^\pm(t)$ to distinguish attempted entrance flow from actually admitted flow, so that excessive demand remains as upstream waiting rather than disappearing from the system. At the optimization level, the controllable variable is $z=(s,q)$, whereas visitor route preferences $\hat p$ and the geometric guidance parameter $\eta_0$ are fixed model inputs. The scalarized objective combines total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and capacity-control smoothness. A hierarchical constrained mixed-variable black-box optimization framework (HCMBO) is designed to solve this direction-capacity problem under limited high-fidelity simulation budgets.
+To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, fixed geometric guidance, multi-stage route behavior, and internal entrance capacity control, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario.
+At the modeling level, this paper constructs a Bellman--conservation-law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set; and a fixed anisotropic metric tensor $M(x;\eta_0)$ characterizes geometric channel alignment.
+We further introduce internal entrance capacity variables $q_c^\pm(t)$ to distinguish attempted entrance flow from actually admitted flow, so that excessive demand remains as upstream waiting rather than disappearing from the system.
+At the optimization level, the controllable variable is $z=(s,q)$, whereas visitor route preferences $\hat p$ and the geometric guidance parameter $\eta_0$ are fixed model inputs.
+The scalarized objective combines total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and capacity-control smoothness.
+A hierarchical constrained mixed-variable black-box optimization framework (HCMBO) is designed to solve this direction-capacity problem under limited high-fidelity simulation budgets.
 
 The main contributions of this paper are as follows.
 
 \begin{enumerate}
 \item A ``waterfront platform--multi-stepped passage'' crowd flow modeling framework for open scenic areas is proposed, representing visitor behavior as a multi-stage, multi-route continuum flow process, where different subpopulations possess independent potential functions while sharing collective congestion feedback.
 
-\item A Bellman--conservation law coupled model integrating passage constraints and geometric guidance is constructed. The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic metric tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
+\item A Bellman--conservation law coupled model integrating passage constraints and geometric guidance is constructed.
+The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic metric tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
 
 \item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, realized channel-flow variance, entrance waiting, and control smoothness).
 
-\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction-capacity variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance. The final HCMBO mainline removes auxiliary internal random search and concentrates the budget on direction-wise structured capacity optimization. The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
+\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction--entrance-rate variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance.
+The final HCMBO mainline concentrates the budget on direction-wise structured entrance-rate optimization and high-fidelity rechecking.
+The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
 \end{enumerate}
 
 \section{Related Work}
@@ -75,80 +109,144 @@ The main contributions of this paper are as follows.
 
 Crowd management in urban centers has been extensively studied from control-theoretic and optimization perspectives, aiming to enhance safety and efficiency through boundary regulation, facility layout, and intelligent decision-making \cite{RN2000,RN2193}.
 
-In control-theoretic approaches, Zhong et al. \cite{RN279} designed boundary control strategies for urban traffic flow networks to ensure convergence to uncongested states under disturbances, with stability analysis based on Lyapunov methods \cite{RN1196}. For one-dimensional crowd dynamics, Wadoo and Kachroo \cite{RN280} employed advection and diffusion control to prevent blocking and shock waves during evacuation. Addressing multi-directional disturbance propagation, Qin \cite{RN277} proposed a unit sliding mode controller based on integral barrier Lyapunov functions to ensure boundedness of internal state variables, demonstrating strong disturbance rejection capabilities. For heterogeneous corridor regulation, Zhu et al. \cite{RN286} combined policy learning with neural networks to learn optimal feedback controllers that adjust inflow rates and free-flow speeds, achieving balanced density distribution and reduced congestion.
+In control-theoretic approaches, Zhong et al. \cite{RN279} designed boundary control strategies for urban traffic flow networks to ensure convergence to uncongested states under disturbances, with stability analysis based on Lyapunov methods \cite{RN1196}.
+For one-dimensional crowd dynamics, Wadoo and Kachroo \cite{RN280} employed advection and diffusion control to prevent blocking and shock waves during evacuation.
+Addressing multi-directional disturbance propagation, Qin \cite{RN277} proposed a unit sliding mode controller based on integral barrier Lyapunov functions to ensure boundedness of internal state variables, demonstrating strong disturbance rejection capabilities.
+For heterogeneous corridor regulation, Zhu et al. \cite{RN286} combined policy learning with neural networks to learn optimal feedback controllers that adjust inflow rates and free-flow speeds, achieving balanced density distribution and reduced congestion.
 
-Physical infrastructure regulation has also proven effective. Studies have shown that strategically placed obstacles can significantly improve outflow, velocity, and local density in merging areas \cite{RN1662,RN2145}. Yang et al. \cite{RN2118,RN2120} employed Model Predictive Control (MPC) to optimize barrier lengths at subway bottlenecks, later extending control variables to entrance limiters, gates, and escalator directions for dynamic, real-time crowd regulation. For evacuation guidance, Carmona and Paricio-Garcia \cite{RN2119} proposed dynamic exit-choice recommendations using multinomial Logit models. However, their approach relies on discrete speed instructions (e.g., ``stop,'' ``walk,'' ``run'') transmitted via electronic wristbands \cite{RN2196}, which poses implementation challenges in open urban scenarios.
+Physical infrastructure regulation has also proven effective.
+Studies have shown that strategically placed obstacles can significantly improve outflow, velocity, and local density in merging areas \cite{RN1662,RN2145}.
+Yang et al. \cite{RN2118,RN2120} employed Model Predictive Control (MPC) to optimize barrier lengths at subway bottlenecks, later extending control variables to entrance limiters, gates, and escalator directions for dynamic, real-time crowd regulation.
+For evacuation guidance, Carmona and Paricio-Garcia \cite{RN2119} proposed dynamic exit-choice recommendations using multinomial Logit models.
+However, their approach relies on discrete speed instructions (e.g., ``stop,'' ``walk,'' ``run'') transmitted via electronic wristbands \cite{RN2196}, which poses implementation challenges in open urban scenarios.
 
-Recently, intelligent optimization and deep reinforcement learning have emerged as promising alternatives. Liao et al. \cite{RN2121} formulated fence layout as a subset selection problem, while subsequent work \cite{RN2122} proposed a dynamic crowd inflow control system using LSTM networks to capture temporal features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance flow regulation. Differential Evolution (DE) \cite{RN2190} has also been applied to optimize guardrail layouts and flow guidance in real-world scenarios such as Chengdu East Railway Station, using average travel time and crowd pressure as multi-objective criteria \cite{RN2123}.
+Recently, intelligent optimization and deep reinforcement learning have emerged as promising alternatives.
+Liao et al. \cite{RN2121} formulated fence layout as a subset selection problem, while subsequent work \cite{RN2122} proposed a dynamic crowd inflow control system using LSTM networks to capture temporal features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance flow regulation.
+Differential Evolution (DE) \cite{RN2190} has also been applied to optimize guardrail layouts and flow guidance in real-world scenarios such as Chengdu East Railway Station, using average travel time and crowd pressure as multi-objective criteria \cite{RN2123}.
 
 \subsection{Macroscopic Crowd Modeling}
 
-Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency and analytical tractability compared to microscopic approaches. Henderson \cite{RN282} first applied fluid dynamics to pedestrian traffic in the early 1970s, comparing crowd motion to the behavior of gas or fluid particles.
+Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency and analytical tractability compared to microscopic approaches.
+Henderson \cite{RN282} first applied fluid dynamics to pedestrian traffic in the early 1970s, comparing crowd motion to the behavior of gas or fluid particles.
 
-Hughes \cite{hughes2003} pioneered the first-order continuum theory for pedestrian flow, introducing the classical model in which pedestrian walking speed is governed by local density through a fundamental diagram, while movement direction follows the steepest-descent path of a potential function representing the remaining travel time to exits. This framework elegantly captures the interplay between congestion and route choice. Ling et al. \cite{RN2078} subsequently generalized the Hughes formulation and developed an efficient numerical solution combining a weighted essentially non-oscillatory (WENO) scheme for the conservation law with a fast sweeping method for the eikonal equation.
+Hughes \cite{hughes2003} pioneered the first-order continuum theory for pedestrian flow, introducing the classical model in which pedestrian walking speed is governed by local density through a fundamental diagram, while movement direction follows the steepest-descent path of a potential function representing the remaining travel time to exits.
+This framework elegantly captures the interplay between congestion and route choice.
+Ling et al. \cite{RN2078} subsequently generalized the Hughes formulation and developed an efficient numerical solution combining a weighted essentially non-oscillatory (WENO) scheme for the conservation law with a fast sweeping method for the eikonal equation.
 
-Several extensions have enriched the descriptive capability of macroscopic models. Nonlocal flux models were proposed by Colombo et al. \cite{RN2097}, replacing pointwise density with a neighborhood-averaged quantity in the velocity function to account for anticipatory behavior. This direction was further extended to incorporate anisotropic perception fields and boundary effects from walls and obstacles, with high-resolution numerical schemes and well-posedness results suitable for realistic architectural configurations \cite{RN2080}. To enforce the hard incompressibility constraint---that pedestrian density cannot exceed a physically admissible maximum---Maury et al. \cite{RN2099} introduced the projection model, which formulates the actual velocity as a least-squares projection of the desired velocity onto the set of feasible (non-overlapping) configurations. This framework was later recast as a Wasserstein gradient flow with density constraints \cite{RN2081}, using the Jordan--Kinderlehrer--Otto (JKO) scheme \cite{RN2188} to discretize the motion while guaranteeing that density respects an upper bound, making it well-suited for high-density congestion scenarios.
+Several extensions have enriched the descriptive capability of macroscopic models.
+Nonlocal flux models were proposed by Colombo et al. \cite{RN2097}, replacing pointwise density with a neighborhood-averaged quantity in the velocity function to account for anticipatory behavior.
+This direction was further extended to incorporate anisotropic perception fields and boundary effects from walls and obstacles, with high-resolution numerical schemes and well-posedness results suitable for realistic architectural configurations \cite{RN2080}.
+To enforce the hard incompressibility constraint---that pedestrian density cannot exceed a physically admissible maximum---Maury et al. \cite{RN2099} introduced the projection model, which formulates the actual velocity as a least-squares projection of the desired velocity onto the set of feasible (non-overlapping) configurations.
+This framework was later recast as a Wasserstein gradient flow with density constraints \cite{RN2081}, using the Jordan--Kinderlehrer--Otto (JKO) scheme \cite{RN2188} to discretize the motion while guaranteeing that density respects an upper bound, making it well-suited for high-density congestion scenarios.
 
-To overcome non-physical behaviors such as supersonic information propagation that may arise in first-order models, Aw and Rascle \cite{RN2103} introduced a second-order model based on a generalized momentum conservation law that preserves anisotropy. The Aw--Rascle (AR) framework was subsequently adapted to pedestrian flows \cite{RN2104}, where the congestion pressure term successfully reproduces characteristic phenomena including stop-and-go waves and spontaneous lane formation.
+To overcome non-physical behaviors such as supersonic information propagation that may arise in first-order models, Aw and Rascle \cite{RN2103} introduced a second-order model based on a generalized momentum conservation law that preserves anisotropy.
+The Aw--Rascle (AR) framework was subsequently adapted to pedestrian flows \cite{RN2104}, where the congestion pressure term successfully reproduces characteristic phenomena including stop-and-go waves and spontaneous lane formation.
 
-Beyond the classical Hughes-type framework, extensions have incorporated control and guidance mechanisms relevant to crowd management. Anisotropic formulations using metric tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}, allowing for continuous geometric guidance without explicit prohibition. Constrained Hamilton-Jacobi-Bellman (HJB) formulations have been employed to model strict directional constraints such as one-way corridors, with the Bellman optimality principle providing a natural framework for unifying anisotropic geometric guidance with discrete directional constraints.
+Beyond the classical Hughes-type framework, extensions have incorporated control and guidance mechanisms relevant to crowd management.
+Anisotropic formulations using metric tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}, allowing for continuous geometric guidance without explicit prohibition.
+Constrained Hamilton-Jacobi-Bellman (HJB) formulations have been employed to model strict directional constraints such as one-way corridors, with the Bellman optimality principle providing a natural framework for unifying anisotropic geometric guidance with discrete directional constraints.
 
-Despite these advances, existing approaches often treat control parameters as fixed or manually tuned. The joint optimization of discrete channel direction configurations and internal entrance capacity profiles remains underexplored, particularly for large-scale urban pedestrian zones with multiple behavioral stages and heterogeneous route choices.
+Despite these advances, existing approaches often treat control parameters as fixed or manually tuned.
+The joint optimization of discrete channel direction configurations and internal entrance capacity profiles remains underexplored, particularly for large-scale urban pedestrian zones with multiple behavioral stages and heterogeneous route choices.
 
-\section{Macroscopic Crowd Dynamics Model}
+\section{Methodology}
 \label{sec:model}
 
-\subsection{Hughes Model Foundation}
+\subsection{Problem Definition and Overall Framework}
 
-We consider a bounded two-dimensional domain $\Omega \subset \mathbb{R}^2$ representing the pedestrian walkway. Let $\rho(x,t)$ denote the crowd density at position $x$ and time $t$, $\phi(x,t)$ the minimal remaining time to reach an exit, and $\mathbf{v}(x,t)$ the mean velocity field. The continuity equation governing mass conservation reads:
+This paper addresses a multi-channel crowd management problem in open scenic areas.
+The proposed method combines a Bellman--conservation-law crowd dynamics model with a joint direction-capacity control formulation.
+The controllable management variable is defined as
+\begin{equation}
+z=(s,q)\in\mathcal Z,
+\label{eq:control_variable}
+\end{equation}
+where $s$ denotes the discrete direction states of the channels, and $q$ denotes the time-varying internal entrance capacity profile.
+The behavioral preference parameter $\hat p$ and the geometric guidance parameter $\eta_0$ are treated as fixed model inputs.
+For a given control variable $z$, the lower-level simulator returns density fields, velocity fields, entrance waiting, and realized channel throughputs.
+The upper-level optimizer then evaluates efficiency, safety, load balance, waiting, and smoothness metrics, and searches for a better control policy under a limited simulation budget.
+The overall method framework is shown in Fig.~\ref{fig:method_framework}.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{../images/framework/method_framework_tikz.pdf}
+\caption{Method framework for joint direction and entrance-rate optimization. Fixed scenario inputs, behavioral preferences, and geometric guidance parameters define the lower-level Bellman--conservation-law crowd simulator. The controllable direction configuration and entrance-rate profile are jointly evaluated by efficiency, safety, load-balance, waiting, and smoothness objectives, and are updated by the upper-level HCMBO optimizer.}
+\label{fig:method_framework}
+\end{figure*}
+
+The key modeling assumption is that direction rules and entrance capacities should be optimized jointly.
+The direction configuration $s$ changes the local feasible direction set, whereas the entrance capacity $q$ changes the realized admitted flux at channel entrances.
+These two controls jointly affect channel loading, local high-density exposure, and upstream waiting.
+Therefore, the paper formulates crowd management as a mixed-variable simulation-based optimization problem rather than as two independent subproblems.
+
+\subsection{Bellman--Conservation-Law Crowd Dynamics}
+
+\subsubsection{Conservation Law and Speed Function}
+
+We consider a bounded two-dimensional domain $\Omega \subset \mathbb{R}^2$ representing the pedestrian walkway.
+Let $\Omega_w\subset\Omega$ denote the walkable region, $\rho(x,t)$ the total crowd density, and $\mathbf v(x,t)$ the local mean velocity.
+Mass conservation is governed by
 \begin{equation}
 \frac{\partial \rho}{\partial t} + \nabla \cdot (\rho \mathbf{v}) = 0.
 \label{eq:continuity}
 \end{equation}
 
-In the classical Hughes model \cite{hughes2003}, pedestrians move in the direction of steepest descent of the potential function:
+The speed magnitude is determined by local congestion.
+We adopt the Greenshields-type speed function
 \begin{equation}
-\mathbf{v} = f(\rho) \frac{-\nabla \phi}{|\nabla \phi|},
-\label{eq:velocity}
-\end{equation}
-where $f(\rho)$ is the speed-density relationship. We adopt the Greenshields form \cite{Greenshields1935ASO}:
-\begin{equation}
-f(\rho) = v_{\max}\left(1 - \frac{\rho}{\rho_{\max}}\right),
+f(\rho) = v_{\max}\left(1 - \frac{\rho}{\rho_{\max}}\right)_+,
 \label{eq:greenshields}
 \end{equation}
-with $v_{\max}$ the free-flow speed and $\rho_{\max}$ the jam density.
+where $v_{\max}$ is the free-flow speed, $\rho_{\max}$ is the maximum admissible density, and $(\cdot)_+$ denotes nonnegative truncation.
+This function captures the feedback that pedestrians move close to free-flow speed in low-density regions and slow down as density approaches congestion.
 
-The potential function satisfies the eikonal equation:
+The classical Hughes model assumes that all movement directions are feasible and isotropic.
+This assumption is insufficient for crowd management scenarios involving one-way rules, temporary closures, entrance metering, and channel-axis alignment.
+The following subsections introduce admissible direction sets, fixed anisotropic metrics, and internal entrance capacity control into the Bellman--conservation-law framework.
+
+\subsubsection{Multi-Stage Multi-Route Density Decomposition}
+
+Visitors in open scenic areas usually experience several behavioral stages, such as entry, touring, exit, and return.
+To represent this behavior chain, the total density is decomposed into stage--route subpopulations:
 \begin{equation}
-|\nabla \phi| = \frac{1}{f(\rho)}.
-\label{eq:eikonal}
+\rho(x,t) = \sum_{\sigma=1}^{S} \sum_{r=1}^{R_\sigma} \rho_{\sigma,r}(x,t),
+\label{eq:density_decomp}
 \end{equation}
+where $\sigma$ denotes the behavioral stage and $r$ denotes the route type within that stage.
+All subpopulations share the speed function $f(\rho)$ determined by the total density, but they have different target regions, potential functions, and velocity directions.
 
-While this model captures basic congestion effects, it assumes that all directions are feasible and equally weighted. It therefore cannot represent one-way rules, temporary closures, or channel-induced geometric preferences. We address these limitations by first introducing HJB admissible-direction constraints for hard channel rules and then introducing the metric tensor to encode soft geometric guidance within the feasible direction set.
+For subpopulation $(\sigma,r)$, the density evolves according to
+\begin{equation}
+\frac{\partial \rho_{\sigma,r}}{\partial t}
++ \nabla \cdot (\rho_{\sigma,r}\mathbf v_{\sigma,r})
+= Q^{\mathrm{in}}_{\sigma,r}-Q^{\mathrm{out}}_{\sigma,r}.
+\label{eq:subpop_continuity}
+\end{equation}
+If pedestrians in subpopulation $(\sigma,r)$ complete the current stage in target region $G_{\sigma,r}$ and switch to next-stage route $k$ with probability $\hat p_{(\sigma,r)\to k}$, the transition term is
+\begin{equation}
+Q_{(\sigma,r)\to(\sigma+1,k)}(x,t)
+=
+\hat p_{(\sigma,r)\to k}
+\kappa_{\sigma,r}
+\chi_{G_{\sigma,r}}(x)
+\rho_{\sigma,r}(x,t),
+\label{eq:transition}
+\end{equation}
+where $\kappa_{\sigma,r}$ is the stage-switching rate and $\chi_{G_{\sigma,r}}$ is the indicator function of the completion region.
+The parameter $\hat p$ represents historically inferred or scenario-given route preferences and is fixed in the optimization problem.
 
-\subsection{Channel Control via Constrained HJB}
+\subsection{Direction Constraints and Geometric Guidance}
+
+\subsubsection{Direction Configuration Variable}
 \label{sec:hjb}
 
-Many crowd management measures directly restrict available movement directions rather than merely adjusting traversal costs. Examples include one-way corridors, bidirectional passages, and temporary closures. Such rules are hard feasibility constraints on the local action set and are naturally modeled via constrained optimal control.
-
-Let $U(x)$ denote the set of admissible unit directions at position $x$. The velocity satisfies:
+Let the direction state of channel $c$ be
 \begin{equation}
-\mathbf{v} = f(\rho) \mathbf{u}, \quad \mathbf{u}(x) \in U(x), \quad |\mathbf{u}| = 1.
-\label{eq:constrained_velocity}
-\end{equation}
-
-By the Bellman optimality principle, the potential function satisfies the constrained HJB equation:
-\begin{equation}
-\max_{\mathbf{u} \in U(x)} \left\{-f(\rho) \mathbf{u} \cdot \nabla \phi\right\} = 1.
-\label{eq:constrained_hjb}
-\end{equation}
-
-When $U(x)$ is the full unit circle, \eqref{eq:constrained_hjb} reduces to the classical Hughes model. For restricted control sets, various channel rules can be expressed naturally. For channel $c$ with region $\Omega_c$ and reference tangent $\tau_c(x)$, define
-\begin{equation}
-s_c \in \{-1,0,+1,\varnothing\},
+s_c \in \{+1,-1,0,\varnothing\},
 \label{eq:channel_state}
 \end{equation}
-where $+1$, $-1$, $0$, and $\varnothing$ denote forward one-way, reverse one-way, bidirectional, and closed states, respectively. The corresponding admissible set is
+where $+1$, $-1$, $0$, and $\varnothing$ denote reference forward one-way, reference reverse one-way, bidirectional, and closed states, respectively.
+If $\tau_c(x)$ is the reference tangent direction of channel $c$, the local admissible direction set in the channel region is defined as
 \begin{equation}
 U_c(x;s_c)=
 \begin{cases}
@@ -160,126 +258,65 @@ U_c(x;s_c)=
 \quad x\in\Omega_c .
 \label{eq:channel_admissible_set}
 \end{equation}
-For a closed channel, the continuous maximum over an empty set is not used as an ordinary HJB state. Numerically, this state is handled as no feasible control in the channel region, equivalently $\phi(x)=+\infty$ for unreachable cells or infinite Bellman step cost from those cells.
+Thus, $s_c$ changes the local feasible direction set.
+A closed channel has no admissible direction, a one-way channel retains only one reference tangent, and a bidirectional channel retains both opposite tangential directions.
 
-\subsection{Channel Geometric Guidance via Metric Tensor}
+\subsubsection{Fixed Anisotropic Metric}
 \label{sec:guidance}
 
-The admissible set $U(x)$ determines which directions are feasible, but it does not fully describe how pedestrians approach and align with channel geometry before entering a passage. In real scenes, pedestrians often pre-align with the channel axis and merge smoothly near entrances rather than abruptly changing direction at the channel boundary. Therefore, after defining hard HJB constraints, we introduce a metric tensor $\mathbf{M}(x)$ to encode soft geometric preference within the feasible direction set.
-
-To represent anisotropic channel geometries such as corridors and barriers, we introduce a spatially varying symmetric positive-definite metric tensor $\mathbf{M}(x)$ that generalizes the classical eikonal equation to anisotropic form \cite{cristiani2016}:
+The admissible set $U(x;s)$ represents hard feasibility, but it does not capture the soft geometric guidance induced by narrow channels.
+Pedestrians approaching a passage often pre-align with the channel axis before entering it.
+To represent this effect, a fixed anisotropic metric tensor $M(x;\eta_0)$ is introduced.
+For channel $c$, let $\tau_c$ and $n_c$ denote its tangent and normal directions.
+The metric tensor is defined as
 \begin{equation}
-\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi} = \frac{1}{f(\rho)}.
-\label{eq:anisotropic_eikonal}
-\end{equation}
-
-Under this metric, the optimal direction is determined by the tensor-induced steepest descent:
-\begin{equation}
-\mathbf{v} = f(\rho) \frac{-\mathbf{M}(x) \nabla \phi}{\sqrt{\nabla \phi^{\top} \mathbf{M}(x) \nabla \phi}}.
-\label{eq:anisotropic_velocity}
-\end{equation}
-
-For a channel region $\Omega_c$ with unit tangent $\tau(x)$ and unit normal $n(x)$, we construct the metric tensor as:
-\begin{equation}
-\mathbf{M}(x) = \alpha(x) \tau \tau^{\top} + \beta(x) n n^{\top}, \quad x \in \Omega_c,
+M_c(x;\eta_0)=\beta_c\left(\eta_0\,\tau_c\tau_c^\top+n_c n_c^\top\right),
+\qquad \eta_0\ge 1,
 \label{eq:metric_tensor}
 \end{equation}
-where $\alpha(x)$ and $\beta(x)$ control the traversal weights in tangential and normal directions, respectively. In the discrete Bellman update used in this paper, the directional step cost is proportional to $1/\sqrt{\mathbf{u}^{\top}\mathbf{M}(x)\mathbf{u}}$. Hence setting $\alpha(x) \gg \beta(x)$ lowers the effective cost along the channel tangent and suppresses cross-channel deviations, achieving continuous geometric guidance without explicit prohibition. Outside channels, $\mathbf{M}(x) = \mathbf{I}$ recovers the isotropic case.
+where $\beta_c$ is a channel weight and $\eta_0$ controls the preference strength along the channel axis.
+Larger $\eta_0$ reduces the effective cost of tangential motion and promotes upstream pre-alignment.
+In this paper, $\eta_0$ is fixed and is not optimized as a control variable.
 
-\textit{Remark}: The metric tensor represents directional preference rather than hard feasibility. As long as costs remain finite, pedestrians may still deviate when congestion or detours require it. Thus $U(x)$ answers which directions are allowed, whereas $\mathbf{M}(x)$ answers which allowed directions better follow the channel geometry.
+\subsubsection{Constrained Bellman Equation}
 
-\subsection{Unified Discrete Bellman Formulation}
-
-To unify anisotropic geometry with discrete constraints, we employ a discrete Bellman formulation. For grid point $x$ and admissible direction $\mathbf{u} \in U(x)$, define the step cost \cite{HOOGENDOORN2004169}:
+Given $U(x;s)$ and $M(x;\eta_0)$, the potential function $\phi(x,t)$ represents the minimum remaining cost to the corresponding target region.
+The discrete Bellman update is
 \begin{equation}
-\text{Cost}(x, \mathbf{u}) = \frac{\Delta x}{f(\rho(x))} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}(x) \mathbf{u}}},
-\label{eq:step_cost}
-\end{equation}
-
-The potential satisfies:
-\begin{equation}
-\phi(x) = \min_{\mathbf{u} \in U(x)} \left[\phi(x + \Delta x \, \mathbf{u}) + \text{Cost}(x, \mathbf{u})\right].
+\phi(x)=
+\min_{\mathbf u\in U(x;s)}
+\left[
+\phi(x+\Delta x\,\mathbf u)
++\frac{\Delta x}{f(\rho(x,t))}
+\frac{1}{\sqrt{\mathbf u^\top M(x;\eta_0)\mathbf u}}
+\right].
 \label{eq:bellman}
 \end{equation}
-
-This formulation couples metric tensor $\mathbf{M}(x)$ for geometric guidance with control set $U(x)$ for directional constraints within a unified Bellman framework. The optimal direction is:
+The optimal direction is
 \begin{equation}
-\mathbf{u}^*(x) = \arg\min_{\mathbf{u} \in U(x)} \left[\phi(x + \Delta x \, \mathbf{u}) + \text{Cost}(x, \mathbf{u})\right],
+\mathbf u^*(x,t)=\operatorname*{arg\,min}_{\mathbf u\in U(x;s)}(\cdots),
 \label{eq:optimal_direction}
 \end{equation}
-with velocity $\mathbf{v}(x) = f(\rho) \mathbf{u}^*(x)$.
-
-\subsection{Multi-Stage Multi-Route Model}
-\label{sec:multistage}
-
-Real-world scenarios often involve complex itineraries with multiple stages and route choices. We extend the density field to include stage and route indices, with fixed-probability splitting at decision boundaries.
-
-\subsubsection{Stage-Route Decomposition}
-
-Let the complete behavior chain consist of $S$ stages, where stage $s$ has $R_s$ alternative routes. The total density decomposes as \cite{WONG2002827}:
+and the velocity is
 \begin{equation}
-\rho(x,t) = \sum_{s=1}^{S} \sum_{r=1}^{R_s} \rho_{s,r}(x,t),
-\label{eq:density_decomp}
+\mathbf v(x,t)=f(\rho(x,t))\,\mathbf u^*(x,t).
+\label{eq:velocity}
 \end{equation}
-where $\rho_{s,r}(x,t)$ is the density of sub-population in stage $s$ following route $r$.
-
-All sub-populations share the same speed function $f(\rho)$ determined by total density, ensuring collective congestion effects. Sub-populations differ in their potential functions, optimal directions, and exit targets.
-
-\subsubsection{Sub-Population Potentials and Velocities}
-
-For each sub-population $(s,r)$, define admissible direction set $U_{s,r}(x)$, metric tensor $\mathbf{M}_{s,r}(x)$, and target regions. The potential $\phi_{s,r}(x)$ satisfies:
-\begin{equation}
-\begin{aligned}
-\phi_{s,r}(x) = \min_{\mathbf{u} \in U_{s,r}(x)} \Bigl[\,&\phi_{s,r}(x + \Delta x \, \mathbf{u}) \\
-&+ \frac{\Delta x}{f(\rho)} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}_{s,r}(x) \mathbf{u}}}\Bigr].
-\end{aligned}
-\label{eq:subpop_bellman}
-\end{equation}
-
-The optimal direction is:
-\begin{equation}
-\begin{aligned}
-\mathbf{u}_{s,r}^*(x) = \arg\min_{\mathbf{u} \in U_{s,r}(x)} \Bigl[\,&\phi_{s,r}(x + \Delta x \, \mathbf{u}) \\
-&+ \frac{\Delta x}{f(\rho)} \frac{1}{\sqrt{\mathbf{u}^{\top} \mathbf{M}_{s,r}(x) \mathbf{u}}}\Bigr],
-\end{aligned}
-\label{eq:subpop_optimal}
-\end{equation}
-with velocity $\mathbf{v}_{s,r}(x) = f(\rho) \, \mathbf{u}_{s,r}^*(x)$.
-
-\subsubsection{Stage Transitions and Fixed-Probability Splitting}
-
-Sub-populations couple through stage transitions. Let $G_{s,r} \subset \Omega$ be the completion goal region for stage $(s,r)$ with indicator $\chi_{G_{s,r}}(x)$. Upon reaching this region, pedestrians switch to next-stage routes with fixed probabilities.
-
-Let $p_{(s,r) \to q}$ be the fixed probability of switching from $(s,r)$ to $(s+1,q)$, satisfying:
-\begin{equation}
-p_{(s,r) \to q} \geq 0, \quad \sum_{q=1}^{R_{s+1}} p_{(s,r) \to q} = 1.
-\label{eq:prob_constraints}
-\end{equation}
-
-The transition term is:
-\begin{equation}
-Q_{(s,r) \to (s+1,q)}(x,t) = p_{(s,r) \to q} \, \kappa_{s,r} \, \chi_{G_{s,r}}(x) \, \rho_{s,r}(x,t),
-\label{eq:transition}
-\end{equation}
-where $\kappa_{s,r} > 0$ is the stage switching rate.
-
-The density evolution for each sub-population includes advection and transition source terms:
-\begin{equation}
-\frac{\partial \rho_{s,r}}{\partial t} + \nabla \cdot (\rho_{s,r} \mathbf{v}_{s,r}) = Q^{\text{in}}_{s,r} - Q^{\text{out}}_{s,r},
-\label{eq:subpop_continuity}
-\end{equation}
-where $Q^{\text{in}}_{s,r}$ is inflow from the previous stage and $Q^{\text{out}}_{s,r}$ is outflow to the next stage.
+For the multi-stage multi-route model, each subpopulation $(\sigma,r)$ uses its own target-specific potential $\phi_{\sigma,r}$ while sharing the same total-density congestion feedback.
+Thus, direction rules, geometric guidance, and density-dependent congestion are coupled in a single Bellman--conservation-law model.
 
 \subsection{Internal Entrance Capacity Control}
 
-In addition to direction rules, managers may need to restrict how many pedestrians are admitted into an open channel during each time period. For channel $c$, we introduce entrance capacity controls
+Direction rules alone cannot represent the management action in which a channel is open but its entrance must be metered.
+For each channel, we introduce maximum internal entrance rates
 \begin{equation}
-q=\{q_c^+(t), q_c^-(t)\}_{c=1}^{C},
+q=\{q_c^+(t),q_c^-(t)\}_{c=1}^C,
 \label{eq:q_control}
 \end{equation}
-where the superscripts $+$ and $-$ denote the reference forward and reverse entrances. These controls constrain internal interface fluxes; they are not external boundary inflows.
+where $q_c^+(t)$ and $q_c^-(t)$ denote the maximum admitted rates at the reference forward and reverse entrances of channel $c$.
+These controls act on internal channel entrance fluxes rather than on external boundary inflows.
 
-The direction state and entrance capacity must satisfy hard consistency constraints:
+The direction state and entrance capacity must satisfy the hard consistency constraints
 \begin{equation}
 \begin{aligned}
 s_c=+1 &\Rightarrow q_c^-(t)=0,\\
@@ -289,399 +326,398 @@ s_c=0 &\Rightarrow q_c^+(t)+q_c^-(t)\le \bar q_c.
 \end{aligned}
 \label{eq:direction_capacity_consistency}
 \end{equation}
-
-Let $A_c^\pm(t)$ be the attempted entrance flux induced by the unconstrained finite-volume update. The actually admitted flux is
+Let $A_c^\pm(t)$ be the attempted entrance flux induced by free movement.
+The actually admitted flux is
 \begin{equation}
 \hat A_c^\pm(t)=\min\{A_c^\pm(t),q_c^\pm(t)\}.
 \label{eq:admitted_flux}
 \end{equation}
-The crossing flux at the internal entrance is scaled by $\hat A_c^\pm(t)/A_c^\pm(t)$ when $A_c^\pm(t)>0$. The blocked part remains upstream and is recorded as entrance waiting or queueing mass, preserving the mass balance of the conservation-law update.
+When $A_c^\pm(t)>0$, the flux across the internal entrance is scaled by
+\begin{equation}
+\theta_c^\pm(t)=\frac{\hat A_c^\pm(t)}{A_c^\pm(t)}.
+\label{eq:flux_scaling}
+\end{equation}
+The excess demand $(A_c^\pm(t)-\hat A_c^\pm(t))_+$ remains upstream and is recorded as waiting or queueing mass.
+This treatment changes channel usage and risk distribution while preserving the mass balance of the conservation-law update.
 
-\section{Numerical Solution}
+\subsection{Numerical Solver and Simulation Operator}
 \label{sec:numerical}
 
-We discretize the domain using a uniform two-dimensional grid, with the control direction set represented as an 8-neighborhood basis with masking for regional restrictions.
+The walkable region, obstacles, channel areas, and internal entrance interfaces are discretized on a uniform two-dimensional grid.
+At each time step, the total density is first computed from all stage--route subpopulations and used to update $f(\rho)$.
+For each subpopulation, the admissible direction set and fixed metric tensor are then constructed, and the corresponding discrete Bellman equation is solved.
+After the velocity direction is recovered, an upwind finite-volume update advances the conservation law, while internal entrance fluxes are modified by $\theta_c^\pm(t)$.
+Finally, stage transition terms are applied to update the subpopulation densities.
 
-\textbf{Unified Bellman Solver.} Rather than separate eikonal and HJB solvers, we use a unified discrete Bellman shortest-path update. For candidate direction $\mathbf{u}$, precompute geometric step factors from the local tensor, then combine with the speed function to form the complete step cost. A priority queue propagates potential values outward from exits until convergence. When the control set is unrestricted, this procedure is equivalent to monotone solution of the anisotropic eikonal equation; when controls are restricted, it naturally reduces to constrained HJB solution, covering all required scenarios within a unified framework.
-
-\textbf{Density Update.} After obtaining converged potentials, recover velocity fields using \eqref{eq:subpop_optimal}, substitute into the continuity equation, and advance density explicitly using an upwind flux scheme:
-\begin{equation}
-\rho^{n+1} = \rho^n - \Delta t \, \nabla \cdot (\rho^n \mathbf{v}^n).
-\label{eq:density_update}
-\end{equation}
-The time step satisfies the CFL stability condition.
-
-\textbf{Evaluation Oracle.} For any feasible control configuration $z=(s,q)$, the simulation workflow constitutes a lower-level evaluation operator:
+For any feasible control variable $z=(s,q)$, the complete numerical workflow defines a lower-level simulation operator
 \begin{equation}
 (\rho,\phi,\mathbf v,B,R)=\mathcal S(z;\hat p,\eta_0),
 \label{eq:simulation_oracle}
 \end{equation}
-where $\hat p$ represents fixed route preference parameters, $\eta_0$ is the fixed geometric guidance parameter, $B$ records entrance waiting, and $R$ records realized cumulative channel throughput. This operator provides the foundation for subsequent control optimization.
+where $B$ records entrance waiting or blocking and $R=(R_1,\ldots,R_C)$ records realized cumulative throughputs of the channels.
+The channel balance metric below is computed from the realized throughputs $R_c$, not from the prescribed capacity limits $q_c^\pm(t)$.
 
-\section{Control Evaluation Metrics}
+\subsection{Evaluation Metrics and Optimization Objective}
 \label{sec:metrics}
 
-We distinguish between behavior validation metrics and control evaluation metrics. Behavior validation metrics include direction consistency, approach-angle distributions, and channel capture domains. Control evaluation metrics assess policy impacts under fixed $\hat p$ and $\eta_0$.
+\subsubsection{Efficiency, Safety, and Load Balance}
 
-\subsection{Efficiency, Safety, and Balance}
-
-For simulation horizon $[0,T]$, the total travel time metric is:
+The total travel time metric is
 \begin{equation}
 J_1(z) = \int_0^T \int_{\Omega_w} \rho(x,t) \, dx \, dt.
 \label{eq:j1}
 \end{equation}
-The high-density exposure metric is:
+The high-density exposure metric is
 \begin{equation}
 J_2(z) = \int_0^T \int_{\Omega_w} \mathbf{1}_{\rho(x,t) > \rho_{\text{safe}}} \, dx \, dt.
 \label{eq:j2}
 \end{equation}
-Let $R_c(T)=\int_0^T(\hat A_c^+(t)+\hat A_c^-(t))\,dt$ be the realized cumulative throughput of channel $c$. The load-balancing metric is:
+Let
 \begin{equation}
-J_5(z) = \operatorname{Var}(R_1(T), \dots, R_C(T)).
-\label{eq:j5}
+R_c(T)=\int_0^T(\hat A_c^+(t)+\hat A_c^-(t))\,dt
+\label{eq:channel_throughput}
 \end{equation}
-This metric is based on realized throughput $R_c$, not directly on the capacity control $q_c^\pm(t)$.
-
-\subsection{Entrance Waiting and Control Smoothness}
-
-Entrance waiting is penalized by
+be the realized cumulative throughput of channel $c$.
+The channel load imbalance is
 \begin{equation}
-J_B(z)=\int_0^T\sum_{c=1}^{C}\left(B_c^+(t)+B_c^-(t)\right)\,dt.
-\label{eq:jb}
+J_3(z) = \operatorname{Var}(R_1(T), \dots, R_C(T)).
+\label{eq:j3}
 \end{equation}
-If explicit queues are not stored, the blocked demand $(A_c^\pm-\hat A_c^\pm)_+$ can be used as an equivalent waiting proxy.
 
+\subsubsection{Entrance Waiting and Control Smoothness}
+
+Entrance waiting is penalized as
+\begin{equation}
+J_4(z)=\int_0^T\sum_{c=1}^{C}\left(B_c^+(t)+B_c^-(t)\right)\,dt.
+\label{eq:j4}
+\end{equation}
 For piecewise-constant capacity profiles, smoothness is measured by
 \begin{equation}
-J_R(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right].
-\label{eq:jr}
+J_5(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right].
+\label{eq:j5}
 \end{equation}
+Here $k$ indexes the capacity-control time segment.
+$J_4$ discourages excessive entrance metering that creates upstream queues, while $J_5$ discourages abrupt high-frequency changes in capacity profiles.
 
-\subsection{Dimensionless Normalization}
+\subsubsection{Standardized Scalar Objective}
 
-All terms are normalized before weighting. Let $M_{\text{tot}} = M_{\text{init}} + M_{\text{in}}$ denote the total evaluated crowd mass, let $|\Omega_w|$ be the walkable area, and let $R_{\text{tot}} = \sum_{c=1}^C R_c(T)$. We define
+Because the evaluation terms have different units and magnitudes, they are standardized before weighting:
+\[
+\tilde J_1,\quad \tilde J_2,\quad \tilde J_3,\quad \tilde J_4,\quad \tilde J_5.
+\]
+Given weights $\lambda=(\lambda_1,\ldots,\lambda_5)$, the scalarized objective is
 \begin{equation}
-\tilde{J}_1(z) = \frac{J_1(z)}{M_{\text{tot}} T},
-\label{eq:j1_norm}
-\end{equation}
-\begin{equation}
-\tilde{J}_2(z) = \frac{J_2(z)}{|\Omega_w| T},
-\label{eq:j2_norm}
-\end{equation}
-and
-\begin{equation}
-\tilde{J}_5(z) =
-\frac{\text{Var}(R_1, \dots, R_C)}{R_{\text{tot}}^2 (C-1)/C^2}
-=
-\frac{C^2}{C-1}\text{Var}(r_1, \dots, r_C),
-\label{eq:j5_norm}
-\end{equation}
-where $r_c=R_c/R_{\text{tot}}$. Waiting and smoothness terms are normalized by fixed reference scales, giving $\tilde J_B$ and $\tilde J_R$.
-
-\subsection{Scalarized Optimization Objective}
-
-Given weights $(\lambda_1,\lambda_2,\lambda_5,\lambda_B,\lambda_R)$, the scalarized objective is:
-\begin{equation}
-J(z) = \lambda_1 \tilde{J}_1(z) + \lambda_2 \tilde{J}_2(z) + \lambda_5 \tilde{J}_5(z) + \lambda_B \tilde{J}_B(z) + \lambda_R \tilde{J}_R(z),
+J(z) = \sum_{k=1}^{5}\lambda_k\tilde{J}_k(z),
 \label{eq:scalarized}
 \end{equation}
-
-with the optimization problem:
+and the optimization problem is
 \begin{equation}
 \min_{z \in \mathcal{Z}} J(z), \qquad z=(s,q).
 \label{eq:optimization}
 \end{equation}
+The paper solves this fixed-weight scalarized management problem.
+Different weights can represent different management preferences, but the algorithm itself does not depend on one specific objective term being independently optimal.
 
-Our algorithm solves this scalarized problem for fixed weights, rather than directly generating the full Pareto frontier. Approximate Pareto sets can be obtained by running with different weight combinations.
-
-\section{Optimization Method}
+\subsection{Hierarchical Constrained Mixed-Variable Black-Box Optimization}
 \label{sec:optimization}
 
-\subsection{Control Variable Definition}
+Since $s$ is discrete, $q$ is continuous or piecewise continuous, and each objective evaluation requires the expensive simulator $\mathcal S$, the resulting problem is an expensive mixed-variable black-box optimization problem.
+This paper proposes HCMBO, a Hierarchical Constrained Mixed-variable Black-box Optimization method, to exploit the structural relation between direction variables and capacity variables.
 
-The controllable management variable is $z=(s,q)$. The direction block is
-\begin{equation}
-s=(s_1,\ldots,s_C),\qquad s_c\in\{-1,0,+1,\varnothing\},
-\end{equation}
-and the capacity block is $q=\{q_c^+(t),q_c^-(t)\}_{c=1}^C$. In implementation, $q$ is represented by a low-dimensional vector $x$ through a direction-aware mapping
+\subsubsection{Direction Candidates and Capacity Parameterization}
+
+HCMBO first generates a direction candidate set $\mathcal S_{\mathrm{cand}}$ satisfying operational and connectivity constraints.
+For a fixed direction configuration $s$, the entrance capacity profile is represented by a low-dimensional continuous vector $x\in[0,1]^d$ and mapped to the actual capacity control by
 \begin{equation}
 q=T_s(x),\qquad x\in[0,1]^d.
 \label{eq:capacity_parameterization}
 \end{equation}
-The mapping applies direction masks, capacity upper bounds, closure constraints, and smoothness restrictions.
+The mapping $T_s$ automatically applies direction masks, capacity upper bounds, closure constraints, and smoothness restrictions.
+For example, if a channel is set to reference forward one-way, the reverse entrance capacity is set to zero; if a channel is closed, both directional capacities are set to zero.
+Thus, the optimizer searches in the continuous $x$-space while all candidates are mapped to capacity profiles consistent with the discrete direction configuration.
 
-\subsection{Hierarchical Constrained Mixed-Variable Optimization}
+\subsubsection{Structured Capacity Search}
 
-Treating this as an unconstrained black-box optimization ignores the hierarchical structure between direction rules and entrance capacities. We use HCMBO, a hierarchical constrained mixed-variable black-box optimization framework with five core components:
-\begin{enumerate}
-\item direction-candidate generation and filtering;
-\item direction-aware capacity parameterization $q=T_s(x)$;
-\item constrained surrogate or finite-budget black-box search over $x$;
-\item derivative-free local refinement for promising candidates;
-\item uniform high-fidelity re-evaluation for final ranking.
-\end{enumerate}
+For each direction candidate $s$, HCMBO performs structured search in the corresponding capacity parameter space.
+The search uses previously evaluated samples to construct surrogate information for objective values and feasibility, and preferentially selects capacity candidates that satisfy constraints and may improve the incumbent objective.
+This hierarchical design avoids blind sampling in the full mixed-variable space and separates discrete direction structure from continuous capacity structure.
 
-\subsection{Direction Candidate Filtering}
+Multi-fidelity evaluation can be used during search.
+Low- or medium-fidelity simulations help identify clearly poor capacity profiles, whereas high-fidelity simulations are reserved for final candidate rechecking and ranking.
+To avoid discarding good long-horizon strategies due to short-horizon bias, low-fidelity results are used only as auxiliary evaluation signals and do not directly determine the final optimum.
 
-The outer level generates a set $\mathcal S_{\mathrm{cand}}$ of direction configurations and removes candidates that violate operational constraints, connectivity requirements, or the direction-capacity consistency in \eqref{eq:direction_capacity_consistency}. The retained set provides interpretable discrete alternatives for the inner capacity optimization.
+\subsubsection{High-Fidelity Rechecking and Final Selection}
 
-\subsection{Capacity Search and High-Fidelity Recheck}
+All finalist candidates are re-evaluated under a unified high-fidelity setting.
+Let $\mathcal C_{\mathrm{HF}}$ be the candidate set selected for high-fidelity rechecking.
+The final output is
+\begin{equation}
+z^*=\operatorname*{arg\,min}_{z\in\mathcal C_{\mathrm{HF}}}J_{\mathrm{HF}}(z).
+\label{eq:hcmbo_final}
+\end{equation}
+This mechanism prevents surrogate error, low-fidelity bias, or intermediate search ranking from directly becoming the final performance claim.
 
-For a fixed direction configuration $s$, the inner level optimizes $x$ in $q=T_s(x)$. The search may use Bayesian optimization, evolutionary search, or another finite-budget derivative-free method, but all candidates are passed through the same feasibility-preserving map $T_s$. The final HCMBO mainline uses the whole optimization budget for this direction-wise structured capacity search and derivative-free local refinement. It does not include an auxiliary internal random-search phase; random search is used only as a separate comparison method. All finalists are re-evaluated under the same high-fidelity simulator, and the paper reports only high-fidelity recheck results.
+The main workflow of HCMBO is summarized in Table~\ref{tab:hcmbo_workflow}.
 
-\subsection{Compared Methods}
+\begin{table}[!t]
+\caption{Main Workflow of HCMBO}
+\label{tab:hcmbo_workflow}
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular}{|p{0.12\columnwidth}|p{0.78\columnwidth}|}
+\hline
+\textbf{Step} & \textbf{Operation} \\
+\hline
+1 & Generate the direction candidate set $\mathcal S_{\mathrm{cand}}$ and remove configurations violating operational or connectivity constraints. \\
+\hline
+2 & For each direction $s$, construct the direction-aware capacity map $q=T_s(x)$. \\
+\hline
+3 & Perform structured black-box search in the capacity parameter space $x\in[0,1]^d$. \\
+\hline
+4 & Evaluate candidates with $\mathcal S(z;\hat p,\eta_0)$ and update surrogate information. \\
+\hline
+5 & Select near-optimal candidates for unified high-fidelity rechecking. \\
+\hline
+6 & Output the final policy $z^*$ according to the high-fidelity objective value. \\
+\hline
+\end{tabular}
+\end{table}
 
-The horizontal comparison includes Random Search, Pure SA (Pure Simulated Annealing), Enum-DE (Enumeration plus Differential Evolution), TPE-Mixed BO (Tree-structured Parzen Estimator based mixed-variable Bayesian optimization), and HCMBO. Pure SA refers to simulated annealing and should not be confused with the obsolete structure-aware block search used in earlier drafts.
+Compared with generic mixed-variable optimization, HCMBO explicitly exploits direction-capacity consistency.
+The direction variable determines the effective feasible structure of the capacity variable, and the capacity variable determines the continuous response of entrance release, waiting, and channel load.
+This structured treatment reduces invalid candidates and concentrates the finite simulation budget on feasible policies with clear management meaning.
+
 
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-This section presents numerical experiments to validate the proposed model mechanisms, control responses, behavior layer, and direction-capacity optimization framework. The experiments use a four-channel scenario, which is a simplified abstraction of the Bund waterfront viewing-platform environment. One side of the platform contains the initial crowd region and entry boundary, the other side contains the viewing and exit region, and a central wall contains four representative passages: upper, middle, lower-middle, and lower passages. The experiments follow a progressive logic: local mechanism validation is first conducted on the four-channel setting; the analysis then extends to multi-channel, multi-stage direction responses, behavior-layer validation, and finally horizontal optimization comparison over $z=(s,q)$.
+This section validates the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from a waterfront viewing area.
+The scenario consists of an inflow region, a viewing and exit region, a central wall, and four connecting passages: upper, middle, lower-middle, and bottom passages.
+The experiments follow the same logic as the Chinese experimental outline: mechanism validation, directional-response analysis, entrance-rate response, horizontal optimizer comparison, and HCMBO ablation.
 
 \subsection{Experimental Setup}
 \label{sec:setup}
 
-\subsubsection{Four-Channel Scenario}
-
-The four-channel scenic-platform scenario is used as the common basis for mechanism validation, strategy comparison, and optimization. The left side represents the initial crowd region and entry boundary, the right side represents the platform and exit target region, and the central wall contains four passages arranged from top to bottom as the upper, middle, lower-middle, and lower channels. Depending on the experiment group, pedestrians perform a single-stage crossing task, a bidirectional passage task, or a multi-stage ``entry--tour--exit'' behavior chain.
+The domain is discretized on a $128\times96$ grid with spacing $\Delta x=0.5$.
+The passage width is $2$, the controlled internal entrance interface width is $8$, the free-flow speed is $v_{\max}=1.5$, the maximum density is $\rho_{\max}=5.0$, the initial density is $\rho_{\mathrm{init}}=2.2$, and the CFL factor is $0.9$.
+Mechanism and response experiments use the corresponding validation horizons, whereas the optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, horizon $160$, and Bellman updates every five steps.
+Final optimizer rankings are based on the high-fidelity objective in Section~\ref{sec:metrics}.
+A high-fidelity best candidate is called feasible if the density-cap removal mass is no more than $2\%$ of the reference mass.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{../images/experiment_result_archive/scene.png}
-\caption{Four-channel simulation scenario used in the numerical experiments.}
+\caption{Four-channel scenic-platform simulation scenario used in the numerical experiments.}
 \label{fig:experiment_scene}
 \end{figure}
-
-Numerical parameters are set as follows: grid resolution $128\times96$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, and safety density threshold $\rho_{\text{safe}}=3.5$. The capacity-control horizontal comparison uses $1600$ high-fidelity steps, a time horizon of $T=160$, and Bellman updates every five simulation steps.
 
 \subsection{Mechanism Validation}
 \label{sec:mechanism}
 
-\subsubsection{Validation Logic and Experimental Matrix}
-
-The G1 mechanism validation experiment does not aim to rank control strategies. Instead, it verifies whether the two local mechanisms in the model have clear and interpretable behavioral meanings. The experiment is organized around four mechanism propositions, as shown in Table~\ref{tab:g1_matrix}.
-
-\begin{table}[!t]
-\caption{G1 Mechanism Validation Matrix}
-\label{tab:g1_matrix}
-\centering
-\small
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.18}
-\begin{tabular}{|p{0.26\columnwidth}|p{0.21\columnwidth}|p{0.22\columnwidth}|p{0.22\columnwidth}|}
-\hline
-\textbf{Mechanism Proposition} & \textbf{Comparison} & \textbf{Main Observables} & \textbf{Expected Phenomenon} \\
-\hline
-$M(x)$ represents soft geometric guidance & baseline vs. $M$-only & channel flow share; approach streamlines & target-channel attraction expands; inflow converges earlier \\
-\hline
-$U(x)$ represents hard directional constraints & baseline vs. $U$-only & restricted-channel flow; local direction field & restricted direction is excluded; flow shifts to feasible channels \\
-\hline
-$U(x)$ suppresses reverse flow and counterflow & bidirectional baseline vs. one-way rule & reverse mass time; head-on cell time & reverse flow and counterflow intensity decrease \\
-\hline
-$U+M$ is spatially transferable & different controlled-channel locations & dominant flow channel; hotspot location & dominant flow migrates with the controlled channel \\
-\hline
-\end{tabular}
-\end{table}
-
-This matrix separates the functional levels of $M(x)$ and $U(x)$. The former concerns preference changes within the feasible direction set, whereas the latter concerns modification of the feasible direction set itself. The final proposition then tests whether their combination produces synchronous migration when the controlled channel location changes.
-
-\subsubsection{Soft Guidance Mechanism: $M(x)$ Alters Channel Attraction}
-
-To verify whether geometric guidance changes the approach process, we compare the baseline configuration against the $M$-only configuration, in which anisotropic geometric guidance is applied to the middle channel.
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_m_attraction_flow_comparison.png}
-\caption{Channel attraction domains and approach streamlines in the G1 experiment. The upper row shows capture-domain boundaries over the mean-density background, and the lower row shows time-averaged approach streamlines.}
-\label{fig:g1_m_attraction_flow}
-\end{figure}
-
-The baseline flow is mainly distributed between the middle and lower-middle channels: upper $1.64\%$, middle $48.78\%$, lower-middle $47.92\%$, and lower $1.66\%$. After introducing $M$-only guidance, the middle-channel flow share increases to $100.00\%$. As shown in Fig.~\ref{fig:g1_m_attraction_flow}, $M$-only guidance not only expands the attraction domain of the middle channel but also causes the incoming flow to converge toward the middle channel further upstream, forming a clear pre-alignment structure before the channel entrance. This indicates that the core role of $M(x)$ is to alter the relative travel cost within the feasible direction set, reshaping which channel attracts the crowd and when alignment begins, rather than directly prohibiting other passages.
-
-\subsubsection{Hard Directional Constraint Mechanism: $U(x)$}
-
-To verify whether directional constraints alter feasible path selection, we first compare the baseline configuration against the $U$-only configuration under unidirectional inflow, where the middle channel is subject to a directional constraint.
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_u_direction_field_comparison.png}
-\caption{Local direction field comparison between baseline (left) and $U$-only (right) configurations. White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
-\label{fig:g1_u_direction}
-\end{figure}
-
-Under the $U$-only configuration, the middle-channel flow share drops to $0$. The flow is redistributed to the upper, lower-middle, and lower channels, with shares of $19.25\%$, $68.76\%$, and $12.00\%$, respectively. This is the primary evidence for the role of $U(x)$: directional constraints do not continuously adjust route preference, but directly modify the local admissible direction set and thereby remove the restricted channel from the feasible choice set.
-
-To further verify the ability of $U(x)$ to control directional conflicts, we conduct a bidirectional flow sub-experiment comparing a bidirectional baseline against a middle-channel eastbound one-way rule.
-
-\begin{table}[!t]
-\caption{Bidirectional $U(x)$ Validation Results}
-\label{tab:bidirectional}
-\centering
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.05}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{|c|c|c|c|}
-\hline
-\textbf{Configuration} & \textbf{Westbound Share} & \textbf{Counter-flow Mass} & \textbf{Head-on Exposure} \\
-\hline
-Bidirectional baseline & $73.18\%$ & $415.75$ & $1213.76$ \\
-Middle channel one-way & $0$ & $0$ & $0$ \\
-\hline
-\end{tabular}
-}
-\end{table}
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_bidirectional_dynamics_lines.png}
-\caption{Dynamic comparison of reverse flow in the middle channel under bidirectional conditions. Left: westbound mass share in the middle channel over time. Right: head-on conflict intensity in the middle channel over time.}
-\label{fig:g1_bidirectional_dynamics}
-\end{figure}
-
-The bidirectional experiment shows that after imposing the one-way rule, westbound pedestrians are completely excluded from the middle channel, and both the middle-channel reverse-flow mass time and head-on cell time become zero. Therefore, $U(x)$ does not merely change path choice under unidirectional demand; it also persistently suppresses reverse flow and head-on conflict under bidirectional demand. This distinction clarifies the functional difference between $U(x)$ and $M(x)$: $M(x)$ adjusts route preference, whereas $U(x)$ modifies the feasible direction set. Thus, $U(x)$ is the hard-constraint representation of directional control policies.
-
-\subsubsection{Composability and Spatial Transferability of the Joint Mechanism}
-
-To verify the sensitivity of the joint mechanism to controlled-channel location, we test four $U+M$ configurations: middle-channel controlled, upper-channel controlled, lower-middle-channel controlled, and lower-channel controlled. The focus here is not on the efficiency or safety index of each configuration, but on whether the dominant flow channel changes synchronously when $U+M$ is applied to different channels.
-
-\begin{table}[!t]
-\caption{Dominant Flow Migration Under Different $U+M$ Controlled-Channel Locations}
-\label{tab:sensitivity}
-\centering
-\setlength{\tabcolsep}{2pt}
-\renewcommand{\arraystretch}{1.08}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{|c|c|c|c|c|c|}
-\hline
-\textbf{Configuration} & \textbf{Dominant Flow Channel} & \textbf{Upper Flow} & \textbf{Middle Flow} & \textbf{Lower-Middle Flow} & \textbf{Lower Flow} \\
-\hline
-baseline & middle/lower-middle & $1.64\%$ & $48.78\%$ & $47.92\%$ & $1.66\%$ \\
-$M$-only-middle & middle & $0$ & $100.00\%$ & $0$ & $0$ \\
-$U+M$-middle & middle & $0$ & $100.00\%$ & $0$ & $0$ \\
-$U+M$-top & upper & $100.00\%$ & $0$ & $0$ & $0$ \\
-$U+M$-lower-middle & lower-middle & $0$ & $0$ & $100.00\%$ & $0$ \\
-$U+M$-lower & lower & $0$ & $0$ & $0$ & $100.00\%$ \\
-\hline
-\end{tabular}
-}
-\end{table}
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_um_configuration_flow_comparison.png}
-\caption{Flow field comparison for the $U+M$ combined mechanism under different controlled-channel locations. The sub-figures correspond to different guided channels; white streamlines and arrows represent time-averaged movement directions, and the background color encodes time-averaged density.}
-\label{fig:g1_um_configuration}
-\end{figure}
-
-The results show that changing the controlled-channel location induces synchronous migration of the dominant flow channel, density hotspot, and approach streamlines. When the upper, middle, lower-middle, or lower channel is selected as the joint guidance channel, the flow concentrates on the corresponding channel. This confirms that $U+M$ is not merely a local parameter setting that works at one fixed position; rather, it produces clear and interpretable behavioral responses as the spatial configuration changes. The joint mechanism can therefore serve as the lower-level simulator for subsequent strategy evaluation and optimization search.
-
-\subsection{System Response and Optimization Complexity Under Directional Control}
-\label{sec:strategy}
-
-After validating that $U(x)$ and $M(x)$ produce the expected local control responses, we further examine whether the discrete directional control variable $s$ induces nontrivial system-level responses in the full multi-stage scenario. The purpose of this experiment is not to select a final optimal policy from a small enumeration, but to test whether interpretable perturbations of channel directions generate distinguishable changes in efficiency, safety exposure, and load balancing. Such evidence is needed before introducing an automated optimization procedure.
-
-The complete combinatorial space of four-channel direction settings is large and contains many cases with weak operational meaning. We therefore construct a representative validation matrix with three policy families: single-entry (SE), single-return (SR), and one-channel-closed (CL), each rotated over the upper, middle, lower-middle, and bottom channels. Together with the all-free baseline (BSL), this gives $1+4+4+4=13$ cases. Direction codes are ordered as $[T,M,LM,B]$, where $T$, $M$, $LM$, and $B$ denote the upper, middle, lower-middle, and bottom channels. The symbols $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, free bidirectional passage, and closure, respectively. Case indices are retained only as configuration identifiers and are not mixed with policy-family labels.
+The first experiment verifies whether the two local modeling components have the intended behavioral meanings.
+The fixed anisotropic metric $M(x;\eta_0)$ should reshape the channel attraction domain and induce entrance pre-alignment, whereas the admissible direction set $U(x;s)$ should remove prohibited directions and reroute flow through feasible passages.
+When $M$ is applied to the middle channel, its flow share increases from $48.78\%$ in the baseline to $100.00\%$.
+When a one-way rule excludes the originally dominant middle-channel direction, the middle-channel share becomes zero and the flow is redistributed to the upper, lower-middle, and bottom channels with shares $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
+In a bidirectional inflow test, imposing an eastbound one-way rule reduces the westbound middle-channel share, reverse-direction mass time, and counterflow cell time from $73.18\%$, $415.75$, and $1213.76$ to zero.
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary.png}
-\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_5$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions. (C) Objective summary heatmap, with only the best value in each objective dimension annotated.}
+\includegraphics[width=0.82\textwidth]{../../codes/results/g1_mechanism_reframed/g1_um_configuration_flow_comparison.png}
+\caption{Spatial transferability of the combined $U+M$ mechanism. Moving the controlled channel induces corresponding migration of dominant flow channels, streamlines, and density hotspots.}
+\label{fig:g1_um_configuration}
+\end{figure*}
+
+Fig.~\ref{fig:g1_um_configuration} further shows that the combined $U+M$ mechanism is spatially transferable.
+Changing the guided channel from the upper to the lower passage moves the dominant flow channel and local density hotspot accordingly.
+These results support using the Bellman--conservation-law simulator as the lower-level evaluator for subsequent strategy optimization.
+
+\subsection{Directional-Control Response}
+\label{sec:strategy}
+
+We next examine whether the discrete direction configuration $s$ creates nontrivial system-level trade-offs.
+The response experiment uses thirteen interpretable direction settings: an all-free baseline, four single-entry cases, four single-return cases, and four one-channel-closure cases.
+The direction code is ordered as $[T,M,LM,B]$, where $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, bidirectional free passage, and closure.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.92\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
+\caption{Directional-control design matrix and objective-space trade-off. Color encodes $\tilde J_3$, marker size encodes $\tilde J=\tilde J_1+\tilde J_2+\tilde J_3$, and diamonds indicate non-dominated cases.}
 \label{fig:g2_control_tradeoff}
 \end{figure*}
 
-\begin{figure*}[!t]
-\centering
-\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_spatial_mechanism_summary.png}
-\caption{Spatial mechanism behind directional-control responses. (A) Channel-load distribution across the 13 representative cases, with annotations retained only for major loaded channels. (B) Hotspot migration over the same scene background used in the density maps. Marker size represents local exposure intensity, and color indicates the policy family. If an exposure-weighted centroid falls inside an obstacle due to averaging over separated high-density regions, it is mapped to the nearest walkable cell for visualization.}
-\label{fig:g2_spatial_mechanism}
-\end{figure*}
-
-Fig.~\ref{fig:g2_control_tradeoff} shows that different direction settings produce stable and clearly separated changes in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$. Using the aggregated normalized objective $\tilde{J}=\tilde{J}_1+\tilde{J}_2+\tilde{J}_5$, C8 (SR-LM, EEWE) obtains the lowest value, $\tilde{J}=0.5102$. The baseline C1 is close, with $\tilde{J}=0.5145$, but achieves the lowest safety exposure, $\tilde{J}_2=0.00785$. C9 (SR-B) gives the best load-balancing term, $\tilde{J}_5=0.1138$, while C3 (SE-M) gives the best efficiency term, $\tilde{J}_1=0.3141$, at the cost of higher safety exposure and load imbalance.
+Fig.~\ref{fig:g2_control_tradeoff} and Table~\ref{tab:g2_nondominated} show that no single direction configuration dominates all objectives.
+C8 (SR-LM, EEWE) obtains the lowest aggregate value $\tilde J=0.5102$, C1 gives the lowest safety exposure $\tilde J_2=0.00785$, C3 gives the best efficiency term $\tilde J_1=0.3141$, and C9 gives the best load-balance term $\tilde J_3=0.1138$.
+This non-monotonic response motivates automatic mixed-variable optimization rather than manual selection from a small set of rules.
 
 \begin{table*}[!t]
 \centering
-\caption{Non-Dominated Directional-Control Cases in G2}
+\caption{Non-Dominated Directional-Control Cases}
 \label{tab:g2_nondominated}
-\footnotesize
+\scriptsize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{c c c c c c c l}
 \hline
-Case & Policy & Code & $\tilde{J}_1$ & $\tilde{J}_2$ & $\tilde{J}_5$ & $\tilde{J}$ & Main characteristic \\
+Case & Policy & Code & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $\tilde J$ & Main characteristic \\
 \hline
-C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure; close to the best aggregate objective \\
-C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency; risk concentrates near the middle channel \\
-C4 & SE-LM & WWEW & 0.3335 & 0.01662 & 0.3131 & 0.6632 & Lower-middle entry; efficient but load-imbalanced \\
-C6 & SR-T & WEEE & 0.4029 & 0.01174 & 0.1335 & 0.5482 & Highest exit throughput; relatively balanced \\
+C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure \\
+C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency but risk-concentrated \\
+C4 & SE-LM & WWEW & 0.3335 & 0.01662 & 0.3131 & 0.6632 & Efficient but load-imbalanced \\
+C6 & SR-T & WEEE & 0.4029 & 0.01174 & 0.1335 & 0.5482 & High return throughput \\
 C8 & SR-LM & EEWE & 0.3395 & 0.01311 & 0.1576 & \textbf{0.5102} & Lowest aggregate objective \\
 C9 & SR-B & EEEW & 0.4377 & 0.01344 & \textbf{0.1138} & 0.5649 & Most balanced channel loads \\
 \hline
 \end{tabular}
 \end{table*}
 
-These results indicate that perturbing the direction variable $s$ does not produce a monotonic improvement pattern, nor does any single configuration dominate all three objectives. The non-dominated set contains C1, C3, C4, C6, C8, and C9, confirming that the four-channel multi-stage scenario already forms a nontrivial multi-objective response structure.
+\subsection{Entrance-Rate Response}
+\label{sec:entrance_rate_exp}
 
-The direct spatial mechanism behind these objective differences is the redistribution of channel loads and high-density hotspots. As shown in Fig.~\ref{fig:g2_spatial_mechanism}(A), the baseline C1 concentrates flow mainly in the middle and lower-middle channels, with shares of $34.0\%$ and $47.2\%$, respectively. C8 has channel-load shares of $0.6\%$, $47.6\%$, $32.0\%$, and $19.7\%$, maintaining a low aggregate objective while still assigning the largest burden to the middle channel. C9 has load shares of $0$, $30.0\%$, $33.7\%$, and $36.3\%$, which explains its best load-balancing term but weaker efficiency.
-
-Fig.~\ref{fig:g2_spatial_mechanism}(B) further shows that directional control changes not only total flow allocation but also the spatial location of risk exposure. Hotspot locations are visualized in the true scene coordinate system and on the same feasible-domain and obstacle background as the density maps. Upper-channel-dominant or middle-closure configurations shift hotspots upward; middle-channel dominance places hotspots near the central passage; and lower-middle or bottom involvement shifts hotspots downward. Hence, the variations in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_5$ are not merely abstract numerical differences, but arise from coupled changes in channel-load redistribution, local safety exposure, and hotspot migration.
-
-The G2 experiment therefore supports the need for subsequent optimization from three perspectives. First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum. Second, the direction variable is combinatorial, and the 13 cases here are only an interpretable slice rather than an exhaustive enumeration. Third, the full control problem also includes the continuous internal entrance capacity profile $q$. The resulting problem is therefore a mixed discrete-continuous, simulation-driven optimization problem with expensive evaluations, motivating the automated search procedure introduced later.
-
-\subsection{Behavior-Layer Necessity}
-\label{sec:multistage_exp}
-
-The behavior-layer experiment compares a single-stage approximation, a multi-stage model with uniform preferences, and a multi-stage model with heterogeneous fixed preferences. The single-stage approximation over-directs pedestrians to the middle channel, while the multi-stage models shift exit demand mainly toward the lower-middle and lower channels. The comparison shows that omitting the stage chain and route preferences can distort channel-load assessment and policy ranking. Therefore, $\hat p$ is treated as a fixed exogenous behavior parameter in the optimization experiment.
-
-\subsection{Horizontal Optimization Comparison}
-\label{sec:optimal}
-
-The completed horizontal comparison evaluates baseline prior best, Random Search, Pure SA, Enum-DE, TPE-Mixed BO, and HCMBO under the same high-fidelity setting. The result root is \texttt{codes/results/g6\_horizontal\_comparison}. Five seeds are used: $11$, $23$, $37$, $51$, and $73$.
+Direction rules alone cannot represent the case in which a channel remains open but its internal entrance must be metered.
+We therefore fix $[T,M,LM,B]=[F,E,W,F]$ and scan four internal entrance-rate levels: no limit, high, medium, and low.
+The rate upper bound acts on internal entrance crossing flow.
+When attempted flow exceeds the upper bound, only the admitted flow crosses the interface, and the unreleased attempted flow remains upstream as waiting mass.
+The entrance binding-time ratio is defined as the fraction of time steps in which attempted entrance flow exceeds the rate upper bound and creates unreleased attempted flow.
 
 \begin{table*}[!t]
 \centering
-\caption{High-Fidelity Best Results in the Direction-Capacity Optimization Comparison}
-\label{tab:g6_summary}
-\footnotesize
+\caption{Response Under Internal Entrance-Rate Upper-Bound Levels}
+\label{tab:entrance_rate_response}
+\scriptsize
+\setlength{\tabcolsep}{5pt}
 \begin{tabular}{lrrrrrr}
 \hline
-Method & Mean objective & Std. & Best & Worst & Feasible rate & Best seed \\
+Level & $\tilde J_1$ & $\tilde J_2^{\mathrm{eval}}$ & $\tilde J_3$ & Objective & Unreleased attempted flow & Binding ratio \\
 \hline
-baseline\_prior\_best & 5.4774 & 0.0000 & 5.4774 & 5.4774 & 0\% & 11 \\
-random\_search & 3.0112 & 0.1319 & 2.8821 & 3.2287 & 40\% & 51 \\
-pure\_sa & 2.9248 & 0.1386 & 2.7468 & 3.1049 & 60\% & 73 \\
-enum\_de & 3.0597 & 0.1932 & 2.7329 & 3.2500 & 40\% & 23 \\
-hcmbo\_proposed & 2.8848 & 0.1491 & 2.7002 & 3.0427 & 80\% & 37 \\
-tpe\_mixed\_bo & \textbf{2.7403} & 0.2475 & \textbf{2.5180} & 3.1345 & 80\% & 23 \\
+No limit & 0.6274 & 0.174 & 0.8838 & 1.6851 & 0.00 & 0.000 \\
+High & 0.6262 & 0.358 & 0.8814 & 1.8652 & 241.40 & 0.605 \\
+Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 329.26 & 0.666 \\
+Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 427.89 & 0.721 \\
 \hline
 \end{tabular}
 \end{table*}
 
-Table~\ref{tab:g6_summary} shows that the G6 implementation of HCMBO outperforms Random Search, Pure SA, and Enum-DE in mean objective, and shares the highest feasible rate of $80\%$ with TPE-Mixed BO. However, TPE-Mixed BO obtains the lowest mean objective and the best single-seed objective in this five-seed table. A post-hoc source audit further showed that the useful HCMBO candidates mainly came from direction-wise structured capacity search rather than auxiliary internal random search. Therefore, the final HCMBO mainline removes the internal random-search phase.
-
-Table~\ref{tab:g7c_summary} reports the focused comparison after this mainline update. Under seed $23$, budget $B=400$, top-$10$ high-fidelity rechecks, $1600$ simulation steps, and time horizon $160$, the updated HCMBO obtains a lower high-fidelity objective than the current TPE-style mixed BO baseline. Since this focused comparison uses one representative seed, it is used as direct evidence for the mainline update rather than as a claim of multi-seed statistical dominance.
-
-\begin{table}[!t]
+\begin{figure}[!t]
 \centering
-\caption{Focused Comparison After the HCMBO Mainline Update}
-\label{tab:g7c_summary}
-\footnotesize
-\begin{tabular}{lrrrr}
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g2/g2_capacity_levels.png}
+\caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow.}
+\label{fig:entrance_rate_response}
+\end{figure}
+
+Table~\ref{tab:entrance_rate_response} and Fig.~\ref{fig:entrance_rate_response} show that tightening the rate upper bound does not simply improve safety.
+From the no-limit case to the low level, unreleased attempted flow increases from $0$ to $427.89$, the binding ratio increases from $0$ to $0.721$, and $\tilde J_2^{\mathrm{eval}}$ increases from $0.174$ to $0.466$.
+Thus, $q$ is a genuine continuous control variable that changes system response and must be optimized jointly with $s$.
+
+\subsection{Horizontal Optimization Comparison}
+\label{sec:optimal}
+
+The horizontal comparison evaluates Prior Baseline, Random Search, Pure Simulated Annealing, Enumeration plus Differential Evolution, TPE-Mixed BO, and HCMBO.
+All optimizers use $B=400$ candidate evaluations and top-$10$ high-fidelity rechecks over seeds $11$, $23$, $37$, $51$, and $73$.
+The final HCMBO data are taken from the G7-D mainline, whereas the other baselines are taken from the G6 horizontal comparison under the same high-fidelity protocol.
+
+\begin{table*}[!t]
+\centering
+\caption{High-Fidelity Performance in the Direction--Entrance-Rate Optimization Comparison}
+\label{tab:optimizer_summary}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrr}
 \hline
-Method & Best objective & Feasible rate & $J_2$ & Gate rejected \\
+Method & Mean objective & Std. & Median & Best & Worst & Feasible rate \\
 \hline
-HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & 2545.508 \\
-TPE-Mixed BO & 2.5180 & 100\% & 1.6948 & 2815.208 \\
-HCMBO queue-aware & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} \\
+HCMBO & \textbf{2.6338} & 0.3106 & \textbf{2.5065} & \textbf{2.4495} & 3.1851 & \textbf{100\%} \\
+TPE-Mixed BO & 2.7403 & 0.2475 & 2.6288 & 2.5180 & 3.1345 & 80\% \\
+Pure SA & 2.9248 & 0.1386 & 2.9203 & 2.7468 & 3.1049 & 60\% \\
+Random Search & 3.0112 & 0.1319 & 2.9797 & 2.8821 & 3.2287 & 40\% \\
+Enum-DE & 3.0597 & 0.1932 & 3.1004 & 2.7329 & 3.2500 & 40\% \\
+Prior Baseline & 5.4774 & 0.0000 & 5.4774 & 5.4774 & 5.4774 & 0\% \\
 \hline
 \end{tabular}
-\end{table}
+\end{table*}
+
+Table~\ref{tab:optimizer_summary} shows that HCMBO achieves the lowest mean objective, lowest median objective, lowest best objective, and highest feasible rate.
+Relative to TPE-Mixed BO, HCMBO is better in $4/5$ paired seeds, with an average objective difference of $-0.1066$.
+It also outperforms Random Search in all five seeds and outperforms Pure SA and Enum-DE in four of five seeds.
+The remaining high objective in one HCMBO seed is mainly driven by a larger safety exposure term, indicating a residual need for stronger safety-constraint awareness.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_best_objective.png}
+\caption{Best high-fidelity objective across seeds. Range bars show the seed-wise spread, and the short vertical mark indicates the median.}
+\label{fig:optimizer_best_objective}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_convergence.png}
+\caption{Best-so-far convergence curves under the same $400$-evaluation budget. The inset highlights the final-stage separation among methods.}
+\label{fig:optimizer_convergence}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_control_profiles.png}
+\caption{Best-solution entrance-rate profiles for Random Search, Pure SA, Enum-DE, TPE-Mixed BO, and HCMBO. The common direction structure is $[T,M,LM,B]=[W,E,E,W]$ for several methods, but the segment-wise rate allocations differ substantially.}
+\label{fig:control_profiles}
+\end{figure}
+
+Figs.~\ref{fig:optimizer_best_objective}--\ref{fig:control_profiles} provide complementary visual evidence.
+TPE-Mixed BO descends quickly in the early evaluations, but HCMBO continues to improve in the middle and late stages and reaches the lowest final region.
+The entrance-rate profiles show that performance differences are not only caused by choosing a discrete direction code; they also arise from detailed segment-wise rate allocation within the same direction structure.
+
+\subsection{HCMBO Ablation}
+\label{sec:ablation}
+
+The ablation experiments examine whether the control variables and search mechanisms used by HCMBO are necessary.
+First, direction and entrance-rate variables must be optimized jointly.
+Optimizing only direction with a fixed high rate gives best high-fidelity objective $3.3751$, while optimizing only rates under prior directions gives $3.3140$; both are clearly worse than joint optimization.
+Second, short-horizon low-fidelity hard screening increases the best objective to $2.9441$ and yields an infeasible best candidate, because early simulations do not reliably reflect long-horizon entrance waiting and load redistribution.
+Third, removing the entrance-waiting penalty slightly reduces the scalar objective to $2.6015$, but increases unreleased attempted flow to $3239.295$, showing that waiting should remain in the management objective.
+
+\begin{table*}[!t]
+\centering
+\caption{Search-Mechanism Ablation Under Seed 23}
+\label{tab:search_ablation}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrl}
+\hline
+Variant & Best objective & Feasible rate & $J_2$ & Unreleased flow & Main meaning \\
+\hline
+HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & 2545.508 & Structured direction-wise rate search \\
+Queue-aware LCB & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} & Queue-aware acquisition \\
+RF-style constrained BO & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} & Constraint surrogate variant \\
+Adaptive racing & 2.6561 & 100\% & 1.9474 & 3204.194 & Stage-wise budget concentration \\
+Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & 2664.373 & Combined racing and queue signal \\
+Trust-region search & 3.0317 & 100\% & 1.9224 & 3967.226 & Local trust-region search \\
+\hline
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:search_ablation} shows that the final HCMBO mainline obtains the lowest scalar objective among the tested variants.
+Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to $2412.404$, but their scalar objective increases to $2.6162$.
+Thus, queue information is useful for executable and safety-aware extensions, whereas the final mainline should retain structured direction-wise rate search as the primary budget allocation mechanism.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presents a Bellman--conservation-law crowd management framework for open pedestrian zones with channel direction configuration and internal entrance capacity control. The current controllable variable is $z=(s,q)$; the geometric guidance parameter $\eta_0$ and route preference parameter $\hat p$ are fixed model inputs. The proposed HCMBO framework exploits the direction-capacity hierarchy, concentrates the optimization budget on structured capacity search rather than internal random search, and uses high-fidelity rechecks for final ranking.
+This paper proposed a Bellman--conservation-law crowd management framework for open pedestrian zones with multi-channel direction rules and internal entrance-rate control.
+The admissible direction set $U(x;s)$ represents hard operational rules such as one-way, bidirectional, and closed passages; the fixed metric tensor $M(x;\eta_0)$ represents geometric guidance; and the multi-stage route structure describes entry, viewing, exit, and return movements.
+The controllable variable is $z=(s,q)$, where $s$ is the channel direction configuration and $q$ is the internal entrance-rate upper-bound profile; behavioral preference $\hat p$ and geometric guidance strength $\eta_0$ are fixed model inputs.
 
-The numerical experiments validate that: (1) fixed geometric guidance $M(x;\eta_0)$ and directional constraints $U(x;s)$ alter local crowd behaviors in interpretable ways; (2) directional configurations induce nontrivial efficiency--safety--balance trade-offs; (3) multi-stage behavior modeling is necessary for reliable channel-load assessment; and (4) HCMBO outperforms Random Search, Pure SA, and Enum-DE in the multi-seed horizontal comparison, while the updated HCMBO mainline obtains a lower high-fidelity objective than the current TPE-style mixed BO baseline in the focused seed-$23$ comparison.
+The numerical experiments support three conclusions.
+First, the lower-level simulator produces interpretable mechanisms: $U(x;s)$ removes prohibited local directions, $M(x;\eta_0)$ changes channel attraction domains and entrance pre-alignment, and the combined $U+M$ mechanism transfers across controlled-channel locations.
+Second, both control variables are necessary.
+Directional settings produce non-monotonic efficiency--safety--load-balance trade-offs, and entrance-rate upper bounds significantly change unreleased attempted flow, binding-time ratios, and safety exposure.
+Third, the final HCMBO optimizer effectively exploits the direction--rate hierarchy.
+Under five random seeds, $B=400$ candidate evaluations, and unified high-fidelity rechecks, HCMBO obtains the lowest mean objective of $2.6338$ and the highest feasible rate of $100\%$, outperforming TPE-Mixed BO, Random Search, Pure SA, Enum-DE, and the prior baseline.
+Compared with TPE-Mixed BO, HCMBO is better in $4/5$ paired seeds, with an average objective difference of $-0.1066$.
+Ablation results further show that joint direction--rate optimization, removal of low-fidelity hard screening, and structured direction-wise rate search are key contributors to this performance.
 
-Future work will extend to larger real-world geometries, more random seeds, stronger official TPE/SMAC baselines, online demand estimation, multi-weight Pareto analysis, and calibration against field observations.
+The current study still has limitations.
+The experiments are based on a four-channel abstract scenario, objective weights and finite random seeds affect optimizer ranking, one HCMBO seed still exhibits relatively high safety exposure, and real crowd calibration and online demand updates are not yet included.
+Future work will extend the framework to more complex real geometries, broader demand levels and random-seed sets, stronger constraint-aware Bayesian optimization or SMAC-style baselines, multi-weight Pareto analysis, and calibration against field observations.
 
 \balance
 
