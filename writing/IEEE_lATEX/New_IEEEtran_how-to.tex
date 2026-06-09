@@ -16,7 +16,7 @@
 
 \begin{document}
 
-\title{…… Massive Crowd Management in Urban Pedestrian Zones}
+\title{Macroscopic Crowd Control with Direction Constraints and Entrance-Rate Control for Urban Pedestrian Zones}
 
 \author{Author Name
 \thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
@@ -97,8 +97,8 @@ The admissible direction set first encodes one-way, bidirectional, and closed ch
 
 \item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, realized channel-flow variance, entrance waiting, and control smoothness).
 
-\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction-capacity variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance.
-The final HCMBO mainline removes auxiliary internal random search and concentrates the budget on direction-wise structured capacity optimization.
+\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction--entrance-rate variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance.
+The final HCMBO mainline concentrates the budget on direction-wise structured entrance-rate optimization and high-fidelity rechecking.
 The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
 \end{enumerate}
 
@@ -489,298 +489,235 @@ Compared with generic mixed-variable optimization, HCMBO explicitly exploits dir
 The direction variable determines the effective feasible structure of the capacity variable, and the capacity variable determines the continuous response of entrance release, waiting, and channel load.
 This structured treatment reduces invalid candidates and concentrates the finite simulation budget on feasible policies with clear management meaning.
 
+
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-This section presents numerical experiments to validate the proposed model mechanisms, control responses, behavior layer, and direction-capacity optimization framework.
-The experiments use a four-channel scenario, which is a simplified abstraction of the Bund waterfront viewing-platform environment.
-One side of the platform contains the initial crowd region and entry boundary, the other side contains the viewing and exit region, and a central wall contains four representative passages: upper, middle, lower-middle, and lower passages.
-The experiments follow a progressive logic: local mechanism validation is first conducted on the four-channel setting; the analysis then extends to multi-channel, multi-stage direction responses, behavior-layer validation, and finally horizontal optimization comparison over $z=(s,q)$.
+This section validates the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from a waterfront viewing area.
+The scenario consists of an inflow region, a viewing and exit region, a central wall, and four connecting passages: upper, middle, lower-middle, and bottom passages.
+The experiments follow the same logic as the Chinese experimental outline: mechanism validation, directional-response analysis, entrance-rate response, horizontal optimizer comparison, and HCMBO ablation.
 
 \subsection{Experimental Setup}
 \label{sec:setup}
 
-\subsubsection{Four-Channel Scenario}
-
-The four-channel scenic-platform scenario is used as the common basis for mechanism validation, strategy comparison, and optimization.
-The left side represents the initial crowd region and entry boundary, the right side represents the platform and exit target region, and the central wall contains four passages arranged from top to bottom as the upper, middle, lower-middle, and lower channels.
-Depending on the experiment group, pedestrians perform a single-stage crossing task, a bidirectional passage task, or a multi-stage ``entry--tour--exit'' behavior chain.
+The domain is discretized on a $128\times96$ grid with spacing $\Delta x=0.5$.
+The passage width is $2$, the controlled internal entrance interface width is $8$, the free-flow speed is $v_{\max}=1.5$, the maximum density is $\rho_{\max}=5.0$, the initial density is $\rho_{\mathrm{init}}=2.2$, and the CFL factor is $0.9$.
+Mechanism and response experiments use the corresponding validation horizons, whereas the optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, horizon $160$, and Bellman updates every five steps.
+Final optimizer rankings are based on the high-fidelity objective in Section~\ref{sec:metrics}.
+A high-fidelity best candidate is called feasible if the density-cap removal mass is no more than $2\%$ of the reference mass.
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{../images/experiment_result_archive/scene.png}
-\caption{Four-channel simulation scenario used in the numerical experiments.}
+\caption{Four-channel scenic-platform simulation scenario used in the numerical experiments.}
 \label{fig:experiment_scene}
 \end{figure}
-
-Numerical parameters are set as follows: grid resolution $128\times96$, spatial step $\Delta x=0.5$, free-flow speed $v_{\max}=1.5$, maximum density $\rho_{\max}=5.0$, initial density $\rho_{\text{init}}=2.2$, CFL coefficient $0.9$, and safety density threshold $\rho_{\text{safe}}=3.5$.
-The capacity-control horizontal comparison uses $1600$ high-fidelity steps, a time horizon of $T=160$, and Bellman updates every five simulation steps.
 
 \subsection{Mechanism Validation}
 \label{sec:mechanism}
 
-\subsubsection{Validation Logic and Experimental Matrix}
-
-The G1 mechanism validation experiment does not aim to rank control strategies.
-Instead, it verifies whether the two local mechanisms in the model have clear and interpretable behavioral meanings.
-The experiment is organized around four mechanism propositions, as shown in Table~\ref{tab:g1_matrix}.
-
-\begin{table}[!t]
-\caption{G1 Mechanism Validation Matrix}
-\label{tab:g1_matrix}
-\centering
-\small
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.18}
-\begin{tabular}{|p{0.26\columnwidth}|p{0.21\columnwidth}|p{0.22\columnwidth}|p{0.22\columnwidth}|}
-\hline
-\textbf{Mechanism Proposition} & \textbf{Comparison} & \textbf{Main Observables} & \textbf{Expected Phenomenon} \\
-\hline
-$M(x)$ represents soft geometric guidance & baseline vs. $M$-only & channel flow share; approach streamlines & target-channel attraction expands; inflow converges earlier \\
-\hline
-$U(x)$ represents hard directional constraints & baseline vs. $U$-only & restricted-channel flow; local direction field & restricted direction is excluded; flow shifts to feasible channels \\
-\hline
-$U(x)$ suppresses reverse flow and counterflow & bidirectional baseline vs. one-way rule & reverse mass time; head-on cell time & reverse flow and counterflow intensity decrease \\
-\hline
-$U+M$ is spatially transferable & different controlled-channel locations & dominant flow channel; hotspot location & dominant flow migrates with the controlled channel \\
-\hline
-\end{tabular}
-\end{table}
-
-This matrix separates the functional levels of $M(x)$ and $U(x)$.
-The former concerns preference changes within the feasible direction set, whereas the latter concerns modification of the feasible direction set itself.
-The final proposition then tests whether their combination produces synchronous migration when the controlled channel location changes.
-
-\subsubsection{Soft Guidance Mechanism: $M(x)$ Alters Channel Attraction}
-
-To verify whether geometric guidance changes the approach process, we compare the baseline configuration against the $M$-only configuration, in which anisotropic geometric guidance is applied to the middle channel.
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_m_attraction_flow_comparison.png}
-\caption{Channel attraction domains and approach streamlines in the G1 experiment.
-The upper row shows capture-domain boundaries over the mean-density background, and the lower row shows time-averaged approach streamlines.}
-\label{fig:g1_m_attraction_flow}
-\end{figure}
-
-The baseline flow is mainly distributed between the middle and lower-middle channels: upper $1.64\%$, middle $48.78\%$, lower-middle $47.92\%$, and lower $1.66\%$.
-After introducing $M$-only guidance, the middle-channel flow share increases to $100.00\%$.
-As shown in Fig.~\ref{fig:g1_m_attraction_flow}, $M$-only guidance not only expands the attraction domain of the middle channel but also causes the incoming flow to converge toward the middle channel further upstream, forming a clear pre-alignment structure before the channel entrance.
-This indicates that the core role of $M(x)$ is to alter the relative travel cost within the feasible direction set, reshaping which channel attracts the crowd and when alignment begins, rather than directly prohibiting other passages.
-
-\subsubsection{Hard Directional Constraint Mechanism: $U(x)$}
-
-To verify whether directional constraints alter feasible path selection, we first compare the baseline configuration against the $U$-only configuration under unidirectional inflow, where the middle channel is subject to a directional constraint.
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_u_direction_field_comparison.png}
-\caption{Local direction field comparison between baseline (left) and $U$-only (right) configurations.
-White streamlines and arrows represent time-averaged movement directions; the background color encodes time-averaged density.}
-\label{fig:g1_u_direction}
-\end{figure}
-
-Under the $U$-only configuration, the middle-channel flow share drops to $0$.
-The flow is redistributed to the upper, lower-middle, and lower channels, with shares of $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
-This is the primary evidence for the role of $U(x)$: directional constraints do not continuously adjust route preference, but directly modify the local admissible direction set and thereby remove the restricted channel from the feasible choice set.
-
-To further verify the ability of $U(x)$ to control directional conflicts, we conduct a bidirectional flow sub-experiment comparing a bidirectional baseline against a middle-channel eastbound one-way rule.
-
-\begin{table}[!t]
-\caption{Bidirectional $U(x)$ Validation Results}
-\label{tab:bidirectional}
-\centering
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.05}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{|c|c|c|c|}
-\hline
-\textbf{Configuration} & \textbf{Westbound Share} & \textbf{Counter-flow Mass} & \textbf{Head-on Exposure} \\
-\hline
-Bidirectional baseline & $73.18\%$ & $415.75$ & $1213.76$ \\
-Middle channel one-way & $0$ & $0$ & $0$ \\
-\hline
-\end{tabular}
-}
-\end{table}
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_bidirectional_dynamics_lines.png}
-\caption{Dynamic comparison of reverse flow in the middle channel under bidirectional conditions.
-Left: westbound mass share in the middle channel over time.
-Right: head-on conflict intensity in the middle channel over time.}
-\label{fig:g1_bidirectional_dynamics}
-\end{figure}
-
-The bidirectional experiment shows that after imposing the one-way rule, westbound pedestrians are completely excluded from the middle channel, and both the middle-channel reverse-flow mass time and head-on cell time become zero.
-Therefore, $U(x)$ does not merely change path choice under unidirectional demand; it also persistently suppresses reverse flow and head-on conflict under bidirectional demand.
-This distinction clarifies the functional difference between $U(x)$ and $M(x)$: $M(x)$ adjusts route preference, whereas $U(x)$ modifies the feasible direction set.
-Thus, $U(x)$ is the hard-constraint representation of directional control policies.
-
-\subsubsection{Composability and Spatial Transferability of the Joint Mechanism}
-
-To verify the sensitivity of the joint mechanism to controlled-channel location, we test four $U+M$ configurations: middle-channel controlled, upper-channel controlled, lower-middle-channel controlled, and lower-channel controlled.
-The focus here is not on the efficiency or safety index of each configuration, but on whether the dominant flow channel changes synchronously when $U+M$ is applied to different channels.
-
-\begin{table}[!t]
-\caption{Dominant Flow Migration Under Different $U+M$ Controlled-Channel Locations}
-\label{tab:sensitivity}
-\centering
-\setlength{\tabcolsep}{2pt}
-\renewcommand{\arraystretch}{1.08}
-\resizebox{\columnwidth}{!}{%
-\begin{tabular}{|c|c|c|c|c|c|}
-\hline
-\textbf{Configuration} & \textbf{Dominant Flow Channel} & \textbf{Upper Flow} & \textbf{Middle Flow} & \textbf{Lower-Middle Flow} & \textbf{Lower Flow} \\
-\hline
-baseline & middle/lower-middle & $1.64\%$ & $48.78\%$ & $47.92\%$ & $1.66\%$ \\
-$M$-only-middle & middle & $0$ & $100.00\%$ & $0$ & $0$ \\
-$U+M$-middle & middle & $0$ & $100.00\%$ & $0$ & $0$ \\
-$U+M$-top & upper & $100.00\%$ & $0$ & $0$ & $0$ \\
-$U+M$-lower-middle & lower-middle & $0$ & $0$ & $100.00\%$ & $0$ \\
-$U+M$-lower & lower & $0$ & $0$ & $0$ & $100.00\%$ \\
-\hline
-\end{tabular}
-}
-\end{table}
-
-\begin{figure}[!t]
-\centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g1/g1_um_configuration_flow_comparison.png}
-\caption{Flow field comparison for the $U+M$ combined mechanism under different controlled-channel locations.
-The sub-figures correspond to different guided channels; white streamlines and arrows represent time-averaged movement directions, and the background color encodes time-averaged density.}
-\label{fig:g1_um_configuration}
-\end{figure}
-
-The results show that changing the controlled-channel location induces synchronous migration of the dominant flow channel, density hotspot, and approach streamlines.
-When the upper, middle, lower-middle, or lower channel is selected as the joint guidance channel, the flow concentrates on the corresponding channel.
-This confirms that $U+M$ is not merely a local parameter setting that works at one fixed position; rather, it produces clear and interpretable behavioral responses as the spatial configuration changes.
-The joint mechanism can therefore serve as the lower-level simulator for subsequent strategy evaluation and optimization search.
-
-\subsection{System Response and Optimization Complexity Under Directional Control}
-\label{sec:strategy}
-
-After validating that $U(x)$ and $M(x)$ produce the expected local control responses, we further examine whether the discrete directional control variable $s$ induces nontrivial system-level responses in the full multi-stage scenario.
-The purpose of this experiment is not to select a final optimal policy from a small enumeration, but to test whether interpretable perturbations of channel directions generate distinguishable changes in efficiency, safety exposure, and load balancing.
-Such evidence is needed before introducing an automated optimization procedure.
-
-The complete combinatorial space of four-channel direction settings is large and contains many cases with weak operational meaning.
-We therefore construct a representative validation matrix with three policy families: single-entry (SE), single-return (SR), and one-channel-closed (CL), each rotated over the upper, middle, lower-middle, and bottom channels.
-Together with the all-free baseline (BSL), this gives $1+4+4+4=13$ cases.
-Direction codes are ordered as $[T,M,LM,B]$, where $T$, $M$, $LM$, and $B$ denote the upper, middle, lower-middle, and bottom channels.
-The symbols $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, free bidirectional passage, and closure, respectively.
-Case indices are retained only as configuration identifiers and are not mixed with policy-family labels.
+The first experiment verifies whether the two local modeling components have the intended behavioral meanings.
+The fixed anisotropic metric $M(x;\eta_0)$ should reshape the channel attraction domain and induce entrance pre-alignment, whereas the admissible direction set $U(x;s)$ should remove prohibited directions and reroute flow through feasible passages.
+When $M$ is applied to the middle channel, its flow share increases from $48.78\%$ in the baseline to $100.00\%$.
+When a one-way rule excludes the originally dominant middle-channel direction, the middle-channel share becomes zero and the flow is redistributed to the upper, lower-middle, and bottom channels with shares $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
+In a bidirectional inflow test, imposing an eastbound one-way rule reduces the westbound middle-channel share, reverse-direction mass time, and counterflow cell time from $73.18\%$, $415.75$, and $1213.76$ to zero.
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
-\caption{Control-variable design and objective-space trade-off in G2. (A) Directional design matrix ordered by $[T,M,LM,B]$. (B) Pareto projection, where color encodes $\tilde{J}_3$, marker size encodes the aggregated normalized objective $\tilde{J}$, and diamond markers indicate non-dominated solutions.}
+\includegraphics[width=0.82\textwidth]{../../codes/results/g1_mechanism_reframed/g1_um_configuration_flow_comparison.png}
+\caption{Spatial transferability of the combined $U+M$ mechanism. Moving the controlled channel induces corresponding migration of dominant flow channels, streamlines, and density hotspots.}
+\label{fig:g1_um_configuration}
+\end{figure*}
+
+Fig.~\ref{fig:g1_um_configuration} further shows that the combined $U+M$ mechanism is spatially transferable.
+Changing the guided channel from the upper to the lower passage moves the dominant flow channel and local density hotspot accordingly.
+These results support using the Bellman--conservation-law simulator as the lower-level evaluator for subsequent strategy optimization.
+
+\subsection{Directional-Control Response}
+\label{sec:strategy}
+
+We next examine whether the discrete direction configuration $s$ creates nontrivial system-level trade-offs.
+The response experiment uses thirteen interpretable direction settings: an all-free baseline, four single-entry cases, four single-return cases, and four one-channel-closure cases.
+The direction code is ordered as $[T,M,LM,B]$, where $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, bidirectional free passage, and closure.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=0.92\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
+\caption{Directional-control design matrix and objective-space trade-off. Color encodes $\tilde J_3$, marker size encodes $\tilde J=\tilde J_1+\tilde J_2+\tilde J_3$, and diamonds indicate non-dominated cases.}
 \label{fig:g2_control_tradeoff}
 \end{figure*}
 
-Fig.~\ref{fig:g2_control_tradeoff} shows that different direction settings produce stable and clearly separated changes in $\tilde{J}_1$, $\tilde{J}_2$, and $\tilde{J}_3$.
-Using the aggregated normalized objective $\tilde{J}=\tilde{J}_1+\tilde{J}_2+\tilde{J}_3$, C8 (SR-LM, EEWE) obtains the lowest value, $\tilde{J}=0.5102$.
-The baseline C1 is close, with $\tilde{J}=0.5145$, but achieves the lowest safety exposure, $\tilde{J}_2=0.00785$.
-C9 (SR-B) gives the best load-balancing term, $\tilde{J}_3=0.1138$, while C3 (SE-M) gives the best efficiency term, $\tilde{J}_1=0.3141$, at the cost of higher safety exposure and load imbalance.
+Fig.~\ref{fig:g2_control_tradeoff} and Table~\ref{tab:g2_nondominated} show that no single direction configuration dominates all objectives.
+C8 (SR-LM, EEWE) obtains the lowest aggregate value $\tilde J=0.5102$, C1 gives the lowest safety exposure $\tilde J_2=0.00785$, C3 gives the best efficiency term $\tilde J_1=0.3141$, and C9 gives the best load-balance term $\tilde J_3=0.1138$.
+This non-monotonic response motivates automatic mixed-variable optimization rather than manual selection from a small set of rules.
 
 \begin{table*}[!t]
 \centering
-\caption{Non-Dominated Directional-Control Cases in G2}
+\caption{Non-Dominated Directional-Control Cases}
 \label{tab:g2_nondominated}
-\footnotesize
+\scriptsize
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{c c c c c c c l}
 \hline
-Case & Policy & Code & $\tilde{J}_1$ & $\tilde{J}_2$ & $\tilde{J}_3$ & $\tilde{J}$ & Main characteristic \\
+Case & Policy & Code & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $\tilde J$ & Main characteristic \\
 \hline
-C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure; close to the best aggregate objective \\
-C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency; risk concentrates near the middle channel \\
-C4 & SE-LM & WWEW & 0.3335 & 0.01662 & 0.3131 & 0.6632 & Lower-middle entry; efficient but load-imbalanced \\
-C6 & SR-T & WEEE & 0.4029 & 0.01174 & 0.1335 & 0.5482 & Highest exit throughput; relatively balanced \\
+C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure \\
+C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency but risk-concentrated \\
+C4 & SE-LM & WWEW & 0.3335 & 0.01662 & 0.3131 & 0.6632 & Efficient but load-imbalanced \\
+C6 & SR-T & WEEE & 0.4029 & 0.01174 & 0.1335 & 0.5482 & High return throughput \\
 C8 & SR-LM & EEWE & 0.3395 & 0.01311 & 0.1576 & \textbf{0.5102} & Lowest aggregate objective \\
 C9 & SR-B & EEEW & 0.4377 & 0.01344 & \textbf{0.1138} & 0.5649 & Most balanced channel loads \\
 \hline
 \end{tabular}
 \end{table*}
 
-These results indicate that perturbing the direction variable $s$ does not produce a monotonic improvement pattern, nor does any single configuration dominate all three objectives.
-The non-dominated set contains C1, C3, C4, C6, C8, and C9, confirming that the four-channel multi-stage scenario already forms a nontrivial multi-objective response structure.
+\subsection{Entrance-Rate Response}
+\label{sec:entrance_rate_exp}
 
-The G2 experiment therefore supports the need for subsequent optimization from three perspectives.
-First, the problem is intrinsically multi-objective: efficiency, safety, and load balancing do not share a consistent optimum.
-Second, the direction variable is combinatorial, and the 13 cases here are only an interpretable slice rather than an exhaustive enumeration.
-Third, the full control problem also includes the continuous internal entrance capacity profile $q$.
-The resulting problem is therefore a mixed discrete-continuous, simulation-driven optimization problem with expensive evaluations, motivating the automated search procedure introduced later.
-
-\subsection{Behavior-Layer Necessity}
-\label{sec:multistage_exp}
-
-The behavior-layer experiment compares a single-stage approximation, a multi-stage model with uniform preferences, and a multi-stage model with heterogeneous fixed preferences.
-The single-stage approximation over-directs pedestrians to the middle channel, while the multi-stage models shift exit demand mainly toward the lower-middle and lower channels.
-The comparison shows that omitting the stage chain and route preferences can distort channel-load assessment and policy ranking.
-Therefore, $\hat p$ is treated as a fixed exogenous behavior parameter in the optimization experiment.
-
-\subsection{Horizontal Optimization Comparison}
-\label{sec:optimal}
-
-The completed horizontal comparison evaluates baseline prior best, Random Search, Pure SA, Enum-DE, TPE-Mixed BO, and HCMBO under the same high-fidelity setting.
-The result root is \texttt{codes/results/g6\_horizontal\_comparison}.
-Five seeds are used: $11$, $23$, $37$, $51$, and $73$.
+Direction rules alone cannot represent the case in which a channel remains open but its internal entrance must be metered.
+We therefore fix $[T,M,LM,B]=[F,E,W,F]$ and scan four internal entrance-rate levels: no limit, high, medium, and low.
+The rate upper bound acts on internal entrance crossing flow.
+When attempted flow exceeds the upper bound, only the admitted flow crosses the interface, and the unreleased attempted flow remains upstream as waiting mass.
+The entrance binding-time ratio is defined as the fraction of time steps in which attempted entrance flow exceeds the rate upper bound and creates unreleased attempted flow.
 
 \begin{table*}[!t]
 \centering
-\caption{High-Fidelity Best Results in the Direction-Capacity Optimization Comparison}
-\label{tab:g6_summary}
-\footnotesize
+\caption{Response Under Internal Entrance-Rate Upper-Bound Levels}
+\label{tab:entrance_rate_response}
+\scriptsize
+\setlength{\tabcolsep}{5pt}
 \begin{tabular}{lrrrrrr}
 \hline
-Method & Mean objective & Std. & Best & Worst & Feasible rate & Best seed \\
+Level & $\tilde J_1$ & $\tilde J_2^{\mathrm{eval}}$ & $\tilde J_3$ & Objective & Unreleased attempted flow & Binding ratio \\
 \hline
-baseline\_prior\_best & 5.4774 & 0.0000 & 5.4774 & 5.4774 & 0\% & 11 \\
-random\_search & 3.0112 & 0.1319 & 2.8821 & 3.2287 & 40\% & 51 \\
-pure\_sa & 2.9248 & 0.1386 & 2.7468 & 3.1049 & 60\% & 73 \\
-enum\_de & 3.0597 & 0.1932 & 2.7329 & 3.2500 & 40\% & 23 \\
-hcmbo\_proposed & 2.8848 & 0.1491 & 2.7002 & 3.0427 & 80\% & 37 \\
-tpe\_mixed\_bo & \textbf{2.7403} & 0.2475 & \textbf{2.5180} & 3.1345 & 80\% & 23 \\
+No limit & 0.6274 & 0.174 & 0.8838 & 1.6851 & 0.00 & 0.000 \\
+High & 0.6262 & 0.358 & 0.8814 & 1.8652 & 241.40 & 0.605 \\
+Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 329.26 & 0.666 \\
+Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 427.89 & 0.721 \\
 \hline
 \end{tabular}
 \end{table*}
 
-Table~\ref{tab:g6_summary} shows that the G6 implementation of HCMBO outperforms Random Search, Pure SA, and Enum-DE in mean objective, and shares the highest feasible rate of $80\%$ with TPE-Mixed BO.
-However, TPE-Mixed BO obtains the lowest mean objective and the best single-seed objective in this five-seed table.
-A post-hoc source audit further showed that the useful HCMBO candidates mainly came from direction-wise structured capacity search rather than auxiliary internal random search.
-Therefore, the final HCMBO mainline removes the internal random-search phase.
-
-Table~\ref{tab:g7c_summary} reports the focused comparison after this mainline update.
-Under seed $23$, budget $B=400$, top-$10$ high-fidelity rechecks, $1600$ simulation steps, and time horizon $160$, the updated HCMBO obtains a lower high-fidelity objective than the current TPE-style mixed BO baseline.
-Since this focused comparison uses one representative seed, it is used as direct evidence for the mainline update rather than as a claim of multi-seed statistical dominance.
-
-\begin{table}[!t]
+\begin{figure}[!t]
 \centering
-\caption{Focused Comparison After the HCMBO Mainline Update}
-\label{tab:g7c_summary}
-\footnotesize
-\begin{tabular}{lrrrr}
+\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g2/g2_capacity_levels.png}
+\caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow.}
+\label{fig:entrance_rate_response}
+\end{figure}
+
+Table~\ref{tab:entrance_rate_response} and Fig.~\ref{fig:entrance_rate_response} show that tightening the rate upper bound does not simply improve safety.
+From the no-limit case to the low level, unreleased attempted flow increases from $0$ to $427.89$, the binding ratio increases from $0$ to $0.721$, and $\tilde J_2^{\mathrm{eval}}$ increases from $0.174$ to $0.466$.
+Thus, $q$ is a genuine continuous control variable that changes system response and must be optimized jointly with $s$.
+
+\subsection{Horizontal Optimization Comparison}
+\label{sec:optimal}
+
+The horizontal comparison evaluates Prior Baseline, Random Search, Pure Simulated Annealing, Enumeration plus Differential Evolution, TPE-Mixed BO, and HCMBO.
+All optimizers use $B=400$ candidate evaluations and top-$10$ high-fidelity rechecks over seeds $11$, $23$, $37$, $51$, and $73$.
+The final HCMBO data are taken from the G7-D mainline, whereas the other baselines are taken from the G6 horizontal comparison under the same high-fidelity protocol.
+
+\begin{table*}[!t]
+\centering
+\caption{High-Fidelity Performance in the Direction--Entrance-Rate Optimization Comparison}
+\label{tab:optimizer_summary}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrr}
 \hline
-Method & Best objective & Feasible rate & $J_2$ & Gate rejected \\
+Method & Mean objective & Std. & Median & Best & Worst & Feasible rate \\
 \hline
-HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & 2545.508 \\
-TPE-Mixed BO & 2.5180 & 100\% & 1.6948 & 2815.208 \\
-HCMBO queue-aware & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} \\
+HCMBO & \textbf{2.6338} & 0.3106 & \textbf{2.5065} & \textbf{2.4495} & 3.1851 & \textbf{100\%} \\
+TPE-Mixed BO & 2.7403 & 0.2475 & 2.6288 & 2.5180 & 3.1345 & 80\% \\
+Pure SA & 2.9248 & 0.1386 & 2.9203 & 2.7468 & 3.1049 & 60\% \\
+Random Search & 3.0112 & 0.1319 & 2.9797 & 2.8821 & 3.2287 & 40\% \\
+Enum-DE & 3.0597 & 0.1932 & 3.1004 & 2.7329 & 3.2500 & 40\% \\
+Prior Baseline & 5.4774 & 0.0000 & 5.4774 & 5.4774 & 5.4774 & 0\% \\
 \hline
 \end{tabular}
-\end{table}
+\end{table*}
+
+Table~\ref{tab:optimizer_summary} shows that HCMBO achieves the lowest mean objective, lowest median objective, lowest best objective, and highest feasible rate.
+Relative to TPE-Mixed BO, HCMBO is better in $4/5$ paired seeds, with an average objective difference of $-0.1066$.
+It also outperforms Random Search in all five seeds and outperforms Pure SA and Enum-DE in four of five seeds.
+The remaining high objective in one HCMBO seed is mainly driven by a larger safety exposure term, indicating a residual need for stronger safety-constraint awareness.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_best_objective.png}
+\caption{Best high-fidelity objective across seeds. Range bars show the seed-wise spread, and the short vertical mark indicates the median.}
+\label{fig:optimizer_best_objective}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_convergence.png}
+\caption{Best-so-far convergence curves under the same $400$-evaluation budget. The inset highlights the final-stage separation among methods.}
+\label{fig:optimizer_convergence}
+\end{figure}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_control_profiles.png}
+\caption{Best-solution entrance-rate profiles for Random Search, Pure SA, Enum-DE, TPE-Mixed BO, and HCMBO. The common direction structure is $[T,M,LM,B]=[W,E,E,W]$ for several methods, but the segment-wise rate allocations differ substantially.}
+\label{fig:control_profiles}
+\end{figure}
+
+Figs.~\ref{fig:optimizer_best_objective}--\ref{fig:control_profiles} provide complementary visual evidence.
+TPE-Mixed BO descends quickly in the early evaluations, but HCMBO continues to improve in the middle and late stages and reaches the lowest final region.
+The entrance-rate profiles show that performance differences are not only caused by choosing a discrete direction code; they also arise from detailed segment-wise rate allocation within the same direction structure.
+
+\subsection{HCMBO Ablation}
+\label{sec:ablation}
+
+The ablation experiments examine whether the control variables and search mechanisms used by HCMBO are necessary.
+First, direction and entrance-rate variables must be optimized jointly.
+Optimizing only direction with a fixed high rate gives best high-fidelity objective $3.3751$, while optimizing only rates under prior directions gives $3.3140$; both are clearly worse than joint optimization.
+Second, short-horizon low-fidelity hard screening increases the best objective to $2.9441$ and yields an infeasible best candidate, because early simulations do not reliably reflect long-horizon entrance waiting and load redistribution.
+Third, removing the entrance-waiting penalty slightly reduces the scalar objective to $2.6015$, but increases unreleased attempted flow to $3239.295$, showing that waiting should remain in the management objective.
+
+\begin{table*}[!t]
+\centering
+\caption{Search-Mechanism Ablation Under Seed 23}
+\label{tab:search_ablation}
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrl}
+\hline
+Variant & Best objective & Feasible rate & $J_2$ & Unreleased flow & Main meaning \\
+\hline
+HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & 2545.508 & Structured direction-wise rate search \\
+Queue-aware LCB & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} & Queue-aware acquisition \\
+RF-style constrained BO & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} & Constraint surrogate variant \\
+Adaptive racing & 2.6561 & 100\% & 1.9474 & 3204.194 & Stage-wise budget concentration \\
+Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & 2664.373 & Combined racing and queue signal \\
+Trust-region search & 3.0317 & 100\% & 1.9224 & 3967.226 & Local trust-region search \\
+\hline
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:search_ablation} shows that the final HCMBO mainline obtains the lowest scalar objective among the tested variants.
+Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to $2412.404$, but their scalar objective increases to $2.6162$.
+Thus, queue information is useful for executable and safety-aware extensions, whereas the final mainline should retain structured direction-wise rate search as the primary budget allocation mechanism.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper presents a Bellman--conservation-law crowd management framework for open pedestrian zones with channel direction configuration and internal entrance capacity control.
-The current controllable variable is $z=(s,q)$; the geometric guidance parameter $\eta_0$ and route preference parameter $\hat p$ are fixed model inputs.
-The proposed HCMBO framework exploits the direction-capacity hierarchy, concentrates the optimization budget on structured capacity search rather than internal random search, and uses high-fidelity rechecks for final ranking.
+This paper proposed a Bellman--conservation-law crowd management framework for open pedestrian zones with multi-channel direction rules and internal entrance-rate control.
+The admissible direction set $U(x;s)$ represents hard operational rules such as one-way, bidirectional, and closed passages; the fixed metric tensor $M(x;\eta_0)$ represents geometric guidance; and the multi-stage route structure describes entry, viewing, exit, and return movements.
+The controllable variable is $z=(s,q)$, where $s$ is the channel direction configuration and $q$ is the internal entrance-rate upper-bound profile; behavioral preference $\hat p$ and geometric guidance strength $\eta_0$ are fixed model inputs.
 
-The numerical experiments validate that: (1) fixed geometric guidance $M(x;\eta_0)$ and directional constraints $U(x;s)$ alter local crowd behaviors in interpretable ways; (2) directional configurations induce nontrivial efficiency--safety--balance trade-offs; (3) multi-stage behavior modeling is necessary for reliable channel-load assessment; and (4) HCMBO outperforms Random Search, Pure SA, and Enum-DE in the multi-seed horizontal comparison, while the updated HCMBO mainline obtains a lower high-fidelity objective than the current TPE-style mixed BO baseline in the focused seed-$23$ comparison.
+The numerical experiments support three conclusions.
+First, the lower-level simulator produces interpretable mechanisms: $U(x;s)$ removes prohibited local directions, $M(x;\eta_0)$ changes channel attraction domains and entrance pre-alignment, and the combined $U+M$ mechanism transfers across controlled-channel locations.
+Second, both control variables are necessary.
+Directional settings produce non-monotonic efficiency--safety--load-balance trade-offs, and entrance-rate upper bounds significantly change unreleased attempted flow, binding-time ratios, and safety exposure.
+Third, the final HCMBO optimizer effectively exploits the direction--rate hierarchy.
+Under five random seeds, $B=400$ candidate evaluations, and unified high-fidelity rechecks, HCMBO obtains the lowest mean objective of $2.6338$ and the highest feasible rate of $100\%$, outperforming TPE-Mixed BO, Random Search, Pure SA, Enum-DE, and the prior baseline.
+Compared with TPE-Mixed BO, HCMBO is better in $4/5$ paired seeds, with an average objective difference of $-0.1066$.
+Ablation results further show that joint direction--rate optimization, removal of low-fidelity hard screening, and structured direction-wise rate search are key contributors to this performance.
 
-Future work will extend to larger real-world geometries, more random seeds, stronger official TPE/SMAC baselines, online demand estimation, multi-weight Pareto analysis, and calibration against field observations.
+The current study still has limitations.
+The experiments are based on a four-channel abstract scenario, objective weights and finite random seeds affect optimizer ranking, one HCMBO seed still exhibits relatively high safety exposure, and real crowd calibration and online demand updates are not yet included.
+Future work will extend the framework to more complex real geometries, broader demand levels and random-seed sets, stronger constraint-aware Bayesian optimization or SMAC-style baselines, multi-weight Pareto analysis, and calibration against field observations.
 
 \balance
 

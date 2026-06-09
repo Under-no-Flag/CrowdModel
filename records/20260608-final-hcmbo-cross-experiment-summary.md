@@ -33,3 +33,4 @@
 - 根据图 13 反馈，将收敛曲线末端放大窗 y 轴范围从 `2.65--3.35` 调整为 `2.45--3.25`，并提高 HCMBO 曲线线宽和绘制层级，避免 HCMBO 在 inset 中被截断或遮挡。
 - 根据图 13 二次反馈，将 best-so-far 收敛曲线从“均值线 + 四分位阴影”改为“中位数线 + 四分位阴影”，避免 HCMBO 均值线落在绿色 IQR 阴影之外；同时将 HCMBO 绿色阴影透明度加深。
 - 根据图 14 反馈，为每个 entrance-rate profile 子图都显示 `Gate segment` 横轴标题，并增加子图行距以避免轴标题与下一行子图标题重叠。
+- 根据 LaTeX PDF 格式反馈，将 `New_IEEEtran_how-to.tex` 中 Fig. 7、Fig. 8、Fig. 9 对应的横向优化图从 `figure*` 双栏浮动改为 `figure` 单栏浮动，并将图片宽度改为 `\columnwidth`。
