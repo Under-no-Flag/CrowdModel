@@ -61,14 +61,21 @@ Among various urban crowd gathering scenarios, open scenic areas, waterfront vie
 Unlike enclosed venues such as stadiums and subway stations with well-defined boundaries \cite{RN761,RN2194}, such areas consist of open spaces, main tourist corridors, multiple lateral connecting passages, and return flow lines; visitors typically undergo a continuous behavioral chain of ``entry--touring along the main corridor--choosing passages to leave--returning'' \cite{RN2301}, with crowd movement governed jointly by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303,RN2301}.
 Taking the Shanghai Nanjing East Road--Bund area as a concrete example, visitors approach the Bund from Nanjing East Road, ascend to the viewing platform via multiple stepped passages, tour along the waterfront, then exit through several southern passages and return along lower streets.
 This scenario can be abstracted as the typical ``waterfront platform--multi-stepped passage'' crowd flow scenario.
-In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas. Fig.~\ref{fig:bund_scene} shows the large-scale crowd at the Shanghai Nanjing East Road--Bund scenario during a holiday period.
+In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas. Fig.~\ref{fig:bund_scene} illustrates the corresponding field-control context in the Shanghai Nanjing East Road--Bund area.
 
-\begin{figure}[!t]
+\begin{figure*}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../images/外滩场景/63988092.jpeg}
-\caption{Large-scale crowd at the Shanghai Nanjing East Road--Bund scenario during a holiday period.}
+\subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/63988092.jpeg}
+\label{fig:bund_scene_crowd}}
+\hfill
+\subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/入口容量控制.png}
+\label{fig:bund_scene_capacity}}
+\par\medskip
+\subfloat[]{\includegraphics[width=0.985\textwidth]{../图表/visio架构图/图表_页-2.jpg}
+\label{fig:bund_scene_layout}}
+\caption{Field-control context of the Shanghai Nanjing East Road--Bund area. (a) Large-scale holiday crowd under one-way passage organization. (b) Entrance-capacity control at a main visitor inflow location. (c) Annotated spatial prototype marking the Bund riverside promenade, pedestrian corridors, primary visitor inflow, and a typical visitor route.}
 \label{fig:bund_scene}
-\end{figure}
+\end{figure*}
 
 Existing large-scale event security management practices typically integrate system dynamics, system coupling, and system safety theory, combined with high-risk zone delineation and historical crowd behavior patterns, to formulate a series of control measures \cite{RN2176,RN1663}.
 These measures include deploying security personnel at critical locations, erecting temporary barriers for isolation and diversion, implementing one-way passage on key channels, and applying batch release in core areas \cite{RN2181,RN1978}.
@@ -698,6 +705,32 @@ Trust-region search & 3.0317 & 100\% & 1.9224 & 3967.226 & Local trust-region se
 Table~\ref{tab:search_ablation} shows that the final HCMBO mainline obtains the lowest scalar objective among the tested variants.
 Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to $2412.404$, but their scalar objective increases to $2.6162$.
 Thus, queue information is useful for executable and safety-aware extensions, whereas the final mainline should retain structured direction-wise rate search as the primary budget allocation mechanism.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Role of the Real-World Scenario Prototype}
+
+This study uses the Shanghai Nanjing East Road--Bund area as a real-world prototype for a class of open pedestrian-zone management problems involving multi-channel connections, one-way passage rules, diversion organization, and entrance-rate control.
+The proposed method does not depend on a complete geometric reconstruction of one specific site.
+Instead, it abstracts the essential structure of a ``viewing platform--multi-channel connection'' scenario and builds a macroscopic crowd dynamics model and control optimization framework for this scenario class.
+Accordingly, the Nanjing East Road--Bund case mainly provides the practical background and modeling motivation, while the simplified numerical scenario is used to verify model mechanisms and optimization behavior under controlled conditions.
+
+\subsection{Interpretation of the Simplified Experiments}
+
+The simplified simulation scenario is not intended to reproduce the exact pedestrian flow of a particular time period at the Nanjing East Road--Bund area.
+Its purpose is to preserve the key structural and operational elements observed in such real settings, including the platform region, connecting passages, channel direction constraints, geometric guidance, entrance release control, and channel-load redistribution.
+This abstraction makes it possible to examine, in a transparent way, whether the model can represent one-way passage, channel closure, geometric pre-alignment, and multi-stage route transfer.
+It also enables a fair comparison of different optimization algorithms under the same simulation evaluator.
+Therefore, the experimental results should be interpreted as evidence of methodological effectiveness and mechanistic interpretability, rather than as a direct operational control plan for the Nanjing East Road--Bund site.
+
+\subsection{Requirements for Field Validation}
+
+Real-scene experiments are not conducted in the present study because they require additional data acquisition, model calibration, and field implementation conditions.
+Practical deployment would require observations of time-varying inflow, local density, velocity fields, channel flow, queue length, and pedestrian route choices.
+It would also require calibration of the speed--density relationship, route preferences, stage-transition parameters, channel capacities, and entrance-rate upper bounds.
+Moreover, one-way channel settings, batch release, and on-site guidance measures are tied to staff deployment, temporary facilities, emergency response plans, and safety approval procedures; simulation-based optimization cannot directly replace these operational processes.
+Future work will combine real geometric data with multi-source pedestrian observations, calibrate the proposed model against field measurements, and incorporate executable management rules into the optimization constraints so that the framework can be extended toward scenario-specific validation and decision support for the Nanjing East Road--Bund area and other open public spaces.
 
 \section{Conclusion}
 \label{sec:conclusion}
