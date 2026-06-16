@@ -14,6 +14,9 @@ from crowd_bellman.g4_sahbo import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[1]
+
+
 class G4SAHBOTests(unittest.TestCase):
     def test_control_vector_normalizes_aliases_and_eta(self) -> None:
         control = ControlVector(("both", "c", "W", "E"), (0.2, 4.0, 8.0, 12.0)).normalized()
@@ -54,7 +57,7 @@ class G4SAHBOTests(unittest.TestCase):
         self.assertGreater(close_loaded, close_light)
 
     def test_g4_toml_config_loads_and_resolves_paths(self) -> None:
-        config_path = Path("codes/scenes/examples/g4_sahbo_vs_grid/g4.toml")
+        config_path = ROOT / "scenes/examples/g4_sahbo_vs_grid/g4.toml"
         config = _load_g4_config(config_path)
 
         self.assertEqual(config["mode"], "matrix")

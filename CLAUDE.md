@@ -179,6 +179,7 @@ When writing reports (e.g., `2026-04-14汇报.md`):
 Standard scientific Python stack:
 - numpy
 - matplotlib
+- numba (required for the default `bellman_backend="sweeping"` / `"fsm"` and optional `"numba"`)
 
 No requirements.txt or setup.py; ensure these are available.
 
