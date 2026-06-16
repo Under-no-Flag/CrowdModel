@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import tempfile
 import unittest
 from dataclasses import replace
@@ -8,7 +9,12 @@ from pathlib import Path
 import numpy as np
 
 from crowd_bellman.compilers.config_compiler import compile_case, compile_scene
-from crowd_bellman.core import greenshields_speed, precompute_step_factors, recover_optimal_direction, solve_bellman
+from crowd_bellman.core import (
+    greenshields_speed,
+    precompute_step_factors,
+    recover_optimal_direction,
+    solve_bellman,
+)
 from crowd_bellman.loaders.config_loader import (
     load_population_spec,
     load_route_spec,
@@ -16,9 +22,11 @@ from crowd_bellman.loaders.config_loader import (
     load_scene_spec,
 )
 from crowd_bellman.runner import simulate_case
+from crowd_bellman.scenes import SimulationConfig
 
 
 ROOT = Path(__file__).resolve().parents[1]
+HAS_NUMBA = importlib.util.find_spec("numba") is not None
 
 
 def _load_scene_case(run_relative_path: str):
@@ -33,6 +41,9 @@ def _load_scene_case(run_relative_path: str):
 
 
 class CoreBackendTests(unittest.TestCase):
+    def test_simulation_config_defaults_to_combined_sweeping_backend(self) -> None:
+        self.assertEqual(SimulationConfig().bellman_backend, "sweeping")
+
     def test_solve_bellman_backends_match(self) -> None:
         run_spec, scene, case = _load_scene_case("scenes/examples/multi_stage/run.toml")
         first_key = next(iter(case.groups))
@@ -66,6 +77,96 @@ class CoreBackendTests(unittest.TestCase):
         )
 
         np.testing.assert_allclose(phi_python, phi_optimized, atol=1.0e-12, rtol=0.0)
+
+    @unittest.skipUnless(HAS_NUMBA, "numba is not installed")
+    def test_solve_bellman_numba_backend_matches_python_and_optimized(self) -> None:
+        run_spec, scene, case = _load_scene_case("scenes/examples/multi_stage/run.toml")
+        first_key = next(iter(case.groups))
+        group = case.groups[first_key]
+        step_factor = precompute_step_factors(
+            walkable=case.walkable,
+            dx=run_spec.simulation.dx,
+            m11=group.m11,
+            m12=group.m12,
+            m22=group.m22,
+        )
+        speed = greenshields_speed(scene.initial_rho, run_spec.simulation.vmax, run_spec.simulation.rho_max)
+
+        phi_python = solve_bellman(
+            walkable=case.walkable,
+            exit_mask=group.goal_mask,
+            allowed_mask=group.allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=run_spec.simulation.bellman_f_eps,
+            backend="python",
+        )
+        phi_optimized = solve_bellman(
+            walkable=case.walkable,
+            exit_mask=group.goal_mask,
+            allowed_mask=group.allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=run_spec.simulation.bellman_f_eps,
+            backend="optimized",
+        )
+        phi_numba = solve_bellman(
+            walkable=case.walkable,
+            exit_mask=group.goal_mask,
+            allowed_mask=group.allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=run_spec.simulation.bellman_f_eps,
+            backend="numba",
+        )
+
+        np.testing.assert_allclose(phi_python, phi_numba, atol=1.0e-12, rtol=0.0)
+        np.testing.assert_allclose(phi_optimized, phi_numba, atol=1.0e-12, rtol=0.0)
+
+    @unittest.skipUnless(HAS_NUMBA, "numba is not installed")
+    def test_solve_bellman_sweeping_backend_matches_python_and_optimized(self) -> None:
+        run_spec, scene, case = _load_scene_case("scenes/examples/multi_stage/run.toml")
+        first_key = next(iter(case.groups))
+        group = case.groups[first_key]
+        step_factor = precompute_step_factors(
+            walkable=case.walkable,
+            dx=run_spec.simulation.dx,
+            m11=group.m11,
+            m12=group.m12,
+            m22=group.m22,
+        )
+        speed = greenshields_speed(scene.initial_rho, run_spec.simulation.vmax, run_spec.simulation.rho_max)
+
+        phi_python = solve_bellman(
+            walkable=case.walkable,
+            exit_mask=group.goal_mask,
+            allowed_mask=group.allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=run_spec.simulation.bellman_f_eps,
+            backend="python",
+        )
+        phi_optimized = solve_bellman(
+            walkable=case.walkable,
+            exit_mask=group.goal_mask,
+            allowed_mask=group.allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=run_spec.simulation.bellman_f_eps,
+            backend="optimized",
+        )
+        phi_sweeping = solve_bellman(
+            walkable=case.walkable,
+            exit_mask=group.goal_mask,
+            allowed_mask=group.allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=run_spec.simulation.bellman_f_eps,
+            backend="sweeping",
+        )
+
+        np.testing.assert_allclose(phi_python, phi_sweeping, atol=1.0e-12, rtol=0.0)
+        np.testing.assert_allclose(phi_optimized, phi_sweeping, atol=1.0e-12, rtol=0.0)
 
     def test_direction_recovery_backends_match(self) -> None:
         run_spec, scene, case = _load_scene_case("scenes/examples/multi_stage/run.toml")
@@ -176,6 +277,128 @@ class CoreBackendTests(unittest.TestCase):
         for mapping_key in ("objective_terms", "objective_terms_normalized", "normalization_context"):
             for name, value in summary_baseline[mapping_key].items():
                 self.assertAlmostEqual(value, summary_optimized[mapping_key][name], places=12)
+
+    @unittest.skipUnless(HAS_NUMBA, "numba is not installed")
+    def test_simulate_case_summary_matches_numba_backend(self) -> None:
+        run_spec, scene, case = _load_scene_case("scenes/examples/multi_stage/run.toml")
+        cfg_baseline = replace(
+            run_spec.simulation,
+            steps=12,
+            time_horizon=3.0,
+            save_every=9999,
+            bellman_backend="optimized",
+            direction_recovery_backend="vectorized",
+        )
+        cfg_numba = replace(cfg_baseline, bellman_backend="numba")
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            summary_baseline = simulate_case(
+                cfg=cfg_baseline,
+                scene=scene,
+                case=case,
+                output_dir=temp_root / "optimized",
+                objective_cfg=run_spec.objective,
+            )
+            summary_numba = simulate_case(
+                cfg=cfg_numba,
+                scene=scene,
+                case=case,
+                output_dir=temp_root / "numba",
+                objective_cfg=run_spec.objective,
+            )
+
+        scalar_keys = [
+            "final_time",
+            "final_sink_cumulative",
+            "mean_density_avg",
+            "peak_density_max",
+            "velocity_discontinuity_avg",
+            "density_gradient_avg",
+            "j1_total_travel_time",
+            "j2_high_density_exposure",
+            "j5_channel_flux_variance",
+            "j1_normalized",
+            "j2_normalized",
+            "j5_normalized",
+            "initial_total_mass",
+            "walkable_area",
+            "objective_value",
+        ]
+        for key in scalar_keys:
+            self.assertAlmostEqual(summary_baseline[key], summary_numba[key], places=12)
+
+        for key in ("group_count", "transition_count"):
+            self.assertEqual(summary_baseline[key], summary_numba[key])
+
+        for mapping_key in ("channel_flux_cumulative", "channel_flux_share", "channel_time_mean_density"):
+            for name, value in summary_baseline[mapping_key].items():
+                self.assertAlmostEqual(value, summary_numba[mapping_key][name], places=12)
+
+        for mapping_key in ("objective_terms", "objective_terms_normalized", "normalization_context"):
+            for name, value in summary_baseline[mapping_key].items():
+                self.assertAlmostEqual(value, summary_numba[mapping_key][name], places=12)
+
+    @unittest.skipUnless(HAS_NUMBA, "numba is not installed")
+    def test_simulate_case_summary_matches_default_sweeping_backend(self) -> None:
+        run_spec, scene, case = _load_scene_case("scenes/examples/multi_stage/run.toml")
+        cfg_baseline = replace(
+            run_spec.simulation,
+            steps=12,
+            time_horizon=3.0,
+            save_every=9999,
+            bellman_backend="optimized",
+            direction_recovery_backend="vectorized",
+        )
+        cfg_sweeping = replace(cfg_baseline, bellman_backend=SimulationConfig().bellman_backend)
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            summary_baseline = simulate_case(
+                cfg=cfg_baseline,
+                scene=scene,
+                case=case,
+                output_dir=temp_root / "optimized",
+                objective_cfg=run_spec.objective,
+            )
+            summary_sweeping = simulate_case(
+                cfg=cfg_sweeping,
+                scene=scene,
+                case=case,
+                output_dir=temp_root / "sweeping",
+                objective_cfg=run_spec.objective,
+            )
+
+        scalar_keys = [
+            "final_time",
+            "final_sink_cumulative",
+            "mean_density_avg",
+            "peak_density_max",
+            "velocity_discontinuity_avg",
+            "density_gradient_avg",
+            "j1_total_travel_time",
+            "j2_high_density_exposure",
+            "j5_channel_flux_variance",
+            "j1_normalized",
+            "j2_normalized",
+            "j5_normalized",
+            "initial_total_mass",
+            "walkable_area",
+            "objective_value",
+        ]
+        for key in scalar_keys:
+            self.assertAlmostEqual(summary_baseline[key], summary_sweeping[key], places=12)
+
+        for key in ("group_count", "transition_count"):
+            self.assertEqual(summary_baseline[key], summary_sweeping[key])
+
+        for mapping_key in ("channel_flux_cumulative", "channel_flux_share", "channel_time_mean_density"):
+            for name, value in summary_baseline[mapping_key].items():
+                self.assertAlmostEqual(value, summary_sweeping[mapping_key][name], places=12)
+
+        for mapping_key in ("objective_terms", "objective_terms_normalized", "normalization_context"):
+            for name, value in summary_baseline[mapping_key].items():
+                self.assertAlmostEqual(value, summary_sweeping[mapping_key][name], places=12)
 
 
 if __name__ == "__main__":

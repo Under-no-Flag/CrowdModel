@@ -21,7 +21,7 @@ class SimulationConfig:
     cfl: float = 0.9
     dt_cap: float = 0.18
     save_every: int = 40
-    bellman_backend: str = "optimized"
+    bellman_backend: str = "sweeping"
     direction_recovery_backend: str = "vectorized"
     density_contour_levels: tuple[float, ...] | int | None = 0
 

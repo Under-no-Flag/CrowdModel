@@ -6,6 +6,20 @@ from typing import Mapping
 
 import numpy as np
 
+try:
+    from numba import njit
+
+    NUMBA_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only in environments without numba
+    NUMBA_AVAILABLE = False
+
+    def njit(*args, **kwargs):
+        def decorator(func):
+            return func
+
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+        return decorator
 
 GroupKey = tuple[int, int]
 
@@ -258,6 +272,268 @@ def _solve_bellman_optimized(
     return phi
 
 
+@njit(cache=True, nogil=True)
+def _heap_push_numba(
+    heap_values: np.ndarray,
+    heap_nodes: np.ndarray,
+    heap_size: int,
+    value: float,
+    node: int,
+) -> int:
+    if heap_size >= heap_values.shape[0]:
+        raise RuntimeError("Bellman heap capacity exceeded")
+
+    i = heap_size
+    heap_values[i] = value
+    heap_nodes[i] = node
+    heap_size += 1
+
+    while i > 0:
+        parent = (i - 1) >> 1
+        if heap_values[parent] <= heap_values[i]:
+            break
+        tmp_value = heap_values[parent]
+        tmp_node = heap_nodes[parent]
+        heap_values[parent] = heap_values[i]
+        heap_nodes[parent] = heap_nodes[i]
+        heap_values[i] = tmp_value
+        heap_nodes[i] = tmp_node
+        i = parent
+
+    return heap_size
+
+
+@njit(cache=True, nogil=True)
+def _heap_pop_numba(
+    heap_values: np.ndarray,
+    heap_nodes: np.ndarray,
+    heap_size: int,
+) -> tuple[float, int, int]:
+    value = heap_values[0]
+    node = heap_nodes[0]
+    heap_size -= 1
+
+    heap_values[0] = heap_values[heap_size]
+    heap_nodes[0] = heap_nodes[heap_size]
+    heap_values[heap_size] = np.inf
+    heap_nodes[heap_size] = -1
+
+    i = 0
+    while True:
+        left = (i << 1) + 1
+        right = left + 1
+        smallest = i
+        if left < heap_size and heap_values[left] < heap_values[smallest]:
+            smallest = left
+        if right < heap_size and heap_values[right] < heap_values[smallest]:
+            smallest = right
+        if smallest == i:
+            break
+
+        tmp_value = heap_values[i]
+        tmp_node = heap_nodes[i]
+        heap_values[i] = heap_values[smallest]
+        heap_nodes[i] = heap_nodes[smallest]
+        heap_values[smallest] = tmp_value
+        heap_nodes[smallest] = tmp_node
+        i = smallest
+
+    return value, node, heap_size
+
+
+@njit(cache=True, nogil=True)
+def _solve_bellman_numba(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    f_eps: float,
+) -> np.ndarray:
+    """Numba nopython Bellman solver with a fixed-size binary heap."""
+
+    ny, nx = walkable.shape
+    n_cells = ny * nx
+    n_dir = 8
+    phi = np.full(n_cells, np.inf, dtype=np.float64)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
+
+    dir_dy = (0, 0, 1, -1, 1, 1, -1, -1)
+    dir_dx = (1, -1, 0, 0, 1, -1, 1, -1)
+    dir_bits = (1, 2, 4, 8, 16, 32, 64, 128)
+
+    max_heap = n_cells * (n_dir + 1) + 1
+    heap_values = np.full(max_heap, np.inf, dtype=np.float64)
+    heap_nodes = np.full(max_heap, -1, dtype=np.int64)
+    heap_size = 0
+
+    for idx in range(n_cells):
+        y = idx // nx
+        x = idx - y * nx
+        if exit_mask[y, x] and walkable[y, x]:
+            phi[idx] = 0.0
+            heap_size = _heap_push_numba(heap_values, heap_nodes, heap_size, 0.0, idx)
+
+    while heap_size > 0:
+        value, idx, heap_size = _heap_pop_numba(heap_values, heap_nodes, heap_size)
+        if value > phi[idx]:
+            continue
+
+        y = idx // nx
+        x = idx - y * nx
+
+        for k in range(n_dir):
+            py = y - dir_dy[k]
+            px = x - dir_dx[k]
+            if py < 0 or py >= ny or px < 0 or px >= nx:
+                continue
+            if not walkable[py, px]:
+                continue
+            if (allowed_mask[py, px] & dir_bits[k]) == 0:
+                continue
+
+            next_idx = py * nx + px
+            candidate = value + step_factor[py, px, k] * inv_speed[py, px]
+            if candidate + 1.0e-12 < phi[next_idx]:
+                phi[next_idx] = candidate
+                heap_size = _heap_push_numba(heap_values, heap_nodes, heap_size, candidate, next_idx)
+
+    min_phi = np.inf
+    for idx in range(n_cells):
+        y = idx // nx
+        x = idx - y * nx
+        if walkable[y, x] and phi[idx] < min_phi:
+            min_phi = phi[idx]
+
+    if min_phi < np.inf:
+        for idx in range(n_cells):
+            y = idx // nx
+            x = idx - y * nx
+            if walkable[y, x] and phi[idx] < np.inf:
+                phi[idx] -= min_phi
+
+    return phi.reshape((ny, nx))
+
+
+@njit(cache=True, nogil=True)
+def _solve_bellman_sweeping(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    f_eps: float,
+) -> np.ndarray:
+    """Fast-sweeping-style relaxation of the same discrete Bellman equation."""
+
+    ny, nx = walkable.shape
+    phi = np.full((ny, nx), np.inf, dtype=np.float64)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
+
+    dir_dy = (0, 0, 1, -1, 1, 1, -1, -1)
+    dir_dx = (1, -1, 0, 0, 1, -1, 1, -1)
+    dir_bits = (1, 2, 4, 8, 16, 32, 64, 128)
+    n_dir = 8
+    tol = 1.0e-12
+    max_sweeps = ny * nx
+
+    for y in range(ny):
+        for x in range(nx):
+            if exit_mask[y, x] and walkable[y, x]:
+                phi[y, x] = 0.0
+
+    converged = False
+    for _sweep in range(max_sweeps):
+        max_delta = 0.0
+
+        for order in range(4):
+            if order == 0:
+                y_start = 0
+                y_stop = ny
+                y_step = 1
+                x_start = 0
+                x_stop = nx
+                x_step = 1
+            elif order == 1:
+                y_start = ny - 1
+                y_stop = -1
+                y_step = -1
+                x_start = 0
+                x_stop = nx
+                x_step = 1
+            elif order == 2:
+                y_start = 0
+                y_stop = ny
+                y_step = 1
+                x_start = nx - 1
+                x_stop = -1
+                x_step = -1
+            else:
+                y_start = ny - 1
+                y_stop = -1
+                y_step = -1
+                x_start = nx - 1
+                x_stop = -1
+                x_step = -1
+
+            y = y_start
+            while y != y_stop:
+                x = x_start
+                while x != x_stop:
+                    if walkable[y, x] and not exit_mask[y, x]:
+                        old_value = phi[y, x]
+                        best_value = old_value
+
+                        for k in range(n_dir):
+                            if (allowed_mask[y, x] & dir_bits[k]) == 0:
+                                continue
+                            nyy = y + dir_dy[k]
+                            nxx = x + dir_dx[k]
+                            if nyy < 0 or nyy >= ny or nxx < 0 or nxx >= nx:
+                                continue
+                            if not walkable[nyy, nxx]:
+                                continue
+                            if phi[nyy, nxx] == np.inf:
+                                continue
+
+                            candidate = phi[nyy, nxx] + step_factor[y, x, k] * inv_speed[y, x]
+                            if candidate + 1.0e-12 < best_value:
+                                best_value = candidate
+
+                        if best_value < old_value:
+                            phi[y, x] = best_value
+                            if old_value == np.inf:
+                                max_delta = np.inf
+                            else:
+                                delta = old_value - best_value
+                                if delta > max_delta:
+                                    max_delta = delta
+
+                    x += x_step
+                y += y_step
+
+        if max_delta <= tol:
+            converged = True
+            break
+
+    if not converged:
+        raise RuntimeError("Bellman sweeping backend did not converge")
+
+    min_phi = np.inf
+    for y in range(ny):
+        for x in range(nx):
+            if walkable[y, x] and phi[y, x] < min_phi:
+                min_phi = phi[y, x]
+
+    if min_phi < np.inf:
+        for y in range(ny):
+            for x in range(nx):
+                if walkable[y, x] and phi[y, x] < np.inf:
+                    phi[y, x] -= min_phi
+
+    return phi
+
+
 def solve_bellman(
     walkable: np.ndarray,
     exit_mask: np.ndarray,
@@ -281,6 +557,28 @@ def solve_bellman(
         )
     if backend == "optimized":
         return _solve_bellman_optimized(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=f_eps,
+        )
+    if backend == "numba":
+        if not NUMBA_AVAILABLE:
+            raise ImportError("bellman_backend='numba' requires numba. Install it with `python -m pip install numba`.")
+        return _solve_bellman_numba(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=f_eps,
+        )
+    if backend in {"sweeping", "fsm"}:
+        if not NUMBA_AVAILABLE:
+            raise ImportError("bellman_backend='sweeping' requires numba. Install it with `python -m pip install numba`.")
+        return _solve_bellman_sweeping(
             walkable=walkable,
             exit_mask=exit_mask,
             allowed_mask=allowed_mask,

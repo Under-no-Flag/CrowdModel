@@ -2,5 +2,8 @@
 
 codes/results/*
 codes/__pycache__/
+__pycache__/
 *.pyc
+*.nbc
+*.nbi
 codes/results_*/

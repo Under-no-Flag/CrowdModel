@@ -12,6 +12,7 @@ from statistics import mean
 
 from crowd_bellman.compilers.config_compiler import compile_case, compile_scene
 from crowd_bellman.core import (
+    NUMBA_AVAILABLE,
     compute_total_density,
     greenshields_speed,
     precompute_step_factors,
@@ -211,6 +212,60 @@ def main() -> None:
             repeats=args.repeats,
         )
 
+    if NUMBA_AVAILABLE:
+        kernel_results["serial_numba"] = _time_repeated(
+            lambda: _benchmark_serial_kernel(
+                case,
+                groups,
+                speed,
+                step_factors,
+                f_eps,
+                bellman_backend="numba",
+                direction_backend="vectorized",
+            ),
+            repeats=args.repeats,
+        )
+        if len(groups) > 1:
+            kernel_results["threaded_numba"] = _time_repeated(
+                lambda: _benchmark_threaded_kernel(
+                    case,
+                    groups,
+                    speed,
+                    step_factors,
+                    f_eps,
+                    bellman_backend="numba",
+                    direction_backend="vectorized",
+                ),
+                repeats=args.repeats,
+            )
+
+    if NUMBA_AVAILABLE:
+        kernel_results["serial_sweeping"] = _time_repeated(
+            lambda: _benchmark_serial_kernel(
+                case,
+                groups,
+                speed,
+                step_factors,
+                f_eps,
+                bellman_backend="sweeping",
+                direction_backend="vectorized",
+            ),
+            repeats=args.repeats,
+        )
+        if len(groups) > 1:
+            kernel_results["threaded_sweeping"] = _time_repeated(
+                lambda: _benchmark_threaded_kernel(
+                    case,
+                    groups,
+                    speed,
+                    step_factors,
+                    f_eps,
+                    bellman_backend="sweeping",
+                    direction_backend="vectorized",
+                ),
+                repeats=args.repeats,
+            )
+
     full_results = {
         "python": _benchmark_full_simulation(
             config_path,
@@ -231,6 +286,26 @@ def main() -> None:
             repeats=args.repeats,
         ),
     }
+    if NUMBA_AVAILABLE:
+        full_results["numba"] = _benchmark_full_simulation(
+            config_path,
+            steps=args.steps,
+            time_horizon=args.time_horizon,
+            save_every=args.save_every,
+            bellman_backend="numba",
+            direction_backend="vectorized",
+            repeats=args.repeats,
+        )
+    if NUMBA_AVAILABLE:
+        full_results["sweeping"] = _benchmark_full_simulation(
+            config_path,
+            steps=args.steps,
+            time_horizon=args.time_horizon,
+            save_every=args.save_every,
+            bellman_backend="sweeping",
+            direction_backend="vectorized",
+            repeats=args.repeats,
+        )
 
     payload = {
         "config_path": str(config_path),
