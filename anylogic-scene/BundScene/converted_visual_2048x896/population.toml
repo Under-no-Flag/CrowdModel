@@ -1,0 +1,13 @@
+[[initial_groups]]
+group_id = "bund_anylogic_initial"
+stage_id = "to_decision_channel_split"
+region = "initial_groups"
+density = 2.0
+
+[[inflow_groups]]
+group_id = "bund_anylogic_inflow"
+stage_id = "to_decision_channel_split"
+region = "initial_groups"
+rate = 0.08
+time_start = 0.0
+rho_cap = 4.8

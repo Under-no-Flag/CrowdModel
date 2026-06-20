@@ -837,7 +837,13 @@ def compute_cfl_dt_multigroup(
     return min(dt_cap, dt_transport, dt_transition)
 
 
-def compute_face_fluxes(rho: np.ndarray, vx: np.ndarray, vy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def compute_face_fluxes(
+    rho: np.ndarray,
+    vx: np.ndarray,
+    vy: np.ndarray,
+    *,
+    walkable: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """First-order upwind face fluxes for explicit conservation update."""
 
     vx_face = 0.5 * (vx[:, :-1] + vx[:, 1:])
@@ -847,7 +853,135 @@ def compute_face_fluxes(rho: np.ndarray, vx: np.ndarray, vy: np.ndarray) -> tupl
     rho_y = np.where(vy_face >= 0.0, rho[:-1, :], rho[1:, :])
     fx = vx_face * rho_x
     fy = vy_face * rho_y
+    if walkable is not None:
+        fx = np.where(walkable[:, :-1] & walkable[:, 1:], fx, 0.0)
+        fy = np.where(walkable[:-1, :] & walkable[1:, :], fy, 0.0)
     return fx, fy
+
+
+def _incoming_outgoing_density_delta(
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    shape: tuple[int, int],
+    dx: float,
+    dt: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    incoming = np.zeros(shape, dtype=float)
+    outgoing = np.zeros(shape, dtype=float)
+    factor = dt / max(dx, 1.0e-12)
+
+    for fx in fx_by_group.values():
+        positive = np.maximum(fx, 0.0)
+        negative = np.maximum(-fx, 0.0)
+        incoming[:, 1:] += positive * factor
+        outgoing[:, :-1] += positive * factor
+        incoming[:, :-1] += negative * factor
+        outgoing[:, 1:] += negative * factor
+
+    for fy in fy_by_group.values():
+        positive = np.maximum(fy, 0.0)
+        negative = np.maximum(-fy, 0.0)
+        incoming[1:, :] += positive * factor
+        outgoing[:-1, :] += positive * factor
+        incoming[:-1, :] += negative * factor
+        outgoing[1:, :] += negative * factor
+
+    return incoming, outgoing
+
+
+def _predict_total_density_from_fluxes(
+    rho_tot: np.ndarray,
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    walkable: np.ndarray,
+    dx: float,
+    dt: float,
+) -> np.ndarray:
+    fx_total = np.zeros((rho_tot.shape[0], rho_tot.shape[1] - 1), dtype=float)
+    fy_total = np.zeros((rho_tot.shape[0] - 1, rho_tot.shape[1]), dtype=float)
+    for fx in fx_by_group.values():
+        fx_total += fx
+    for fy in fy_by_group.values():
+        fy_total += fy
+
+    div_x = np.zeros_like(rho_tot)
+    div_y = np.zeros_like(rho_tot)
+    div_x[:, 1:-1] = (fx_total[:, 1:] - fx_total[:, :-1]) / dx
+    div_y[1:-1, :] = (fy_total[1:, :] - fy_total[:-1, :]) / dx
+    predicted = rho_tot - dt * (div_x + div_y)
+    predicted[~walkable] = 0.0
+    return np.clip(predicted, 0.0, None)
+
+
+def _face_throughput_mass(
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    dx: float,
+    dt: float,
+) -> float:
+    total = 0.0
+    for fx in fx_by_group.values():
+        total += float(np.sum(np.abs(fx)) * dx * dt)
+    for fy in fy_by_group.values():
+        total += float(np.sum(np.abs(fy)) * dx * dt)
+    return total
+
+
+def limit_fluxes_to_density_capacity(
+    *,
+    rho_by_group: Mapping[GroupKey, np.ndarray],
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    walkable: np.ndarray,
+    rho_max: float,
+    dx: float,
+    dt: float,
+    capacity_mask: np.ndarray | None = None,
+    iterations: int = 3,
+) -> tuple[dict[GroupKey, np.ndarray], dict[GroupKey, np.ndarray], dict[str, float | bool | int]]:
+    """Limit incoming face fluxes so crowded cells queue mass upstream instead of deleting it."""
+
+    limited_fx = {key: np.array(fx, copy=True) for key, fx in fx_by_group.items()}
+    limited_fy = {key: np.array(fy, copy=True) for key, fy in fy_by_group.items()}
+    rho_tot = compute_total_density(rho_by_group)
+    active_capacity = walkable if capacity_mask is None else (capacity_mask & walkable)
+    original_throughput = _face_throughput_mass(fx_by_group, fy_by_group, dx, dt)
+    binding = False
+
+    for _ in range(max(1, int(iterations))):
+        incoming, outgoing = _incoming_outgoing_density_delta(limited_fx, limited_fy, rho_tot.shape, dx, dt)
+        allowed_incoming = np.maximum(float(rho_max) - rho_tot + outgoing, 0.0)
+        constrained = active_capacity & (incoming > allowed_incoming + 1.0e-12)
+        if not np.any(constrained):
+            break
+
+        binding = True
+        cell_scale = np.ones_like(rho_tot)
+        cell_scale[constrained] = np.clip(allowed_incoming[constrained] / incoming[constrained], 0.0, 1.0)
+
+        for key, fx in limited_fx.items():
+            positive_scale = cell_scale[:, 1:]
+            negative_scale = cell_scale[:, :-1]
+            limited_fx[key] = np.where(fx > 0.0, fx * positive_scale, np.where(fx < 0.0, fx * negative_scale, fx))
+
+        for key, fy in limited_fy.items():
+            positive_scale = cell_scale[1:, :]
+            negative_scale = cell_scale[:-1, :]
+            limited_fy[key] = np.where(fy > 0.0, fy * positive_scale, np.where(fy < 0.0, fy * negative_scale, fy))
+
+    predicted = _predict_total_density_from_fluxes(rho_tot, limited_fx, limited_fy, walkable, dx, dt)
+    overflow = np.maximum(predicted - float(rho_max), 0.0)
+    overflow_peak = float(np.max(overflow[active_capacity])) if np.any(active_capacity) else 0.0
+    limited_throughput = _face_throughput_mass(limited_fx, limited_fy, dx, dt)
+    limited_mass = max(original_throughput - limited_throughput, 0.0)
+    diagnostics: dict[str, float | bool | int] = {
+        "limited_mass": float(limited_mass),
+        "limited_rate": float(limited_mass / max(dt, 1.0e-12)),
+        "overflow_peak": overflow_peak,
+        "binding": bool(binding or limited_mass > 1.0e-12),
+        "iterations": int(max(1, int(iterations))),
+    }
+    return limited_fx, limited_fy, diagnostics
 
 
 def update_density(
@@ -861,7 +995,7 @@ def update_density(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """Advance one density field with explicit conservative advection and sink mask."""
 
-    fx, fy = compute_face_fluxes(rho, vx, vy)
+    fx, fy = compute_face_fluxes(rho, vx, vy, walkable=walkable)
 
     div_x = np.zeros_like(rho)
     div_y = np.zeros_like(rho)

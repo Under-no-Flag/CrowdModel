@@ -1,9 +1,17 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 from .core import DirectionHandoffRule, GroupKey, TransitionRule
+
+
+def _empty_int_array() -> np.ndarray:
+    return np.empty(0, dtype=int)
+
+
+def _empty_float_array() -> np.ndarray:
+    return np.empty(0, dtype=float)
 
 
 @dataclass(frozen=True)
@@ -35,6 +43,7 @@ class BaseScene:
     exit_mask: np.ndarray
     channel_masks: dict[str, np.ndarray]
     probe_x: dict[str, int]
+    channel_axes: dict[str, tuple[float, float]]
     wall_x0: int
     wall_x1: int
     tooth_x1: int
@@ -80,6 +89,13 @@ class ChannelGateModel:
     face_index: int
     face_rows: np.ndarray
     waiting_mask: np.ndarray
+    face_x_rows: np.ndarray = field(default_factory=_empty_int_array)
+    face_x_cols: np.ndarray = field(default_factory=_empty_int_array)
+    face_x_signs: np.ndarray = field(default_factory=_empty_float_array)
+    face_y_rows: np.ndarray = field(default_factory=_empty_int_array)
+    face_y_cols: np.ndarray = field(default_factory=_empty_int_array)
+    face_y_signs: np.ndarray = field(default_factory=_empty_float_array)
+    normal: tuple[float, float] = (1.0, 0.0)
 
 
 @dataclass(frozen=True)
@@ -107,6 +123,7 @@ class CaseModel:
     exit_mask: np.ndarray
     channel_masks: dict[str, np.ndarray]
     probe_x: dict[str, int]
+    channel_axes: dict[str, tuple[float, float]]
     m11: np.ndarray
     m12: np.ndarray
     m22: np.ndarray

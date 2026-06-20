@@ -1,0 +1,136 @@
+[case]
+case_id = "bund_anylogic_simple_route"
+title = "Bund AnyLogic simple route"
+
+[[stages]]
+stage_id = "to_decision_channel_split"
+group_key = [1, 1]
+goal_region = "decision_channel_split"
+decision_region = "decision_channel_split"
+kappa = 2.0
+
+[[stages.targets]]
+stage_id = "to_pre_channel_1"
+probability = 0.25
+
+[[stages.targets]]
+stage_id = "to_pre_channel_2"
+probability = 0.25
+
+[[stages.targets]]
+stage_id = "to_pre_channel_3"
+probability = 0.25
+
+[[stages.targets]]
+stage_id = "to_pre_channel_4"
+probability = 0.25
+
+[[stages]]
+stage_id = "to_pre_channel_1"
+group_key = [1, 2]
+goal_region = "goal_region11"
+decision_region = "goal_region11"
+next_stage = "to_channel_1"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_pre_channel_2"
+group_key = [1, 3]
+goal_region = "goal_region"
+decision_region = "goal_region"
+next_stage = "to_channel_2"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_pre_channel_3"
+group_key = [1, 4]
+goal_region = "goal_region2"
+decision_region = "goal_region2"
+next_stage = "to_channel_3"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_pre_channel_4"
+group_key = [1, 5]
+goal_region = "goal_region5"
+decision_region = "goal_region5"
+next_stage = "to_channel_4"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_channel_1"
+group_key = [1, 6]
+goal_region = "channel_1"
+decision_region = "channel_1"
+next_stage = "post_channel_1"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_channel_2"
+group_key = [1, 7]
+goal_region = "channel_2"
+decision_region = "channel_2"
+next_stage = "post_channel_2"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_channel_3"
+group_key = [1, 8]
+goal_region = "channel_3"
+decision_region = "channel_3"
+next_stage = "post_channel_3"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_channel_4"
+group_key = [1, 9]
+goal_region = "channel_4"
+decision_region = "channel_4"
+next_stage = "post_channel_4"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "post_channel_1"
+group_key = [1, 10]
+goal_region = "post_channel_1"
+decision_region = "post_channel_1"
+next_stage = "to_merge_after_channels"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "post_channel_2"
+group_key = [1, 11]
+goal_region = "post_channel_2"
+decision_region = "post_channel_2"
+next_stage = "to_merge_after_channels"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "post_channel_3"
+group_key = [1, 12]
+goal_region = "post_channel_3"
+decision_region = "post_channel_3"
+next_stage = "to_merge_after_channels"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "post_channel_4"
+group_key = [1, 13]
+goal_region = "post_channel_4"
+decision_region = "post_channel_4"
+next_stage = "to_merge_after_channels"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_merge_after_channels"
+group_key = [1, 14]
+goal_region = "merge_after_channels"
+decision_region = "merge_after_channels"
+next_stage = "to_exits"
+transition_direction = "inherit_target"
+
+[[stages]]
+stage_id = "to_exits"
+group_key = [1, 15]
+goal_region = "exits"
+sink_region = "exits"

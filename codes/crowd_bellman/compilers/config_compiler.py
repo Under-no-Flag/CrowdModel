@@ -24,6 +24,8 @@ class CompiledSceneBundle:
     scene: BaseScene
     region_masks: dict[str, np.ndarray]
     exit_masks: dict[str, np.ndarray]
+    region_axes: dict[str, tuple[float, float]]
+    channel_axes: dict[str, tuple[float, float]]
 
 
 def _clip_interval(value0: int, value1: int, limit: int) -> tuple[int, int]:
@@ -40,6 +42,131 @@ def _rect_mask(cfg: SimulationConfig, x0: int, x1: int, y0: int, y1: int) -> np.
         return mask
     mask[yy0:yy1, xx0:xx1] = True
     return mask
+
+
+def _point_in_polygon(x: float, y: float, points: tuple[tuple[float, float], ...]) -> bool:
+    inside = False
+    previous_x, previous_y = points[-1]
+    for current_x, current_y in points:
+        crosses_y = (current_y > y) != (previous_y > y)
+        if crosses_y:
+            x_intersection = (previous_x - current_x) * (y - current_y) / (previous_y - current_y) + current_x
+            if x < x_intersection:
+                inside = not inside
+        previous_x, previous_y = current_x, current_y
+    return inside
+
+
+def _polygon_mask(cfg: SimulationConfig, points: tuple[tuple[float, float], ...]) -> np.ndarray:
+    mask = np.zeros((cfg.ny, cfg.nx), dtype=bool)
+    if len(points) < 3:
+        return mask
+
+    xs = [point[0] for point in points]
+    ys = [point[1] for point in points]
+    x0, x1 = _clip_interval(int(np.floor(min(xs))), int(np.ceil(max(xs))), cfg.nx)
+    y0, y1 = _clip_interval(int(np.floor(min(ys))), int(np.ceil(max(ys))), cfg.ny)
+    if x1 <= x0 or y1 <= y0:
+        return mask
+
+    edges = tuple(zip(points, points[1:] + points[:1]))
+    for yy in range(y0, y1):
+        cy = float(yy) + 0.5
+        for xx in range(x0, x1):
+            cx = float(xx) + 0.5
+            if _point_in_polygon(cx, cy, points) or any(
+                _distance_to_segment(cx, cy, start, end) <= 1.0e-9 for start, end in edges
+            ):
+                mask[yy, xx] = True
+    return mask
+
+
+def _distance_to_segment(
+    x: float,
+    y: float,
+    start: tuple[float, float],
+    end: tuple[float, float],
+) -> float:
+    sx, sy = start
+    ex, ey = end
+    dx = ex - sx
+    dy = ey - sy
+    length2 = dx * dx + dy * dy
+    if length2 <= 1.0e-12:
+        return float(np.hypot(x - sx, y - sy))
+    t = max(0.0, min(1.0, ((x - sx) * dx + (y - sy) * dy) / length2))
+    px = sx + t * dx
+    py = sy + t * dy
+    return float(np.hypot(x - px, y - py))
+
+
+def _polyline_wall_mask(cfg: SimulationConfig, points: tuple[tuple[float, float], ...], width: float) -> np.ndarray:
+    mask = np.zeros((cfg.ny, cfg.nx), dtype=bool)
+    if len(points) < 2 or width <= 0.0:
+        return mask
+
+    radius = width / 2.0
+    for start, end in zip(points[:-1], points[1:]):
+        min_x = int(np.floor(min(start[0], end[0]) - radius))
+        max_x = int(np.ceil(max(start[0], end[0]) + radius)) + 1
+        min_y = int(np.floor(min(start[1], end[1]) - radius))
+        max_y = int(np.ceil(max(start[1], end[1]) + radius)) + 1
+        x0, x1 = _clip_interval(min_x, max_x, cfg.nx)
+        y0, y1 = _clip_interval(min_y, max_y, cfg.ny)
+        for yy in range(y0, y1):
+            for xx in range(x0, x1):
+                if _distance_to_segment(float(xx), float(yy), start, end) <= radius + 1.0e-9:
+                    mask[yy, xx] = True
+    return mask
+
+
+def _normalize_axis(axis: tuple[float, float], *, region_name: str) -> tuple[float, float]:
+    norm = float(np.hypot(axis[0], axis[1]))
+    if norm <= 1.0e-12:
+        raise ValueError(f"Region {region_name} axis must be non-zero")
+    return float(axis[0] / norm), float(axis[1] / norm)
+
+
+def _longest_edge_axis(points: tuple[tuple[float, float], ...]) -> tuple[float, float]:
+    best_axis = (1.0, 0.0)
+    best_length2 = 0.0
+    for start, end in zip(points, points[1:] + points[:1]):
+        dx = end[0] - start[0]
+        dy = end[1] - start[1]
+        length2 = dx * dx + dy * dy
+        if length2 > best_length2:
+            best_length2 = length2
+            best_axis = (dx, dy)
+    return best_axis
+
+
+def _region_axis(region: object) -> tuple[float, float]:
+    explicit_axis = getattr(region, "axis", None)
+    if explicit_axis is not None:
+        return _normalize_axis(explicit_axis, region_name=str(getattr(region, "name", "")))
+
+    shape = str(getattr(region, "shape", "rect")).lower()
+    if shape == "polygon":
+        return _normalize_axis(
+            _longest_edge_axis(getattr(region, "points", ())),
+            region_name=str(getattr(region, "name", "")),
+        )
+    return (1.0, 0.0)
+
+
+def _region_mask(cfg: SimulationConfig, region: object) -> np.ndarray:
+    shape = str(getattr(region, "shape", "rect")).lower()
+    if shape == "rect":
+        x0 = getattr(region, "x0", None)
+        x1 = getattr(region, "x1", None)
+        y0 = getattr(region, "y0", None)
+        y1 = getattr(region, "y1", None)
+        if x0 is None or x1 is None or y0 is None or y1 is None:
+            raise ValueError(f"Rect region {getattr(region, 'name', '')} is missing x0/x1/y0/y1")
+        return _rect_mask(cfg, int(x0), int(x1), int(y0), int(y1))
+    if shape == "polygon":
+        return _polygon_mask(cfg, getattr(region, "points", ()))
+    raise ValueError(f"Unsupported region shape: {shape}")
 
 
 def _selector_mask(
@@ -76,6 +203,19 @@ def _channel_probe_x(mask: np.ndarray, probe_x: int | None) -> int:
     return int(round(float(np.mean(points[:, 1]))))
 
 
+def _channel_axis(channel: object, region_axes: dict[str, tuple[float, float]]) -> tuple[float, float]:
+    axes = [region_axes[name] for name in getattr(channel, "regions", ()) if name in region_axes]
+    if not axes:
+        return (1.0, 0.0)
+
+    axis_x = float(sum(axis[0] for axis in axes))
+    axis_y = float(sum(axis[1] for axis in axes))
+    norm = float(np.hypot(axis_x, axis_y))
+    if norm <= 1.0e-12:
+        return axes[0]
+    return axis_x / norm, axis_y / norm
+
+
 def compile_scene(scene_spec: SceneSpec, cfg: SimulationConfig) -> CompiledSceneBundle:
     walkable = np.ones((cfg.ny, cfg.nx), dtype=bool)
     if scene_spec.block_boundaries and cfg.nx >= 2 and cfg.ny >= 2:
@@ -85,16 +225,29 @@ def compile_scene(scene_spec: SceneSpec, cfg: SimulationConfig) -> CompiledScene
         walkable[:, -1] = False
 
     region_masks: dict[str, np.ndarray] = {}
+    region_axes: dict[str, tuple[float, float]] = {}
     for region in scene_spec.regions:
         if region.name in region_masks:
             raise ValueError(f"Duplicate region name: {region.name}")
-        region_masks[region.name] = _rect_mask(cfg, region.x0, region.x1, region.y0, region.y1)
+        region_masks[region.name] = _region_mask(cfg, region)
+        region_axes[region.name] = _region_axis(region)
+
+    wall_names: set[str] = set()
+    for wall in scene_spec.walls:
+        if wall.name in region_masks:
+            raise ValueError(f"Duplicate region name: {wall.name}")
+        wall_mask = _polyline_wall_mask(cfg, wall.points, wall.width)
+        region_masks[wall.name] = wall_mask
+        wall_names.add(wall.name)
 
     for obstacle_name in scene_spec.obstacles:
         obstacle_mask = region_masks.get(obstacle_name)
         if obstacle_mask is None:
             raise ValueError(f"Obstacle region not found: {obstacle_name}")
         walkable[obstacle_mask] = False
+
+    for wall_name in wall_names:
+        walkable[region_masks[wall_name]] = False
 
     exit_masks: dict[str, np.ndarray] = {}
     exit_union = np.zeros_like(walkable, dtype=bool)
@@ -105,10 +258,12 @@ def compile_scene(scene_spec: SceneSpec, cfg: SimulationConfig) -> CompiledScene
 
     channel_masks: dict[str, np.ndarray] = {}
     probe_x: dict[str, int] = {}
+    channel_axes: dict[str, tuple[float, float]] = {}
     for channel in scene_spec.channels:
         mask = _selector_mask(channel.regions, region_masks, walkable)
         channel_masks[channel.name] = mask
         probe_x[channel.name] = _channel_probe_x(mask, channel.probe_x)
+        channel_axes[channel.name] = _channel_axis(channel, region_axes)
 
     centers_y = [0, 0, 0]
     for idx, channel in enumerate(scene_spec.channels[:3]):
@@ -122,13 +277,20 @@ def compile_scene(scene_spec: SceneSpec, cfg: SimulationConfig) -> CompiledScene
         exit_mask=exit_union,
         channel_masks=channel_masks,
         probe_x=probe_x,
+        channel_axes=channel_axes,
         wall_x0=0,
         wall_x1=0,
         tooth_x1=0,
         centers_y=(centers_y[0], centers_y[1], centers_y[2]),
         middle_entry=(0, 0),
     )
-    return CompiledSceneBundle(scene=scene, region_masks=region_masks, exit_masks=exit_masks)
+    return CompiledSceneBundle(
+        scene=scene,
+        region_masks=region_masks,
+        exit_masks=exit_masks,
+        region_axes=region_axes,
+        channel_axes=channel_axes,
+    )
 
 
 def _direction_bitmask(direction_names: tuple[str, ...] | None) -> np.uint16:
@@ -162,6 +324,27 @@ def _constant_direction_vector(direction_name: str) -> tuple[float, float]:
     return float(DIRECTIONS.ux[index]), float(DIRECTIONS.uy[index])
 
 
+def _axis_direction(
+    axis: tuple[float, float],
+    direction_name: str | None,
+) -> tuple[float, float, np.uint16 | None]:
+    normalized = "both" if direction_name is None else direction_name.lower()
+    if normalized in {"both", "bidirectional", "all", "free"}:
+        return axis[0], axis[1], None
+    if normalized in {"plus", "+", "forward", "positive"}:
+        vector = axis
+    elif normalized in {"minus", "-", "reverse", "negative"}:
+        vector = (-axis[0], -axis[1])
+    elif normalized in {"none", "closed"}:
+        return axis[0], axis[1], np.uint16(0)
+    else:
+        raise ValueError(f"Unsupported region_axis direction: {direction_name!r}")
+
+    dots = DIRECTIONS.ux * vector[0] + DIRECTIONS.uy * vector[1]
+    nearest_index = int(np.argmax(dots))
+    return vector[0], vector[1], np.uint16(DIRECTIONS.bits[nearest_index])
+
+
 def _normalize_gate_side(side: str) -> str:
     normalized = str(side).lower()
     if normalized in {"plus", "+", "east", "eastbound", "e"}:
@@ -173,54 +356,198 @@ def _normalize_gate_side(side: str) -> str:
     raise ValueError(f"Unsupported capacity-control side: {side!r}")
 
 
+def _oriented_gate_faces(
+    *,
+    channel_mask: np.ndarray,
+    walkable: np.ndarray,
+    normal: tuple[float, float],
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    inside = channel_mask & walkable
+    if not np.any(inside):
+        empty_i = np.empty(0, dtype=int)
+        empty_f = np.empty(0, dtype=float)
+        return empty_i, empty_i, empty_f, empty_i, empty_i, empty_f
+
+    yy, xx = np.indices(inside.shape)
+    projection = (xx.astype(float) + 0.5) * normal[0] + (yy.astype(float) + 0.5) * normal[1]
+
+    x_rows: list[np.ndarray] = []
+    x_cols: list[np.ndarray] = []
+    x_signs: list[np.ndarray] = []
+    x_projections: list[np.ndarray] = []
+    y_rows: list[np.ndarray] = []
+    y_cols: list[np.ndarray] = []
+    y_signs: list[np.ndarray] = []
+    y_projections: list[np.ndarray] = []
+
+    eps = 1.0e-9
+
+    def add_x(mask: np.ndarray, sign: float, inside_projection: np.ndarray) -> None:
+        rows, cols = np.where(mask)
+        if rows.size == 0:
+            return
+        x_rows.append(rows.astype(int))
+        x_cols.append(cols.astype(int))
+        x_signs.append(np.full(rows.shape, sign, dtype=float))
+        x_projections.append(inside_projection[mask].astype(float))
+
+    def add_y(mask: np.ndarray, sign: float, inside_projection: np.ndarray) -> None:
+        rows, cols = np.where(mask)
+        if rows.size == 0:
+            return
+        y_rows.append(rows.astype(int))
+        y_cols.append(cols.astype(int))
+        y_signs.append(np.full(rows.shape, sign, dtype=float))
+        y_projections.append(inside_projection[mask].astype(float))
+
+    if normal[0] > eps:
+        add_x((~inside[:, :-1]) & walkable[:, :-1] & inside[:, 1:], 1.0, projection[:, 1:])
+    if normal[0] < -eps:
+        add_x(inside[:, :-1] & walkable[:, 1:] & (~inside[:, 1:]), -1.0, projection[:, :-1])
+    if normal[1] > eps:
+        add_y((~inside[:-1, :]) & walkable[:-1, :] & inside[1:, :], 1.0, projection[1:, :])
+    if normal[1] < -eps:
+        add_y(inside[:-1, :] & walkable[1:, :] & (~inside[1:, :]), -1.0, projection[:-1, :])
+
+    x_row_values = np.concatenate(x_rows) if x_rows else np.empty(0, dtype=int)
+    x_col_values = np.concatenate(x_cols) if x_cols else np.empty(0, dtype=int)
+    x_sign_values = np.concatenate(x_signs) if x_signs else np.empty(0, dtype=float)
+    x_projection_values = np.concatenate(x_projections) if x_projections else np.empty(0, dtype=float)
+    y_row_values = np.concatenate(y_rows) if y_rows else np.empty(0, dtype=int)
+    y_col_values = np.concatenate(y_cols) if y_cols else np.empty(0, dtype=int)
+    y_sign_values = np.concatenate(y_signs) if y_signs else np.empty(0, dtype=float)
+    y_projection_values = np.concatenate(y_projections) if y_projections else np.empty(0, dtype=float)
+
+    all_projections = np.concatenate([x_projection_values, y_projection_values])
+    if all_projections.size == 0:
+        empty_i = np.empty(0, dtype=int)
+        empty_f = np.empty(0, dtype=float)
+        return empty_i, empty_i, empty_f, empty_i, empty_i, empty_f
+
+    entry_projection = float(np.min(all_projections))
+    entry_limit = entry_projection + 1.5
+    keep_x = x_projection_values <= entry_limit
+    keep_y = y_projection_values <= entry_limit
+
+    if not np.any(keep_x) and not np.any(keep_y):
+        keep_x = x_projection_values <= entry_projection + 1.0e-9
+        keep_y = y_projection_values <= entry_projection + 1.0e-9
+
+    return (
+        x_row_values[keep_x],
+        x_col_values[keep_x],
+        x_sign_values[keep_x],
+        y_row_values[keep_y],
+        y_col_values[keep_y],
+        y_sign_values[keep_y],
+    )
+
+
+def _oriented_waiting_mask(
+    *,
+    channel_mask: np.ndarray,
+    walkable: np.ndarray,
+    normal: tuple[float, float],
+    waiting_width: int,
+) -> np.ndarray:
+    inside = channel_mask & walkable
+    waiting_mask = np.zeros_like(walkable, dtype=bool)
+    if not np.any(inside):
+        return waiting_mask
+
+    yy, xx = np.indices(inside.shape)
+    x_center = xx.astype(float) + 0.5
+    y_center = yy.astype(float) + 0.5
+    projection = x_center * normal[0] + y_center * normal[1]
+    tangent_x = -normal[1]
+    tangent_y = normal[0]
+    lateral = x_center * tangent_x + y_center * tangent_y
+
+    width = max(int(waiting_width), 1)
+    entry_projection = float(np.min(projection[inside]))
+    lateral_values = lateral[inside]
+    lateral_min = float(np.min(lateral_values)) - width
+    lateral_max = float(np.max(lateral_values)) + width
+    waiting_mask = (
+        walkable
+        & (~inside)
+        & (projection >= entry_projection - width)
+        & (projection < entry_projection)
+        & (lateral >= lateral_min)
+        & (lateral <= lateral_max)
+    )
+    return waiting_mask
+
+
 def _build_channel_gate(
     *,
     channel_name: str,
     side: str,
     channel_mask: np.ndarray,
     walkable: np.ndarray,
+    axis: tuple[float, float],
     waiting_width: int,
 ) -> ChannelGateModel:
     points = np.argwhere(channel_mask & walkable)
     if points.size == 0:
         raise ValueError(f"Channel {channel_name!r} is empty; cannot build capacity gate")
 
+    axis_norm = float(np.hypot(axis[0], axis[1]))
+    if axis_norm <= 1.0e-12:
+        raise ValueError(f"Channel {channel_name!r} axis must be non-zero")
+    axis_unit = (float(axis[0] / axis_norm), float(axis[1] / axis_norm))
+    normal = axis_unit if side == "plus" else (-axis_unit[0], -axis_unit[1])
+    face_x_rows, face_x_cols, face_x_signs, face_y_rows, face_y_cols, face_y_signs = _oriented_gate_faces(
+        channel_mask=channel_mask,
+        walkable=walkable,
+        normal=normal,
+    )
+    if face_x_rows.size == 0 and face_y_rows.size == 0:
+        raise ValueError(f"Capacity gate {channel_name}:{side} has no walkable entrance faces")
+
     rows = np.unique(points[:, 0]).astype(int)
     x_min = int(np.min(points[:, 1]))
     x_max = int(np.max(points[:, 1]))
     nx = int(walkable.shape[1])
-    width = max(int(waiting_width), 1)
 
     if side == "plus":
         face_index = x_min - 1
-        x0 = max(0, x_min - width)
-        x1 = x_min
     elif side == "minus":
         face_index = x_max
-        x0 = x_max + 1
-        x1 = min(nx, x_max + 1 + width)
     else:
         raise ValueError(f"Gate side must be plus/minus, got {side!r}")
 
+    if face_index < 0 or face_index >= nx - 1:
+        fallback_index = int(np.median(face_x_cols)) if face_x_cols.size > 0 else int(round(float(np.mean(points[:, 1]))))
+        face_index = min(max(fallback_index, 0), nx - 2)
     if face_index < 0 or face_index >= nx - 1:
         raise ValueError(
             f"Capacity gate {channel_name}:{side} has invalid face_index={face_index} for nx={nx}"
         )
 
-    waiting_mask = np.zeros_like(walkable, dtype=bool)
-    if x1 > x0:
-        waiting_mask[np.ix_(rows, np.arange(x0, x1, dtype=int))] = True
-    waiting_mask &= walkable
+    waiting_mask = _oriented_waiting_mask(
+        channel_mask=channel_mask,
+        walkable=walkable,
+        normal=normal,
+        waiting_width=waiting_width,
+    )
 
     gate_id = f"{channel_name}:{side}"
     return ChannelGateModel(
         gate_id=gate_id,
         channel=channel_name,
         side=side,
-        face_axis="x",
+        face_axis="oriented",
         face_index=face_index,
         face_rows=rows,
         waiting_mask=waiting_mask,
+        face_x_rows=face_x_rows,
+        face_x_cols=face_x_cols,
+        face_x_signs=face_x_signs,
+        face_y_rows=face_y_rows,
+        face_y_cols=face_y_cols,
+        face_y_signs=face_y_signs,
+        normal=normal,
     )
 
 
@@ -228,6 +555,7 @@ def _compile_capacity_controls(
     *,
     controls: tuple[CapacityControlSpec, ...],
     channel_masks: dict[str, np.ndarray],
+    channel_axes: dict[str, tuple[float, float]],
     walkable: np.ndarray,
 ) -> tuple[dict[str, ChannelGateModel], tuple[GateCapacitySchedule, ...]]:
     gates: dict[str, ChannelGateModel] = {}
@@ -250,6 +578,7 @@ def _compile_capacity_controls(
                     side=side,
                     channel_mask=channel_masks[control.channel],
                     walkable=walkable,
+                    axis=channel_axes.get(control.channel, (1.0, 0.0)),
                     waiting_width=control.waiting_width,
                 )
             schedules.append(
@@ -318,6 +647,7 @@ def _apply_control(
     *,
     walkable: np.ndarray,
     region_masks: dict[str, np.ndarray],
+    region_axes: dict[str, tuple[float, float]],
     goal_mask: np.ndarray,
     m11: np.ndarray,
     m12: np.ndarray,
@@ -360,6 +690,27 @@ def _apply_control(
         m11[control_region] = control_m11[control_region]
         m12[control_region] = control_m12[control_region]
         m22[control_region] = control_m22[control_region]
+    elif mode == "region_axis":
+        if control.region is None or control.alpha is None or control.beta is None:
+            raise ValueError(f"region_axis control is missing region/alpha/beta in stage {stage.stage_id}")
+        axis_region = control.axis_region or control.region
+        axis = region_axes.get(axis_region)
+        if axis is None:
+            raise ValueError(f"region_axis control references region without axis: {axis_region}")
+        tau_x_value, tau_y_value, direction_bit = _axis_direction(axis, control.direction)
+        tau_x = np.full(walkable.shape, tau_x_value, dtype=float)
+        tau_y = np.full(walkable.shape, tau_y_value, dtype=float)
+        control_m11, control_m12, control_m22 = tensor_from_tau(
+            tau_x=tau_x,
+            tau_y=tau_y,
+            alpha=control.alpha,
+            beta=control.beta,
+        )
+        m11[control_region] = control_m11[control_region]
+        m12[control_region] = control_m12[control_region]
+        m22[control_region] = control_m22[control_region]
+        if direction_bit is not None:
+            allowed_mask[control_region] = direction_bit
     elif mode == "target_region":
         if control.alpha is None or control.beta is None:
             raise ValueError(f"target_region control is missing alpha/beta in stage {stage.stage_id}")
@@ -441,6 +792,7 @@ def compile_case(
                 control,
                 walkable=walkable,
                 region_masks=region_masks,
+                region_axes=bundle.region_axes,
                 goal_mask=goal_mask,
                 m11=m11,
                 m12=m12,
@@ -574,6 +926,7 @@ def compile_case(
     gates, gate_capacity_schedules = _compile_capacity_controls(
         controls=tuple(route_spec.capacity_controls),
         channel_masks=bundle.scene.channel_masks,
+        channel_axes=bundle.channel_axes,
         walkable=walkable,
     )
 
@@ -585,6 +938,7 @@ def compile_case(
         exit_mask=case_exit_mask,
         channel_masks=scene.channel_masks,
         probe_x=scene.probe_x,
+        channel_axes=scene.channel_axes,
         m11=groups[first_stage.group_key].m11,
         m12=groups[first_stage.group_key].m12,
         m22=groups[first_stage.group_key].m22,

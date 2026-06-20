@@ -82,6 +82,9 @@ def run_from_config(
     scene_spec = load_scene_spec(run_spec.scene_path)
     population_spec = load_population_spec(run_spec.population_path)
     route_spec = load_route_spec(run_spec.routes_path)
+    scene_background_path = run_spec.scene_path.parent / "grid_overlay.png"
+    if not scene_background_path.exists():
+        scene_background_path = None
 
     bundle = compile_scene(scene_spec=scene_spec, cfg=simulation)
     scene, case = compile_case(
@@ -115,6 +118,7 @@ def run_from_config(
         objective_cfg=run_spec.objective,
         step_observer=step_observer,
         channel_flux_directions=channel_flux_directions,
+        scene_background_path=scene_background_path,
     )
     summary["config_path"] = str(run_spec.config_path)
     summary["scene_path"] = str(run_spec.scene_path)
