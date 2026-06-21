@@ -18,6 +18,8 @@ DENSITY_CMAP = LinearSegmentedColormap.from_list(
     "density_blue_to_red",
     ("#00106e", "#0057ff", "#00b7ff", "#24d96b", "#ffe600", "#ff8a00", "#d7191c"),
 )
+TRANSPARENT_DENSITY_CMAP = DENSITY_CMAP.copy()
+TRANSPARENT_DENSITY_CMAP.set_bad((1.0, 1.0, 1.0, 0.0))
 DENSITY_INTERPOLATION = "bilinear"
 
 
@@ -92,6 +94,36 @@ def parse_density_contour_levels(raw: str | None) -> DensityContourLevels:
     return tuple(float(part) for part in parts)
 
 
+def _background_content_limits(
+    background: np.ndarray,
+    *,
+    data_width: int,
+    data_height: int,
+    padding_fraction: float = 0.08,
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    rgb = np.asarray(background[..., :3], dtype=float)
+    alpha = np.ones(rgb.shape[:2], dtype=float)
+    if background.ndim == 3 and background.shape[2] >= 4:
+        alpha = np.asarray(background[..., 3], dtype=float)
+
+    content = (alpha > 0.01) & np.any(rgb < 0.97, axis=2)
+    if not np.any(content):
+        return (0.0, float(data_width)), (float(data_height), 0.0)
+
+    rows, cols = np.where(content)
+    image_height, image_width = content.shape
+    x0 = float(np.min(cols)) / image_width * data_width
+    x1 = float(np.max(cols) + 1) / image_width * data_width
+    y0 = float(np.min(rows)) / image_height * data_height
+    y1 = float(np.max(rows) + 1) / image_height * data_height
+
+    pad_x = max((x1 - x0) * padding_fraction, 2.0)
+    pad_y = max((y1 - y0) * padding_fraction, 2.0)
+    xlim = (max(0.0, x0 - pad_x), min(float(data_width), x1 + pad_x))
+    ylim = (min(float(data_height), y1 + pad_y), max(0.0, y0 - pad_y))
+    return xlim, ylim
+
+
 def save_case_snapshot(
     path: Path,
     title: str,
@@ -103,18 +135,41 @@ def save_case_snapshot(
     rho_max: float,
     panel_title: str = "Density and direction",
     density_contour_levels: DensityContourLevels = None,
+    scene_background_path: Path | None = None,
 ) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5), dpi=150)
     fig.suptitle(title)
 
+    use_background = scene_background_path is not None and scene_background_path.exists()
     density = rho.copy()
-    density[~walkable] = np.nan
+    if use_background:
+        density[(~walkable) | (rho <= 1.0e-10)] = np.nan
+        origin = "upper"
+        extent = [0, rho.shape[1], rho.shape[0], 0]
+        cmap = TRANSPARENT_DENSITY_CMAP
+    else:
+        density[~walkable] = np.nan
+        origin = "lower"
+        extent = None
+        cmap = DENSITY_CMAP
+
+    if use_background:
+        background = plt.imread(scene_background_path)
+        background_xlim, background_ylim = _background_content_limits(
+            background,
+            data_width=rho.shape[1],
+            data_height=rho.shape[0],
+        )
+        for ax in axes:
+            ax.imshow(background, origin="upper", extent=extent)
+
     im0 = axes[0].imshow(
         density,
-        origin="lower",
-        cmap=DENSITY_CMAP,
+        origin=origin,
+        extent=extent,
+        cmap=cmap,
         vmin=0.0,
         vmax=rho_max,
         interpolation=DENSITY_INTERPOLATION,
@@ -125,8 +180,9 @@ def save_case_snapshot(
 
     im1 = axes[1].imshow(
         density,
-        origin="lower",
-        cmap=DENSITY_CMAP,
+        origin=origin,
+        extent=extent,
+        cmap=cmap,
         vmin=0.0,
         vmax=rho_max,
         interpolation=DENSITY_INTERPOLATION,
@@ -135,18 +191,33 @@ def save_case_snapshot(
     axes[1].set_title(panel_title)
     fig.colorbar(im1, ax=axes[1], fraction=0.046, pad=0.04)
 
-    step = 4
+    step = max(4, int(np.ceil(max(rho.shape) / 64)))
     ys, xs = np.mgrid[0:rho.shape[0]:step, 0:rho.shape[1]:step]
     ux_d = ux[0:rho.shape[0]:step, 0:rho.shape[1]:step]
     uy_d = uy[0:rho.shape[0]:step, 0:rho.shape[1]:step]
     walkable_d = walkable[0:rho.shape[0]:step, 0:rho.shape[1]:step]
-    axes[1].quiver(xs[walkable_d], ys[walkable_d], ux_d[walkable_d], uy_d[walkable_d], color="white", scale=20)
+    rho_d = rho[0:rho.shape[0]:step, 0:rho.shape[1]:step]
+    quiver_mask = walkable_d & (rho_d > 1.0e-10 if use_background else True)
+    axes[1].quiver(
+        xs[quiver_mask],
+        ys[quiver_mask],
+        ux_d[quiver_mask],
+        uy_d[quiver_mask],
+        color="#1f1f1f" if use_background else "white",
+        scale=20,
+        alpha=0.75,
+    )
 
-    oy, ox = np.where(~walkable)
     for ax in axes:
-        ax.scatter(ox, oy, s=2, c="black", marker="s", linewidths=0)
-        ax.set_xlim(0, rho.shape[1] - 1)
-        ax.set_ylim(0, rho.shape[0] - 1)
+        if not use_background:
+            oy, ox = np.where(~walkable)
+            ax.scatter(ox, oy, s=2, c="black", marker="s", linewidths=0)
+            ax.set_xlim(0, rho.shape[1] - 1)
+            ax.set_ylim(0, rho.shape[0] - 1)
+        else:
+            ax.set_xlim(*background_xlim)
+            ax.set_ylim(*background_ylim)
+            ax.set_aspect("equal", adjustable="box")
 
     fig.tight_layout()
     fig.savefig(path)

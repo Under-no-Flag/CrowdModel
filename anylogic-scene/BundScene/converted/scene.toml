@@ -1,0 +1,160 @@
+# Auto-generated from AnyLogic RectangleNode and Path objects.
+# RectangleNode regions are written as polygons; Path walls remain polylines.
+block_boundaries = true
+obstacles = []
+
+[[regions]]
+name = "channel_1"
+shape = "polygon"
+points = [[115.375, 75.583], [127.678, 81.056], [126.664, 83.332], [114.361, 77.86]]
+axis = [0.914, 0.406]
+
+[[regions]]
+name = "channel_2"
+shape = "polygon"
+points = [[192.281, 114.118], [196.134, 102.269], [198.506, 103.039], [194.652, 114.888]]
+axis = [0.309, -0.951]
+
+[[regions]]
+name = "channel_3"
+shape = "polygon"
+points = [[245.601, 112.687], [259.109, 115.067], [258.676, 117.52], [245.168, 115.141]]
+axis = [0.985, 0.173]
+
+[[regions]]
+name = "channel_4"
+shape = "polygon"
+points = [[266.599, 116.111], [286.002, 119.529], [285.569, 121.983], [266.166, 118.565]]
+axis = [0.985, 0.173]
+
+[[regions]]
+name = "initial_groups"
+shape = "polygon"
+points = [[240.912, 130.812], [251.885, 130.812], [251.885, 139.034], [240.912, 139.034]]
+axis = [1, 0]
+
+[[regions]]
+name = "goal_region"
+shape = "polygon"
+points = [[190.961, 115.688], [196.586, 117.733], [193.771, 125.46], [188.146, 123.415]]
+axis = [-0.342, 0.94]
+
+[[regions]]
+name = "goal_region2"
+shape = "polygon"
+points = [[234.943, 110.723], [240.798, 111.967], [239.19, 119.522], [233.336, 118.279]]
+axis = [0.208, -0.978]
+
+[[regions]]
+name = "goal_region5"
+shape = "polygon"
+points = [[287.31, 118.866], [292.27, 119.387], [291.097, 130.538], [286.137, 130.017]]
+axis = [0.105, -0.995]
+
+[[regions]]
+name = "goal_region11"
+shape = "polygon"
+points = [[108.281, 74.245], [112.968, 75.949], [109.556, 85.315], [104.869, 83.61]]
+axis = [-0.342, 0.94]
+
+[[regions]]
+name = "exits"
+shape = "polygon"
+points = [[219.714, 127.324], [227.818, 128.752], [225.783, 140.284], [217.678, 138.857]]
+axis = [-0.174, 0.985]
+
+[[regions]]
+name = "decision_channel_split"
+shape = "polygon"
+points = [[241.909, 120.596], [250.638, 120.596], [250.638, 129.566], [241.909, 129.566]]
+axis = [0, 1]
+
+[[regions]]
+name = "merge_after_channels"
+shape = "polygon"
+points = [[211.163, 108.696], [230.812, 112.157], [228.213, 126.88], [208.565, 123.419]]
+axis = [0.985, 0.173]
+
+[[regions]]
+name = "post_channel_1"
+shape = "polygon"
+points = [[127.051, 71.706], [131.738, 73.41], [129.179, 80.434], [124.492, 78.73]]
+axis = [0.342, -0.94]
+
+[[regions]]
+name = "post_channel_2"
+shape = "polygon"
+points = [[197.719, 92.623], [201.774, 93.861], [200.315, 98.627], [196.261, 97.388]]
+axis = [-0.293, 0.956]
+
+[[regions]]
+name = "post_channel_3"
+shape = "polygon"
+points = [[256.432, 103.774], [261.64, 104.32], [260.728, 112.994], [255.52, 112.447]]
+axis = [-0.105, 0.995]
+
+[[regions]]
+name = "post_channel_4"
+shape = "polygon"
+points = [[268.107, 105.162], [271.827, 105.552], [270.81, 115.217], [267.09, 114.826]]
+axis = [-0.105, 0.995]
+
+[[regions]]
+name = "waypoint_channel2_to_channel3"
+shape = "polygon"
+points = [[262.11, 105.397], [267.319, 105.944], [266.849, 110.404], [261.641, 109.858]]
+axis = [0.995, 0.104]
+
+[[walls]]
+name = "path2"
+shape = "polyline"
+points = [[113.473, 79.733], [127.189, 85.962], [129.683, 80.979], [194.525, 100.912], [190.784, 114.616], [124.696, 93.437], [127.189, 85.962]]
+width = 1
+
+[[walls]]
+name = "path3"
+shape = "polyline"
+points = [[240.662, 115.862], [260.614, 119.6], [261.861, 112.125], [265.602, 112.125], [265.512, 112.663], [264.355, 119.6], [285.553, 123.337]]
+width = 1
+
+[[walls]]
+name = "path5"
+shape = "polyline"
+points = [[195.772, 115.862], [199.513, 103.404], [254.379, 112.125]]
+width = 1
+
+[[walls]]
+name = "path6"
+shape = "polyline"
+points = [[122.7, 77.74], [92.275, 64.783], [74.817, 56.062], [57.36, 46.096], [49.878, 53.571], [43.643, 57.308], [38.656, 51.079], [47.384, 44.85], [51.125, 37.375], [110.979, 64.783], [138.412, 74.75], [180.809, 87.208], [208.242, 94.683], [233.181, 99.666], [253.132, 102.158], [274.33, 104.65], [301.763, 107.141], [312.986, 107.141], [311.739, 119.6], [311.739, 125.829], [307.998, 135.795], [253.132, 136.792], [253.381, 141.526], [239.166, 141.526], [239.415, 135.795], [228.692, 134.051], [227.195, 142.772], [216.222, 140.031], [217.469, 132.058], [183.302, 123.337], [113.473, 100.912], [81.052, 95.929], [62.348, 95.929], [43.643, 57.308]]
+width = 1
+
+[[walls]]
+name = "path7"
+shape = "polyline"
+points = [[272.086, 115.115], [296.775, 118.354], [311.739, 119.6]]
+width = 1
+
+[[exits]]
+name = "exits"
+region = "exits"
+
+[[channels]]
+name = "channel_1"
+region = "channel_1"
+probe_x = 121
+
+[[channels]]
+name = "channel_2"
+region = "channel_2"
+probe_x = 195
+
+[[channels]]
+name = "channel_3"
+region = "channel_3"
+probe_x = 252
+
+[[channels]]
+name = "channel_4"
+region = "channel_4"
+probe_x = 276

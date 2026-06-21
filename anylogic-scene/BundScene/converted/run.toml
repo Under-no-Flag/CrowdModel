@@ -1,0 +1,38 @@
+[simulation]
+nx = 512
+ny = 224
+dx = 0.125
+steps = 200
+time_horizon = 40.0
+vmax = 1.5
+rho_max = 5.0
+rho_init = 2.2
+bellman_every = 1
+bellman_f_eps = 0.08
+cfl = 0.9
+dt_cap = 0.18
+save_every = 40
+density_contour_levels = 0
+
+[objective]
+name = "bund_anylogic_baseline"
+lambda_j1 = 1.0
+lambda_j2 = 1.0
+lambda_j5 = 1.0
+rho_safe = 3.5
+use_normalized_terms = true
+j1_scale = 1.0
+j2_scale = 0.001
+j5_scale = 1.0
+
+[scene]
+file = "scene.toml"
+
+[population]
+file = "population.toml"
+
+[routes]
+file = "routes.toml"
+
+[outputs]
+output_root = "../../../results/bund_anylogic"

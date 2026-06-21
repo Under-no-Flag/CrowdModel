@@ -1,0 +1,6 @@
+name,point_mode,raw_point_count,point_count,line_width,grid_line_width,x0,x1,y0,y1
+path2,anchors,21,7,4.0,1.0,113,195,79,115
+path3,anchors,21,7,3.0,1.0,240,286,112,124
+path5,anchors,9,3,3.0,1.0,195,255,103,116
+path6,anchors,102,34,3.0,1.0,38,313,37,143
+path7,anchors,9,3,3.0,1.0,272,312,115,120

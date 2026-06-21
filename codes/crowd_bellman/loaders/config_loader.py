@@ -8,7 +8,7 @@ from ..scenes import SimulationConfig
 from ..spec.experiment_spec import RunConfigSpec
 from ..spec.population_spec import InflowGroupSpec, InitialGroupSpec, PopulationSpec
 from ..spec.route_spec import CapacityControlSpec, CaseRouteSpec, ControlSpec, StageSpec, TransitionTargetSpec
-from ..spec.scene_spec import ChannelSpec, NamedRegionSelectionSpec, RectRegionSpec, SceneSpec
+from ..spec.scene_spec import ChannelSpec, NamedRegionSelectionSpec, RectRegionSpec, SceneSpec, WallSpec
 
 
 def _load_toml(path: Path) -> dict[str, object]:
@@ -49,6 +49,39 @@ def _as_point(value: object, field_name: str) -> tuple[int, int] | None:
     ):
         return (int(value[0]), int(value[1]))
     raise ValueError(f"{field_name} must be a list with exactly two numeric values")
+
+
+def _as_optional_float_vector(value: object, field_name: str) -> tuple[float, float] | None:
+    if value is None:
+        return None
+    if (
+        isinstance(value, list)
+        and len(value) == 2
+        and all(isinstance(item, int | float) for item in value)
+    ):
+        return (float(value[0]), float(value[1]))
+    raise ValueError(f"{field_name} must be a list with exactly two numeric values")
+
+
+def _as_float_point_tuple(
+    value: object,
+    field_name: str,
+    *,
+    min_points: int = 2,
+) -> tuple[tuple[float, float], ...]:
+    if not isinstance(value, list) or len(value) < min_points:
+        raise ValueError(f"{field_name} must be a list of at least {min_points} [x, y] points")
+
+    points: list[tuple[float, float]] = []
+    for index, item in enumerate(value):
+        if (
+            not isinstance(item, list)
+            or len(item) != 2
+            or not all(isinstance(coord, int | float) for coord in item)
+        ):
+            raise ValueError(f"{field_name}[{index}] must be a list with exactly two numeric values")
+        points.append((float(item[0]), float(item[1])))
+    return tuple(points)
 
 
 def _as_group_key(value: object, field_name: str) -> tuple[int, int]:
@@ -114,13 +147,52 @@ def load_scene_spec(path: Path) -> SceneSpec:
     for item in raw.get("regions", []):
         if not isinstance(item, dict):
             raise ValueError("scene.regions entries must be tables")
-        region_specs.append(
-            RectRegionSpec(
+        shape = str(item.get("shape", "rect")).lower()
+        axis = _as_optional_float_vector(item.get("axis"), f"region {item.get('name', '')}.axis")
+        if shape in {"rect", "rectangle"}:
+            region_specs.append(
+                RectRegionSpec(
+                    name=str(item["name"]),
+                    x0=int(item["x0"]),
+                    x1=int(item["x1"]),
+                    y0=int(item["y0"]),
+                    y1=int(item["y1"]),
+                    shape="rect",
+                    axis=axis,
+                )
+            )
+            continue
+        if shape == "polygon":
+            region_specs.append(
+                RectRegionSpec(
+                    name=str(item["name"]),
+                    shape="polygon",
+                    points=_as_float_point_tuple(
+                        item.get("points"),
+                        f"region {item.get('name', '')}.points",
+                        min_points=3,
+                    ),
+                    axis=axis,
+                )
+            )
+            continue
+        raise ValueError(f"Unsupported region shape: {shape}")
+
+    wall_specs: list[WallSpec] = []
+    for item in raw.get("walls", []):
+        if not isinstance(item, dict):
+            raise ValueError("scene.walls entries must be tables")
+        shape = str(item.get("shape", "polyline"))
+        if shape != "polyline":
+            raise ValueError(f"Unsupported wall shape: {shape}")
+        width = float(item.get("width", 1.0))
+        if width <= 0.0:
+            raise ValueError(f"wall {item.get('name', '')} width must be positive")
+        wall_specs.append(
+            WallSpec(
                 name=str(item["name"]),
-                x0=int(item["x0"]),
-                x1=int(item["x1"]),
-                y0=int(item["y0"]),
-                y1=int(item["y1"]),
+                points=_as_float_point_tuple(item.get("points"), f"wall {item.get('name', '')}.points", min_points=2),
+                width=width,
             )
         )
 
@@ -151,6 +223,7 @@ def load_scene_spec(path: Path) -> SceneSpec:
     return SceneSpec(
         block_boundaries=bool(raw.get("block_boundaries", True)),
         regions=tuple(region_specs),
+        walls=tuple(wall_specs),
         obstacles=_as_string_tuple(raw.get("obstacles", []), "scene.obstacles"),
         exits=tuple(exit_specs),
         channels=tuple(channel_specs),
@@ -224,6 +297,7 @@ def load_route_spec(path: Path) -> CaseRouteSpec:
                     direction=str(control["direction"]) if control.get("direction") is not None else None,
                     target_region=str(control["target_region"]) if control.get("target_region") is not None else None,
                     target_point=_as_point(control.get("target_point"), "control.target_point"),
+                    axis_region=str(control["axis_region"]) if control.get("axis_region") is not None else None,
                     allowed_directions=_as_optional_string_tuple(control.get("allowed_directions"), "control.allowed_directions"),
                 )
             )

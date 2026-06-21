@@ -26,6 +26,11 @@ class CaseStats:
     high_density_exposure_cumulative: list[float] = field(default_factory=list)
     inflow_cumulative: list[float] = field(default_factory=list)
     cap_removed_cumulative: list[float] = field(default_factory=list)
+    current_mass: list[float] = field(default_factory=list)
+    mass_balance_residual: list[float] = field(default_factory=list)
+    capacity_limited_cumulative: list[float] = field(default_factory=list)
+    capacity_overflow_peak: list[float] = field(default_factory=list)
+    capacity_binding_steps: int = 0
     channel_density: dict[str, list[float]] = field(default_factory=dict)
     channel_flux_cumulative: dict[str, float] = field(default_factory=dict)
     gate_attempted_cumulative: dict[str, float] = field(default_factory=dict)
@@ -104,18 +109,130 @@ def channel_flux_increment(
     if y_valid.size == 0:
         return 0.0
     face_flux = fx[y_valid, face_index]
-    normalized_direction = direction.upper()
-    if normalized_direction in {"E", "EAST", "EASTBOUND"}:
+    normalized_direction = _normalize_flux_direction(direction)
+    if normalized_direction == "plus":
         counted_flux = np.maximum(face_flux, 0.0)
-    elif normalized_direction in {"W", "WEST", "WESTBOUND"}:
+    elif normalized_direction == "minus":
         counted_flux = np.maximum(-face_flux, 0.0)
-    elif normalized_direction in {"FREE", "ABS", "ABSOLUTE", "BOTH", "BIDIRECTIONAL"}:
+    elif normalized_direction == "both":
         counted_flux = np.abs(face_flux)
-    elif normalized_direction in {"CLOSED", "NONE"}:
+    elif normalized_direction == "closed":
         counted_flux = np.zeros_like(face_flux)
     else:
         raise ValueError(f"Unsupported channel flux direction: {direction!r}")
     return float(np.sum(counted_flux) * dx * dt)
+
+
+def _normalize_flux_axis(axis: tuple[float, float]) -> tuple[float, float] | None:
+    norm = float(np.hypot(axis[0], axis[1]))
+    if norm <= 1.0e-12:
+        return None
+    return float(axis[0] / norm), float(axis[1] / norm)
+
+
+def _normalize_flux_direction(direction: str) -> str:
+    normalized = direction.upper()
+    if normalized in {"E", "EAST", "EASTBOUND", "PLUS", "+", "FORWARD", "POSITIVE"}:
+        return "plus"
+    if normalized in {"W", "WEST", "WESTBOUND", "MINUS", "-", "REVERSE", "NEGATIVE"}:
+        return "minus"
+    if normalized in {"FREE", "ABS", "ABSOLUTE", "BOTH", "BIDIRECTIONAL", "ALL"}:
+        return "both"
+    if normalized in {"CLOSED", "NONE"}:
+        return "closed"
+    raise ValueError(f"Unsupported channel flux direction: {direction!r}")
+
+
+def _axis_section_mask(
+    channel_mask: np.ndarray,
+    *,
+    axis: tuple[float, float],
+    side: str,
+    face_kind: str,
+) -> np.ndarray:
+    yy, xx = np.where(channel_mask)
+    if xx.size == 0:
+        return np.zeros(
+            (channel_mask.shape[0], channel_mask.shape[1] - 1)
+            if face_kind == "x"
+            else (channel_mask.shape[0] - 1, channel_mask.shape[1]),
+            dtype=bool,
+        )
+
+    axis_x, axis_y = axis
+    cell_projection = (xx.astype(float) + 0.5) * axis_x + (yy.astype(float) + 0.5) * axis_y
+    target = float(np.max(cell_projection) if side == "plus" else np.min(cell_projection))
+
+    if face_kind == "x":
+        if abs(axis_x) <= 1.0e-12:
+            return np.zeros((channel_mask.shape[0], channel_mask.shape[1] - 1), dtype=bool)
+        rows, cols = np.indices((channel_mask.shape[0], channel_mask.shape[1] - 1))
+        left_projection = (cols.astype(float) + 0.5) * axis_x + (rows.astype(float) + 0.5) * axis_y
+        right_projection = (cols.astype(float) + 1.5) * axis_x + (rows.astype(float) + 0.5) * axis_y
+        adjacent = channel_mask[:, :-1] | channel_mask[:, 1:]
+    elif face_kind == "y":
+        if abs(axis_y) <= 1.0e-12:
+            return np.zeros((channel_mask.shape[0] - 1, channel_mask.shape[1]), dtype=bool)
+        rows, cols = np.indices((channel_mask.shape[0] - 1, channel_mask.shape[1]))
+        left_projection = (cols.astype(float) + 0.5) * axis_x + (rows.astype(float) + 0.5) * axis_y
+        right_projection = (cols.astype(float) + 0.5) * axis_x + (rows.astype(float) + 1.5) * axis_y
+        adjacent = channel_mask[:-1, :] | channel_mask[1:, :]
+    else:
+        raise ValueError(f"Unsupported face kind: {face_kind!r}")
+
+    lower = np.minimum(left_projection, right_projection)
+    upper = np.maximum(left_projection, right_projection)
+    if side == "plus":
+        crosses = (lower <= target + 1.0e-12) & (target < upper + 1.0e-12)
+    else:
+        crosses = (lower < target + 1.0e-12) & (target <= upper + 1.0e-12)
+    return adjacent & crosses
+
+
+def _axis_section_flux(
+    *,
+    fx: np.ndarray,
+    fy: np.ndarray,
+    channel_mask: np.ndarray,
+    axis: tuple[float, float],
+    side: str,
+) -> float:
+    axis_x, axis_y = axis
+    total = 0.0
+    x_mask = _axis_section_mask(channel_mask, axis=axis, side=side, face_kind="x")
+    if np.any(x_mask):
+        signed_x = fx[x_mask] * axis_x
+        total += float(np.sum(np.maximum(signed_x, 0.0) if side == "plus" else np.maximum(-signed_x, 0.0)))
+    y_mask = _axis_section_mask(channel_mask, axis=axis, side=side, face_kind="y")
+    if np.any(y_mask):
+        signed_y = fy[y_mask] * axis_y
+        total += float(np.sum(np.maximum(signed_y, 0.0) if side == "plus" else np.maximum(-signed_y, 0.0)))
+    return total
+
+
+def channel_axis_flux_increment(
+    fx: np.ndarray,
+    fy: np.ndarray,
+    channel_mask: np.ndarray,
+    axis: tuple[float, float],
+    dx: float,
+    dt: float,
+    direction: str = "plus",
+) -> float:
+    axis_unit = _normalize_flux_axis(axis)
+    if axis_unit is None:
+        return 0.0
+    normalized_direction = _normalize_flux_direction(direction)
+    if normalized_direction == "closed":
+        return 0.0
+    if normalized_direction == "plus":
+        flux = _axis_section_flux(fx=fx, fy=fy, channel_mask=channel_mask, axis=axis_unit, side="plus")
+    elif normalized_direction == "minus":
+        flux = _axis_section_flux(fx=fx, fy=fy, channel_mask=channel_mask, axis=axis_unit, side="minus")
+    else:
+        flux = _axis_section_flux(fx=fx, fy=fy, channel_mask=channel_mask, axis=axis_unit, side="plus")
+        flux += _axis_section_flux(fx=fx, fy=fy, channel_mask=channel_mask, axis=axis_unit, side="minus")
+    return float(flux * dx * dt)
 
 
 def channel_flux_variance(channel_flux_cumulative: dict[str, float]) -> float:
@@ -383,6 +500,7 @@ def record_step(
     vx: np.ndarray,
     vy: np.ndarray,
     fx: np.ndarray,
+    fy: np.ndarray | None,
     sink_total: float,
     dt: float,
     dx: float,
@@ -390,11 +508,14 @@ def record_step(
     channel_masks: dict[str, np.ndarray],
     probe_x: dict[str, int],
     inflow_total: float,
+    channel_axes: dict[str, tuple[float, float]] | None = None,
     j2_metric: str = "soft",
     j2_gamma: float = 1.0,
     channel_flux_directions: dict[str, str] | None = None,
     cap_removed_total: float = 0.0,
     gate_diagnostics: dict[str, dict[str, float | bool]] | None = None,
+    capacity_limited_total: float = 0.0,
+    capacity_diagnostics: dict[str, float | bool | int] | None = None,
 ) -> None:
     cell_area = dx * dx
     walkable_rho = rho[walkable]
@@ -408,8 +529,19 @@ def record_step(
     stats.dt.append(dt)
     stats.inflow_cumulative.append(inflow_total)
     stats.cap_removed_cumulative.append(float(cap_removed_total))
+    stats.capacity_limited_cumulative.append(float(capacity_limited_total))
+    capacity_overflow_peak = float((capacity_diagnostics or {}).get("overflow_peak", 0.0))
+    stats.capacity_overflow_peak.append(capacity_overflow_peak)
+    if bool((capacity_diagnostics or {}).get("binding", False)):
+        stats.capacity_binding_steps += 1
+    current_mass = float(np.sum(walkable_rho) * cell_area)
+    mass_balance_residual = float(
+        stats.initial_total_mass + inflow_total - sink_total - cap_removed_total - current_mass
+    )
+    stats.current_mass.append(current_mass)
+    stats.mass_balance_residual.append(mass_balance_residual)
 
-    travel_increment = float(np.sum(walkable_rho) * cell_area * dt)
+    travel_increment = current_mass * dt
     risk_density = safety_risk_density(walkable_rho, rho_safe, j2_metric, j2_gamma)
     exposure_increment = float(np.sum(risk_density) * cell_area * dt)
     prev_j1 = stats.travel_time_cumulative[-1] if stats.travel_time_cumulative else 0.0
@@ -419,14 +551,28 @@ def record_step(
 
     for name, channel_mask in channel_masks.items():
         stats.channel_density[name].append(float(np.mean(rho[channel_mask])) if np.any(channel_mask) else 0.0)
-        stats.channel_flux_cumulative[name] += channel_flux_increment(
-            fx=fx,
-            probe_x=probe_x[name],
-            channel_mask=channel_mask,
-            dx=dx,
-            dt=dt,
-            direction=(channel_flux_directions or {}).get(name, "E"),
-        )
+        direction = (channel_flux_directions or {}).get(name, "plus")
+        axis = (channel_axes or {}).get(name)
+        if fy is not None and axis is not None:
+            increment = channel_axis_flux_increment(
+                fx=fx,
+                fy=fy,
+                channel_mask=channel_mask,
+                axis=axis,
+                dx=dx,
+                dt=dt,
+                direction=direction,
+            )
+        else:
+            increment = channel_flux_increment(
+                fx=fx,
+                probe_x=probe_x[name],
+                channel_mask=channel_mask,
+                dx=dx,
+                dt=dt,
+                direction=direction,
+            )
+        stats.channel_flux_cumulative[name] += increment
 
     for gate_id, payload in (gate_diagnostics or {}).items():
         stats.gate_attempted_cumulative.setdefault(gate_id, 0.0)
@@ -489,6 +635,7 @@ def build_summary(
         gate_id: float(count / step_count)
         for gate_id, count in stats.gate_binding_steps.items()
     }
+    capacity_binding_time_ratio = float(stats.capacity_binding_steps / step_count)
     jb_waiting_exposure = float(sum(stats.gate_waiting_mass_cumulative.values()))
 
     summary = {
@@ -498,6 +645,20 @@ def build_summary(
         "final_sink_cumulative": float(stats.sink_cumulative[-1]) if stats.sink_cumulative else 0.0,
         "final_inflow_cumulative": float(stats.inflow_cumulative[-1]) if stats.inflow_cumulative else 0.0,
         "final_cap_removed_cumulative": float(stats.cap_removed_cumulative[-1]) if stats.cap_removed_cumulative else 0.0,
+        "final_capacity_limited_cumulative": (
+            float(stats.capacity_limited_cumulative[-1]) if stats.capacity_limited_cumulative else 0.0
+        ),
+        "capacity_binding_time_ratio": capacity_binding_time_ratio,
+        "capacity_overflow_peak_max": (
+            float(np.max(stats.capacity_overflow_peak)) if stats.capacity_overflow_peak else 0.0
+        ),
+        "final_mass": float(stats.current_mass[-1]) if stats.current_mass else 0.0,
+        "final_mass_balance_residual": (
+            float(stats.mass_balance_residual[-1]) if stats.mass_balance_residual else 0.0
+        ),
+        "max_abs_mass_balance_residual": (
+            float(np.max(np.abs(stats.mass_balance_residual))) if stats.mass_balance_residual else 0.0
+        ),
         "mean_density_avg": float(np.mean(stats.mean_density)) if stats.mean_density else 0.0,
         "peak_density_max": float(np.max(stats.peak_density)) if stats.peak_density else 0.0,
         "velocity_discontinuity_avg": float(np.mean(stats.velocity_discontinuity)) if stats.velocity_discontinuity else 0.0,
@@ -547,6 +708,10 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
         "j2_safety_risk_cumulative",
         "inflow_cumulative",
         "cap_removed_cumulative",
+        "capacity_limited_cumulative",
+        "capacity_overflow_peak",
+        "current_mass",
+        "mass_balance_residual",
     ] + [f"channel_density_{name}" for name in stats.channel_density]
     for gate_id in stats.gate_waiting_mass:
         safe_gate = gate_id.replace(":", "_")
@@ -576,6 +741,10 @@ def save_case_timeseries(path: Path, stats: CaseStats) -> None:
                 "j2_safety_risk_cumulative": stats.high_density_exposure_cumulative[idx],
                 "inflow_cumulative": stats.inflow_cumulative[idx],
                 "cap_removed_cumulative": stats.cap_removed_cumulative[idx],
+                "capacity_limited_cumulative": stats.capacity_limited_cumulative[idx],
+                "capacity_overflow_peak": stats.capacity_overflow_peak[idx],
+                "current_mass": stats.current_mass[idx],
+                "mass_balance_residual": stats.mass_balance_residual[idx],
             }
             for name, series in stats.channel_density.items():
                 row[f"channel_density_{name}"] = series[idx]

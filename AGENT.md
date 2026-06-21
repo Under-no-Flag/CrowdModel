@@ -14,6 +14,24 @@ AGENT.md for codex
 - 目标任务描述
 - 已完成的具体任务和产物（如代码文件、文档、实验结果等）
 
+## 外滩密度热力图高清化
+
+外滩场景仿真后若需要生成更清晰、平滑且不跨墙扩散的密度热力图，应优先使用 `codes/render_refined_density_heatmap.py` 读取实验结果目录中的 `fields/field_step_XXXX.npz` 数据，而不是直接使用低分辨率 snapshot。仿真时需开启字段保存，例如在外滩 HCMBO 迁移实验中使用 `--save-field-data --field-save-every 80`，字段目录中应包含 `fields_manifest.json` 和 `static_masks.npz`，其中 `static_masks.npz` 提供 `walkable` mask 供 wall-aware smoothing 使用。
+
+推荐高清渲染命令如下，将 `<case_dir>` 替换为具体实验 case 目录：
+
+```powershell
+python codes\render_refined_density_heatmap.py <case_dir> --all --output-dir <case_dir>\refined_density_wall_aware_hq --scale 12 --smooth-sigma 2.4 --color-scale frame-percentile --color-percentiles 0,98 --cmap low-density --gamma 0.42 --fusion-mode wall-preserve --density-alpha 1.0 --overlay-threshold 0.005 --alpha-gamma 0.32 --dpi 320
+```
+
+示例：
+
+```powershell
+python codes\render_refined_density_heatmap.py codes\results\bund_hcmbo_transfer_wall_avoid_1600_full\bund_hcmbo_transfer_wall_avoid --all --output-dir codes\results\bund_hcmbo_transfer_wall_avoid_1600_full\bund_hcmbo_transfer_wall_avoid\refined_density_wall_aware_hq --scale 12 --smooth-sigma 2.4 --color-scale frame-percentile --color-percentiles 0,98 --cmap low-density --gamma 0.42 --fusion-mode wall-preserve --density-alpha 1.0 --overlay-threshold 0.005 --alpha-gamma 0.32 --dpi 320
+```
+
+参数约定：`--scale` 控制密度场插值倍率，`--smooth-sigma` 控制平滑强度，`--color-scale frame-percentile` 使每帧颜色相对当前密度分布更明显，`--cmap low-density` 使用低密度强化的非均匀色阶，`--gamma 0.42` 强化低密度颜色响应，`--fusion-mode wall-preserve` 会保留墙/障碍背景，同时让所有非墙有限密度单元都按密度色表填充，包括密度为 0 的区域，`--density-alpha 1.0` 使密度层完全覆盖非墙背景。脚本会自动从 `summary.json` 或配置快照定位 `grid_overlay.png` 作为场景结构背景；若背景定位失败，可显式传入 `--background <grid_overlay.png>`。生成外滩论文或汇报图时，优先使用 `refined_density_wall_aware_hq/density_step_1599.png` 等高清图。
+
 ## 写作要点
 - 撰写论文内容段落时，句子之间逻辑严密，切题。
 - 不要分点要成一个段落、尽量不使用双引号和破折号。

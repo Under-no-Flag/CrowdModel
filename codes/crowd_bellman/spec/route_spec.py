@@ -14,6 +14,7 @@ class ControlSpec:
     target_region: str | None = None
     target_point: tuple[int, int] | None = None
     allowed_directions: tuple[str, ...] | None = None
+    axis_region: str | None = None
 
 
 @dataclass(frozen=True)

@@ -1,0 +1,29 @@
+{
+  "alp": "D:\\CrowdModels\\anylogic-scene\\BundScene\\BundScene.alp",
+  "output_dir": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896",
+  "region_count": 16,
+  "wall_path_count": 5,
+  "wall_point_mode": "anchors",
+  "wall_obstacle_region_count": 1466,
+  "counts_by_kind": {
+    "channel": 4,
+    "exit": 1,
+    "goal": 4,
+    "initial": 1,
+    "other": 0,
+    "route": 6,
+    "wall": 0
+  },
+  "outputs": {
+    "regions_json": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\regions_extracted.json",
+    "regions_csv": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\regions_extracted.csv",
+    "wall_paths_csv": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\wall_paths_extracted.csv",
+    "wall_obstacles_csv": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\wall_obstacles.csv",
+    "anylogic_overlay": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\anylogic_overlay.png",
+    "grid_overlay": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\grid_overlay.png",
+    "draft_scene": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\scene.toml",
+    "draft_population": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\population.toml",
+    "draft_routes": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\routes.toml",
+    "draft_run": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted_visual_2048x896\\run.toml"
+  }
+}

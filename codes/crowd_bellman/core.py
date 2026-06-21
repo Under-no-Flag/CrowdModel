@@ -6,6 +6,20 @@ from typing import Mapping
 
 import numpy as np
 
+try:
+    from numba import njit
+
+    NUMBA_AVAILABLE = True
+except ImportError:  # pragma: no cover - exercised only in environments without numba
+    NUMBA_AVAILABLE = False
+
+    def njit(*args, **kwargs):
+        def decorator(func):
+            return func
+
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+        return decorator
 
 GroupKey = tuple[int, int]
 
@@ -258,6 +272,268 @@ def _solve_bellman_optimized(
     return phi
 
 
+@njit(cache=True, nogil=True)
+def _heap_push_numba(
+    heap_values: np.ndarray,
+    heap_nodes: np.ndarray,
+    heap_size: int,
+    value: float,
+    node: int,
+) -> int:
+    if heap_size >= heap_values.shape[0]:
+        raise RuntimeError("Bellman heap capacity exceeded")
+
+    i = heap_size
+    heap_values[i] = value
+    heap_nodes[i] = node
+    heap_size += 1
+
+    while i > 0:
+        parent = (i - 1) >> 1
+        if heap_values[parent] <= heap_values[i]:
+            break
+        tmp_value = heap_values[parent]
+        tmp_node = heap_nodes[parent]
+        heap_values[parent] = heap_values[i]
+        heap_nodes[parent] = heap_nodes[i]
+        heap_values[i] = tmp_value
+        heap_nodes[i] = tmp_node
+        i = parent
+
+    return heap_size
+
+
+@njit(cache=True, nogil=True)
+def _heap_pop_numba(
+    heap_values: np.ndarray,
+    heap_nodes: np.ndarray,
+    heap_size: int,
+) -> tuple[float, int, int]:
+    value = heap_values[0]
+    node = heap_nodes[0]
+    heap_size -= 1
+
+    heap_values[0] = heap_values[heap_size]
+    heap_nodes[0] = heap_nodes[heap_size]
+    heap_values[heap_size] = np.inf
+    heap_nodes[heap_size] = -1
+
+    i = 0
+    while True:
+        left = (i << 1) + 1
+        right = left + 1
+        smallest = i
+        if left < heap_size and heap_values[left] < heap_values[smallest]:
+            smallest = left
+        if right < heap_size and heap_values[right] < heap_values[smallest]:
+            smallest = right
+        if smallest == i:
+            break
+
+        tmp_value = heap_values[i]
+        tmp_node = heap_nodes[i]
+        heap_values[i] = heap_values[smallest]
+        heap_nodes[i] = heap_nodes[smallest]
+        heap_values[smallest] = tmp_value
+        heap_nodes[smallest] = tmp_node
+        i = smallest
+
+    return value, node, heap_size
+
+
+@njit(cache=True, nogil=True)
+def _solve_bellman_numba(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    f_eps: float,
+) -> np.ndarray:
+    """Numba nopython Bellman solver with a fixed-size binary heap."""
+
+    ny, nx = walkable.shape
+    n_cells = ny * nx
+    n_dir = 8
+    phi = np.full(n_cells, np.inf, dtype=np.float64)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
+
+    dir_dy = (0, 0, 1, -1, 1, 1, -1, -1)
+    dir_dx = (1, -1, 0, 0, 1, -1, 1, -1)
+    dir_bits = (1, 2, 4, 8, 16, 32, 64, 128)
+
+    max_heap = n_cells * (n_dir + 1) + 1
+    heap_values = np.full(max_heap, np.inf, dtype=np.float64)
+    heap_nodes = np.full(max_heap, -1, dtype=np.int64)
+    heap_size = 0
+
+    for idx in range(n_cells):
+        y = idx // nx
+        x = idx - y * nx
+        if exit_mask[y, x] and walkable[y, x]:
+            phi[idx] = 0.0
+            heap_size = _heap_push_numba(heap_values, heap_nodes, heap_size, 0.0, idx)
+
+    while heap_size > 0:
+        value, idx, heap_size = _heap_pop_numba(heap_values, heap_nodes, heap_size)
+        if value > phi[idx]:
+            continue
+
+        y = idx // nx
+        x = idx - y * nx
+
+        for k in range(n_dir):
+            py = y - dir_dy[k]
+            px = x - dir_dx[k]
+            if py < 0 or py >= ny or px < 0 or px >= nx:
+                continue
+            if not walkable[py, px]:
+                continue
+            if (allowed_mask[py, px] & dir_bits[k]) == 0:
+                continue
+
+            next_idx = py * nx + px
+            candidate = value + step_factor[py, px, k] * inv_speed[py, px]
+            if candidate + 1.0e-12 < phi[next_idx]:
+                phi[next_idx] = candidate
+                heap_size = _heap_push_numba(heap_values, heap_nodes, heap_size, candidate, next_idx)
+
+    min_phi = np.inf
+    for idx in range(n_cells):
+        y = idx // nx
+        x = idx - y * nx
+        if walkable[y, x] and phi[idx] < min_phi:
+            min_phi = phi[idx]
+
+    if min_phi < np.inf:
+        for idx in range(n_cells):
+            y = idx // nx
+            x = idx - y * nx
+            if walkable[y, x] and phi[idx] < np.inf:
+                phi[idx] -= min_phi
+
+    return phi.reshape((ny, nx))
+
+
+@njit(cache=True, nogil=True)
+def _solve_bellman_sweeping(
+    walkable: np.ndarray,
+    exit_mask: np.ndarray,
+    allowed_mask: np.ndarray,
+    speed: np.ndarray,
+    step_factor: np.ndarray,
+    f_eps: float,
+) -> np.ndarray:
+    """Fast-sweeping-style relaxation of the same discrete Bellman equation."""
+
+    ny, nx = walkable.shape
+    phi = np.full((ny, nx), np.inf, dtype=np.float64)
+    inv_speed = 1.0 / np.maximum(speed, f_eps)
+
+    dir_dy = (0, 0, 1, -1, 1, 1, -1, -1)
+    dir_dx = (1, -1, 0, 0, 1, -1, 1, -1)
+    dir_bits = (1, 2, 4, 8, 16, 32, 64, 128)
+    n_dir = 8
+    tol = 1.0e-12
+    max_sweeps = ny * nx
+
+    for y in range(ny):
+        for x in range(nx):
+            if exit_mask[y, x] and walkable[y, x]:
+                phi[y, x] = 0.0
+
+    converged = False
+    for _sweep in range(max_sweeps):
+        max_delta = 0.0
+
+        for order in range(4):
+            if order == 0:
+                y_start = 0
+                y_stop = ny
+                y_step = 1
+                x_start = 0
+                x_stop = nx
+                x_step = 1
+            elif order == 1:
+                y_start = ny - 1
+                y_stop = -1
+                y_step = -1
+                x_start = 0
+                x_stop = nx
+                x_step = 1
+            elif order == 2:
+                y_start = 0
+                y_stop = ny
+                y_step = 1
+                x_start = nx - 1
+                x_stop = -1
+                x_step = -1
+            else:
+                y_start = ny - 1
+                y_stop = -1
+                y_step = -1
+                x_start = nx - 1
+                x_stop = -1
+                x_step = -1
+
+            y = y_start
+            while y != y_stop:
+                x = x_start
+                while x != x_stop:
+                    if walkable[y, x] and not exit_mask[y, x]:
+                        old_value = phi[y, x]
+                        best_value = old_value
+
+                        for k in range(n_dir):
+                            if (allowed_mask[y, x] & dir_bits[k]) == 0:
+                                continue
+                            nyy = y + dir_dy[k]
+                            nxx = x + dir_dx[k]
+                            if nyy < 0 or nyy >= ny or nxx < 0 or nxx >= nx:
+                                continue
+                            if not walkable[nyy, nxx]:
+                                continue
+                            if phi[nyy, nxx] == np.inf:
+                                continue
+
+                            candidate = phi[nyy, nxx] + step_factor[y, x, k] * inv_speed[y, x]
+                            if candidate + 1.0e-12 < best_value:
+                                best_value = candidate
+
+                        if best_value < old_value:
+                            phi[y, x] = best_value
+                            if old_value == np.inf:
+                                max_delta = np.inf
+                            else:
+                                delta = old_value - best_value
+                                if delta > max_delta:
+                                    max_delta = delta
+
+                    x += x_step
+                y += y_step
+
+        if max_delta <= tol:
+            converged = True
+            break
+
+    if not converged:
+        raise RuntimeError("Bellman sweeping backend did not converge")
+
+    min_phi = np.inf
+    for y in range(ny):
+        for x in range(nx):
+            if walkable[y, x] and phi[y, x] < min_phi:
+                min_phi = phi[y, x]
+
+    if min_phi < np.inf:
+        for y in range(ny):
+            for x in range(nx):
+                if walkable[y, x] and phi[y, x] < np.inf:
+                    phi[y, x] -= min_phi
+
+    return phi
+
+
 def solve_bellman(
     walkable: np.ndarray,
     exit_mask: np.ndarray,
@@ -281,6 +557,28 @@ def solve_bellman(
         )
     if backend == "optimized":
         return _solve_bellman_optimized(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=f_eps,
+        )
+    if backend == "numba":
+        if not NUMBA_AVAILABLE:
+            raise ImportError("bellman_backend='numba' requires numba. Install it with `python -m pip install numba`.")
+        return _solve_bellman_numba(
+            walkable=walkable,
+            exit_mask=exit_mask,
+            allowed_mask=allowed_mask,
+            speed=speed,
+            step_factor=step_factor,
+            f_eps=f_eps,
+        )
+    if backend in {"sweeping", "fsm"}:
+        if not NUMBA_AVAILABLE:
+            raise ImportError("bellman_backend='sweeping' requires numba. Install it with `python -m pip install numba`.")
+        return _solve_bellman_sweeping(
             walkable=walkable,
             exit_mask=exit_mask,
             allowed_mask=allowed_mask,
@@ -539,7 +837,13 @@ def compute_cfl_dt_multigroup(
     return min(dt_cap, dt_transport, dt_transition)
 
 
-def compute_face_fluxes(rho: np.ndarray, vx: np.ndarray, vy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def compute_face_fluxes(
+    rho: np.ndarray,
+    vx: np.ndarray,
+    vy: np.ndarray,
+    *,
+    walkable: np.ndarray | None = None,
+) -> tuple[np.ndarray, np.ndarray]:
     """First-order upwind face fluxes for explicit conservation update."""
 
     vx_face = 0.5 * (vx[:, :-1] + vx[:, 1:])
@@ -549,7 +853,135 @@ def compute_face_fluxes(rho: np.ndarray, vx: np.ndarray, vy: np.ndarray) -> tupl
     rho_y = np.where(vy_face >= 0.0, rho[:-1, :], rho[1:, :])
     fx = vx_face * rho_x
     fy = vy_face * rho_y
+    if walkable is not None:
+        fx = np.where(walkable[:, :-1] & walkable[:, 1:], fx, 0.0)
+        fy = np.where(walkable[:-1, :] & walkable[1:, :], fy, 0.0)
     return fx, fy
+
+
+def _incoming_outgoing_density_delta(
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    shape: tuple[int, int],
+    dx: float,
+    dt: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    incoming = np.zeros(shape, dtype=float)
+    outgoing = np.zeros(shape, dtype=float)
+    factor = dt / max(dx, 1.0e-12)
+
+    for fx in fx_by_group.values():
+        positive = np.maximum(fx, 0.0)
+        negative = np.maximum(-fx, 0.0)
+        incoming[:, 1:] += positive * factor
+        outgoing[:, :-1] += positive * factor
+        incoming[:, :-1] += negative * factor
+        outgoing[:, 1:] += negative * factor
+
+    for fy in fy_by_group.values():
+        positive = np.maximum(fy, 0.0)
+        negative = np.maximum(-fy, 0.0)
+        incoming[1:, :] += positive * factor
+        outgoing[:-1, :] += positive * factor
+        incoming[:-1, :] += negative * factor
+        outgoing[1:, :] += negative * factor
+
+    return incoming, outgoing
+
+
+def _predict_total_density_from_fluxes(
+    rho_tot: np.ndarray,
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    walkable: np.ndarray,
+    dx: float,
+    dt: float,
+) -> np.ndarray:
+    fx_total = np.zeros((rho_tot.shape[0], rho_tot.shape[1] - 1), dtype=float)
+    fy_total = np.zeros((rho_tot.shape[0] - 1, rho_tot.shape[1]), dtype=float)
+    for fx in fx_by_group.values():
+        fx_total += fx
+    for fy in fy_by_group.values():
+        fy_total += fy
+
+    div_x = np.zeros_like(rho_tot)
+    div_y = np.zeros_like(rho_tot)
+    div_x[:, 1:-1] = (fx_total[:, 1:] - fx_total[:, :-1]) / dx
+    div_y[1:-1, :] = (fy_total[1:, :] - fy_total[:-1, :]) / dx
+    predicted = rho_tot - dt * (div_x + div_y)
+    predicted[~walkable] = 0.0
+    return np.clip(predicted, 0.0, None)
+
+
+def _face_throughput_mass(
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    dx: float,
+    dt: float,
+) -> float:
+    total = 0.0
+    for fx in fx_by_group.values():
+        total += float(np.sum(np.abs(fx)) * dx * dt)
+    for fy in fy_by_group.values():
+        total += float(np.sum(np.abs(fy)) * dx * dt)
+    return total
+
+
+def limit_fluxes_to_density_capacity(
+    *,
+    rho_by_group: Mapping[GroupKey, np.ndarray],
+    fx_by_group: Mapping[GroupKey, np.ndarray],
+    fy_by_group: Mapping[GroupKey, np.ndarray],
+    walkable: np.ndarray,
+    rho_max: float,
+    dx: float,
+    dt: float,
+    capacity_mask: np.ndarray | None = None,
+    iterations: int = 3,
+) -> tuple[dict[GroupKey, np.ndarray], dict[GroupKey, np.ndarray], dict[str, float | bool | int]]:
+    """Limit incoming face fluxes so crowded cells queue mass upstream instead of deleting it."""
+
+    limited_fx = {key: np.array(fx, copy=True) for key, fx in fx_by_group.items()}
+    limited_fy = {key: np.array(fy, copy=True) for key, fy in fy_by_group.items()}
+    rho_tot = compute_total_density(rho_by_group)
+    active_capacity = walkable if capacity_mask is None else (capacity_mask & walkable)
+    original_throughput = _face_throughput_mass(fx_by_group, fy_by_group, dx, dt)
+    binding = False
+
+    for _ in range(max(1, int(iterations))):
+        incoming, outgoing = _incoming_outgoing_density_delta(limited_fx, limited_fy, rho_tot.shape, dx, dt)
+        allowed_incoming = np.maximum(float(rho_max) - rho_tot + outgoing, 0.0)
+        constrained = active_capacity & (incoming > allowed_incoming + 1.0e-12)
+        if not np.any(constrained):
+            break
+
+        binding = True
+        cell_scale = np.ones_like(rho_tot)
+        cell_scale[constrained] = np.clip(allowed_incoming[constrained] / incoming[constrained], 0.0, 1.0)
+
+        for key, fx in limited_fx.items():
+            positive_scale = cell_scale[:, 1:]
+            negative_scale = cell_scale[:, :-1]
+            limited_fx[key] = np.where(fx > 0.0, fx * positive_scale, np.where(fx < 0.0, fx * negative_scale, fx))
+
+        for key, fy in limited_fy.items():
+            positive_scale = cell_scale[1:, :]
+            negative_scale = cell_scale[:-1, :]
+            limited_fy[key] = np.where(fy > 0.0, fy * positive_scale, np.where(fy < 0.0, fy * negative_scale, fy))
+
+    predicted = _predict_total_density_from_fluxes(rho_tot, limited_fx, limited_fy, walkable, dx, dt)
+    overflow = np.maximum(predicted - float(rho_max), 0.0)
+    overflow_peak = float(np.max(overflow[active_capacity])) if np.any(active_capacity) else 0.0
+    limited_throughput = _face_throughput_mass(limited_fx, limited_fy, dx, dt)
+    limited_mass = max(original_throughput - limited_throughput, 0.0)
+    diagnostics: dict[str, float | bool | int] = {
+        "limited_mass": float(limited_mass),
+        "limited_rate": float(limited_mass / max(dt, 1.0e-12)),
+        "overflow_peak": overflow_peak,
+        "binding": bool(binding or limited_mass > 1.0e-12),
+        "iterations": int(max(1, int(iterations))),
+    }
+    return limited_fx, limited_fy, diagnostics
 
 
 def update_density(
@@ -563,7 +995,7 @@ def update_density(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
     """Advance one density field with explicit conservative advection and sink mask."""
 
-    fx, fy = compute_face_fluxes(rho, vx, vy)
+    fx, fy = compute_face_fluxes(rho, vx, vy, walkable=walkable)
 
     div_x = np.zeros_like(rho)
     div_y = np.zeros_like(rho)
