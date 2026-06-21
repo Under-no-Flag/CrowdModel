@@ -254,16 +254,18 @@ def simulate_case(
     groups = _build_group_models(case)
     rho_by_group = _build_initial_group_density(scene, case, groups)
 
-    step_factors = {
-        key: precompute_step_factors(
+    step_factors = {}
+    for key, group in groups.items():
+        step_factor = precompute_step_factors(
             walkable=case.walkable,
             dx=cfg.dx,
             m11=group.m11,
             m12=group.m12,
             m22=group.m22,
         )
-        for key, group in groups.items()
-    }
+        if np.any(scene.wall_cost != 1.0):
+            step_factor = step_factor * scene.wall_cost[:, :, None]
+        step_factors[key] = step_factor
 
     transitions = tuple(case.transitions)
     transition_rates = build_transition_out_rate_maps(transitions=transitions, shape=case.walkable.shape)
@@ -498,6 +500,7 @@ def simulate_case(
                     "speed": speed,
                     "vx": vx_total,
                     "vy": vy_total,
+                    "walkable": case.walkable,
                     "phi": phi_by_group[vis_key],
                     "ux": ux_by_group[vis_key],
                     "uy": uy_by_group[vis_key],

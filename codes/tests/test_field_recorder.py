@@ -31,6 +31,7 @@ class FieldDataRecorderTests(unittest.TestCase):
             assert observer is not None
 
             rho = np.arange(6, dtype=float).reshape(2, 3)
+            walkable = np.array([[True, False, True], [True, True, False]], dtype=bool)
             for step, is_final in ((0, False), (1, False), (3, True)):
                 observer(
                     {
@@ -41,6 +42,7 @@ class FieldDataRecorderTests(unittest.TestCase):
                         "speed": rho + step + 10.0,
                         "vx": rho + step + 20.0,
                         "vy": rho + step + 30.0,
+                        "walkable": walkable,
                         "is_final": is_final,
                     }
                 )
@@ -67,10 +69,13 @@ class FieldDataRecorderTests(unittest.TestCase):
             self.assertEqual(manifest["shape"], [2, 3])
             self.assertEqual(manifest["dtype"], "float32")
             self.assertEqual(manifest["fields"], ["rho", "speed", "vx", "vy"])
+            self.assertEqual(manifest["static_masks"], "static_masks.npz")
             self.assertEqual(
                 [item["file"] for item in manifest["files"]],
                 ["field_step_0000.npz", "field_step_0003.npz"],
             )
+            with np.load(fields_dir / "static_masks.npz") as payload:
+                np.testing.assert_array_equal(payload["walkable"], walkable)
 
 
 if __name__ == "__main__":

@@ -21,6 +21,7 @@ class FieldDataRecorder:
     fields: tuple[str, ...] = ("rho", "speed", "vx", "vy")
     _files: list[dict[str, object]] = field(default_factory=list)
     _shape: tuple[int, ...] | None = None
+    _static_masks_file: str | None = None
 
     def __post_init__(self) -> None:
         if self.save_every <= 0:
@@ -33,6 +34,8 @@ class FieldDataRecorder:
         is_final = bool(snapshot.get("is_final", False))
         if (step % self.save_every) != 0 and not is_final:
             return
+
+        self._write_static_masks(snapshot)
 
         payload: dict[str, np.ndarray] = {
             "step": np.array([step], dtype=np.int64),
@@ -62,18 +65,26 @@ class FieldDataRecorder:
         )
         self._write_manifest()
 
+    def _write_static_masks(self, snapshot: dict[str, object]) -> None:
+        if self._static_masks_file is not None or "walkable" not in snapshot:
+            return
+        filename = "static_masks.npz"
+        path = self.output_dir / filename
+        np.savez_compressed(path, walkable=np.asarray(snapshot["walkable"], dtype=bool))
+        self._static_masks_file = filename
+
     def _write_manifest(self) -> None:
-        save_json(
-            self.output_dir / "fields_manifest.json",
-            {
-                "format": "npz_compressed",
-                "save_every": int(self.save_every),
-                "dtype": str(np.dtype(self.dtype).name),
-                "fields": list(self.fields),
-                "shape": list(self._shape or ()),
-                "files": self._files,
-            },
-        )
+        payload: dict[str, object] = {
+            "format": "npz_compressed",
+            "save_every": int(self.save_every),
+            "dtype": str(np.dtype(self.dtype).name),
+            "fields": list(self.fields),
+            "shape": list(self._shape or ()),
+            "files": self._files,
+        }
+        if self._static_masks_file is not None:
+            payload["static_masks"] = self._static_masks_file
+        save_json(self.output_dir / "fields_manifest.json", payload)
 
 
 def make_field_data_observer_factory(

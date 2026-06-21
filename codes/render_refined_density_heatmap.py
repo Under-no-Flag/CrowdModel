@@ -11,15 +11,43 @@ import matplotlib
 
 matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
-from matplotlib.colors import Normalize, PowerNorm
+from matplotlib.collections import LineCollection
+from matplotlib.colors import LinearSegmentedColormap, Normalize, PowerNorm
 import numpy as np
 from PIL import Image
 
+from crowd_bellman.loaders.config_loader import load_scene_spec
 from crowd_bellman.plotting import DENSITY_CMAP
+from crowd_bellman.spec.scene_spec import WallSpec
 
 
-TRANSPARENT_DENSITY_CMAP = DENSITY_CMAP.copy()
-TRANSPARENT_DENSITY_CMAP.set_bad((1.0, 1.0, 1.0, 0.0))
+LOW_DENSITY_CMAP = LinearSegmentedColormap.from_list(
+    "low_density_nonuniform",
+    [
+        (0.00, "#06115f"),
+        (0.02, "#004cff"),
+        (0.06, "#00a7ff"),
+        (0.12, "#00dfd8"),
+        (0.24, "#28d85e"),
+        (0.42, "#f4ef2a"),
+        (0.68, "#ff9a00"),
+        (1.00, "#d7191c"),
+    ],
+)
+
+
+def make_density_cmap(name: str, *, transparent_bad: bool = False):
+    if name == "density":
+        cmap = DENSITY_CMAP.copy()
+    elif name == "low-density":
+        cmap = LOW_DENSITY_CMAP.copy()
+    elif name in {"turbo", "magma"}:
+        cmap = matplotlib.colormaps[name].copy()
+    else:
+        raise ValueError(f"Unsupported density colormap: {name!r}")
+    if transparent_bad:
+        cmap.set_bad((1.0, 1.0, 1.0, 0.0))
+    return cmap
 
 
 @dataclass(frozen=True)
@@ -28,6 +56,7 @@ class DensityFrame:
     time: float
     density: np.ndarray
     source_path: Path
+    walkable: np.ndarray | None = None
 
 
 def resolve_fields_dir(result_dir: Path | str) -> Path:
@@ -84,6 +113,121 @@ def resolve_background_path(explicit_background: Path | str | None, fields_dir: 
     return None
 
 
+def resolve_scene_path(explicit_scene: Path | str | None, fields_dir: Path) -> Path | None:
+    if explicit_scene is not None:
+        path = Path(explicit_scene)
+        if not path.exists():
+            raise FileNotFoundError(path)
+        return path
+
+    case_dir = fields_dir.parent
+    direct_candidates = (
+        case_dir / "config_snapshot" / "scene.toml",
+        case_dir / "scene.toml",
+        case_dir.parent / "scene.toml",
+    )
+    for candidate in direct_candidates:
+        if candidate.exists():
+            return candidate
+
+    summary_path = case_dir / "summary.json"
+    if summary_path.exists():
+        with summary_path.open("r", encoding="utf-8") as handle:
+            summary = json.load(handle)
+        if isinstance(summary, dict):
+            snapshot = summary.get("config_snapshot", {})
+            if isinstance(snapshot, dict):
+                files = snapshot.get("files", {})
+                if isinstance(files, dict) and files.get("scene"):
+                    candidate = Path(str(files["scene"]))
+                    if candidate.exists():
+                        return candidate
+
+            scene_path = summary.get("scene_path")
+            if scene_path:
+                candidate = Path(str(scene_path))
+                if candidate.exists():
+                    return candidate
+
+    return None
+
+
+def load_wall_polylines(scene_path: Path | str | None) -> tuple[WallSpec, ...]:
+    if scene_path is None:
+        return ()
+    return load_scene_spec(Path(scene_path)).walls
+
+
+def _wall_segments_for_display(
+    walls: Iterable[WallSpec],
+    *,
+    bounds: tuple[int, int, int, int],
+    display_shape: tuple[int, int],
+) -> tuple[list[np.ndarray], list[float]]:
+    y0, y1, x0, x1 = bounds
+    display_height, display_width = display_shape
+    crop_width = max(int(x1) - int(x0), 1)
+    crop_height = max(int(y1) - int(y0), 1)
+    x_scale = (float(display_width) - 1.0) / max(float(crop_width) - 1.0, 1.0)
+    y_scale = (float(display_height) - 1.0) / max(float(crop_height) - 1.0, 1.0)
+
+    segments: list[np.ndarray] = []
+    widths: list[float] = []
+    for wall in walls:
+        points = np.asarray(wall.points, dtype=float)
+        if points.ndim != 2 or points.shape[0] < 2 or points.shape[1] != 2:
+            continue
+        transformed = points.copy()
+        transformed[:, 0] = (transformed[:, 0] - float(x0)) * x_scale
+        transformed[:, 1] = (transformed[:, 1] - float(y0)) * y_scale
+        if (
+            np.nanmax(transformed[:, 0]) < -1.0
+            or np.nanmin(transformed[:, 0]) > float(display_width)
+            or np.nanmax(transformed[:, 1]) < -1.0
+            or np.nanmin(transformed[:, 1]) > float(display_height)
+        ):
+            continue
+        segments.append(transformed)
+        widths.append(float(wall.width))
+    return segments, widths
+
+
+def _draw_vector_wall_overlay(
+    ax,
+    walls: Iterable[WallSpec],
+    *,
+    bounds: tuple[int, int, int, int],
+    display_shape: tuple[int, int],
+    scale: int,
+    dpi: int,
+    color: str,
+    alpha: float,
+    linewidth: float | None,
+) -> None:
+    segments, raw_widths = _wall_segments_for_display(
+        walls,
+        bounds=bounds,
+        display_shape=display_shape,
+    )
+    if not segments:
+        return
+    if linewidth is None:
+        line_widths = [max(0.9, width * float(scale) * 72.0 / max(float(dpi), 1.0)) for width in raw_widths]
+    else:
+        line_widths = [float(linewidth)] * len(segments)
+    collection = LineCollection(
+        segments,
+        colors=color,
+        linewidths=line_widths,
+        alpha=float(alpha),
+        capstyle="round",
+        joinstyle="round",
+        antialiaseds=True,
+        zorder=5,
+    )
+    ax.add_collection(collection)
+
+
 def _load_manifest(fields_dir: Path) -> dict[str, object]:
     manifest_path = fields_dir / "fields_manifest.json"
     with manifest_path.open("r", encoding="utf-8") as handle:
@@ -91,6 +235,17 @@ def _load_manifest(fields_dir: Path) -> dict[str, object]:
     if not isinstance(payload, dict):
         raise ValueError(f"Manifest must be a JSON object: {manifest_path}")
     return payload
+
+
+def load_walkable_mask(fields_dir: Path, manifest: dict[str, object]) -> np.ndarray | None:
+    static_masks = manifest.get("static_masks")
+    if isinstance(static_masks, str):
+        path = fields_dir / static_masks
+        if path.exists():
+            with np.load(path) as payload:
+                if "walkable" in payload.files:
+                    return np.asarray(payload["walkable"], dtype=bool)
+    return None
 
 
 def _entry_step(entry: dict[str, object]) -> int:
@@ -125,17 +280,21 @@ def select_manifest_entries(
     return matches
 
 
-def load_density_frame(fields_dir: Path, entry: dict[str, object]) -> DensityFrame:
+def load_density_frame(fields_dir: Path, entry: dict[str, object], *, walkable: np.ndarray | None = None) -> DensityFrame:
     path = fields_dir / str(entry["file"])
     with np.load(path) as payload:
         if "rho" not in payload.files:
             raise ValueError(f"Field file does not contain rho: {path}")
         density = np.asarray(payload["rho"], dtype=float)
+        if walkable is None and "walkable" in payload.files:
+            walkable = np.asarray(payload["walkable"], dtype=bool)
         step = int(payload["step"][0]) if "step" in payload.files else _entry_step(entry)
         time = float(payload["time"][0]) if "time" in payload.files else float(entry.get("time", math.nan))
     if density.ndim != 2:
         raise ValueError(f"rho must be a 2D array, got shape {density.shape} from {path}")
-    return DensityFrame(step=step, time=time, density=density, source_path=path)
+    if walkable is not None and walkable.shape != density.shape:
+        raise ValueError(f"walkable mask shape {walkable.shape} does not match rho shape {density.shape} from {path}")
+    return DensityFrame(step=step, time=time, density=density, source_path=path, walkable=walkable)
 
 
 def parse_percentile_pair(raw: str) -> tuple[float, float]:
@@ -209,6 +368,17 @@ def upsample_density(density: np.ndarray, *, scale: int) -> np.ndarray:
     return output
 
 
+def upsample_mask(mask: np.ndarray, *, scale: int) -> np.ndarray:
+    if scale <= 0:
+        raise ValueError("scale must be positive")
+    values = np.asarray(mask, dtype=bool)
+    if values.ndim != 2:
+        raise ValueError(f"mask must be 2D, got shape {values.shape}")
+    if scale == 1:
+        return values.copy()
+    return np.repeat(np.repeat(values, scale, axis=0), scale, axis=1)
+
+
 def _gaussian_kernel1d(sigma: float) -> np.ndarray:
     if sigma <= 0.0:
         return np.array([1.0], dtype=float)
@@ -229,11 +399,32 @@ def _convolve_along_axis(values: np.ndarray, kernel: np.ndarray, axis: int) -> n
     return np.apply_along_axis(lambda row: np.convolve(row, kernel, mode="valid"), axis, padded)
 
 
-def smooth_density(density: np.ndarray, *, sigma: float) -> np.ndarray:
+def smooth_density(density: np.ndarray, *, sigma: float, walkable: np.ndarray | None = None) -> np.ndarray:
     values = np.asarray(density, dtype=float)
     kernel = _gaussian_kernel1d(float(sigma))
-    smoothed = _convolve_along_axis(values, kernel, axis=1)
+    if walkable is None:
+        smoothed = _convolve_along_axis(values, kernel, axis=1)
+        smoothed = _convolve_along_axis(smoothed, kernel, axis=0)
+        smoothed[smoothed < 0.0] = 0.0
+        return smoothed
+
+    mask = np.asarray(walkable, dtype=bool)
+    if mask.shape != values.shape:
+        raise ValueError(f"walkable mask shape {mask.shape} does not match density shape {values.shape}")
+    weighted_values = np.where(mask, values, 0.0)
+    weights = mask.astype(float)
+    smoothed = _convolve_along_axis(weighted_values, kernel, axis=1)
     smoothed = _convolve_along_axis(smoothed, kernel, axis=0)
+    smoothed_weights = _convolve_along_axis(weights, kernel, axis=1)
+    smoothed_weights = _convolve_along_axis(smoothed_weights, kernel, axis=0)
+    normalized = np.divide(
+        smoothed,
+        smoothed_weights,
+        out=np.zeros_like(smoothed),
+        where=smoothed_weights > 1.0e-12,
+    )
+    normalized[~mask] = np.nan
+    smoothed = normalized
     smoothed[smoothed < 0.0] = 0.0
     return smoothed
 
@@ -317,15 +508,45 @@ def _density_overlay_alpha(
     vmax: float | None,
     density_alpha: float,
     overlay_threshold: float,
+    alpha_gamma: float,
 ) -> np.ndarray:
+    if alpha_gamma <= 0.0:
+        raise ValueError("alpha_gamma must be positive")
     values = np.asarray(density, dtype=float)
     alpha = np.zeros_like(values, dtype=float)
     visible = np.isfinite(values) & (values > overlay_threshold)
     if not np.any(visible):
         return alpha
-    scale = max((float(vmax) if vmax is not None else float(np.nanmax(values))) * 0.35, 1.0e-9)
-    alpha[visible] = float(density_alpha) * np.clip((values[visible] - overlay_threshold) / scale, 0.0, 1.0)
+    upper = float(vmax) if vmax is not None else float(np.nanmax(values))
+    scale = max(upper - float(overlay_threshold), 1.0e-9)
+    normalized = np.clip((values[visible] - float(overlay_threshold)) / scale, 0.0, 1.0)
+    alpha[visible] = float(density_alpha) * np.power(normalized, float(alpha_gamma))
     return alpha
+
+
+def _density_fusion_alpha(
+    density: np.ndarray,
+    *,
+    fusion_mode: str,
+    vmax: float | None,
+    density_alpha: float,
+    overlay_threshold: float,
+    alpha_gamma: float,
+) -> np.ndarray:
+    if fusion_mode == "overlay":
+        return _density_overlay_alpha(
+            density,
+            vmax=vmax,
+            density_alpha=density_alpha,
+            overlay_threshold=overlay_threshold,
+            alpha_gamma=alpha_gamma,
+        )
+    if fusion_mode == "wall-preserve":
+        values = np.asarray(density, dtype=float)
+        alpha = np.zeros_like(values, dtype=float)
+        alpha[np.isfinite(values)] = float(density_alpha)
+        return alpha
+    raise ValueError(f"Unsupported fusion mode: {fusion_mode!r}")
 
 
 def render_density_heatmap(
@@ -336,6 +557,7 @@ def render_density_heatmap(
     smooth_sigma: float = 1.0,
     vmax: float | None = 5.0,
     color_limits: tuple[float, float] | None = None,
+    cmap_name: str = "low-density",
     norm_mode: str = "power",
     gamma: float = 0.55,
     dpi: int = 220,
@@ -348,6 +570,14 @@ def render_density_heatmap(
     background_alpha: float = 1.0,
     density_alpha: float = 0.82,
     overlay_threshold: float = 0.05,
+    alpha_gamma: float = 0.35,
+    fusion_mode: str = "wall-preserve",
+    nonwalkable_fill: str = "nan",
+    walls: Iterable[WallSpec] = (),
+    wall_overlay: str = "none",
+    vector_wall_color: str = "#111111",
+    vector_wall_alpha: float = 0.95,
+    vector_wall_linewidth: float | None = None,
 ) -> None:
     bounds = (
         density_crop_bounds(frame.density, threshold=crop_threshold, padding=crop_padding)
@@ -356,8 +586,14 @@ def render_density_heatmap(
     )
     y0, y1, x0, x1 = bounds
     raw_density = frame.density[y0:y1, x0:x1]
+    raw_walkable = frame.walkable[y0:y1, x0:x1] if frame.walkable is not None else None
     density = upsample_density(raw_density, scale=scale)
-    density = smooth_density(density, sigma=smooth_sigma)
+    walkable = upsample_mask(raw_walkable, scale=scale) if raw_walkable is not None else None
+    density = smooth_density(density, sigma=smooth_sigma, walkable=walkable)
+    if nonwalkable_fill == "zero":
+        density = np.where(np.isfinite(density), density, 0.0)
+    elif nonwalkable_fill != "nan":
+        raise ValueError(f"Unsupported nonwalkable fill mode: {nonwalkable_fill!r}")
     display_vmin, display_vmax = color_limits if color_limits is not None else (0.0, float(vmax or np.nanmax(density)))
     density_norm = make_density_norm(vmin=display_vmin, vmax=display_vmax, norm_mode=norm_mode, gamma=gamma)
     background = None
@@ -380,17 +616,20 @@ def render_density_heatmap(
     if background is not None:
         ax.imshow(background, origin=origin, interpolation="nearest", aspect="equal", alpha=background_alpha)
         density_for_plot = density.copy()
-        density_for_plot[density_for_plot <= overlay_threshold] = np.nan
-        cmap = TRANSPARENT_DENSITY_CMAP
-        alpha = _density_overlay_alpha(
+        if fusion_mode == "overlay":
+            density_for_plot[density_for_plot <= overlay_threshold] = np.nan
+        cmap = make_density_cmap(cmap_name, transparent_bad=True)
+        alpha = _density_fusion_alpha(
             density,
+            fusion_mode=fusion_mode,
             vmax=display_vmax,
             density_alpha=density_alpha,
             overlay_threshold=overlay_threshold,
+            alpha_gamma=alpha_gamma,
         )
     else:
         density_for_plot = density
-        cmap = DENSITY_CMAP
+        cmap = make_density_cmap(cmap_name, transparent_bad=False)
         alpha = 1.0
 
     image = ax.imshow(
@@ -398,10 +637,24 @@ def render_density_heatmap(
         origin=origin,
         cmap=cmap,
         norm=density_norm,
-        interpolation="bicubic",
+        interpolation="nearest",
         aspect="equal",
         alpha=alpha,
     )
+    if wall_overlay == "vector":
+        _draw_vector_wall_overlay(
+            ax,
+            walls,
+            bounds=bounds,
+            display_shape=density.shape,
+            scale=scale,
+            dpi=dpi,
+            color=vector_wall_color,
+            alpha=vector_wall_alpha,
+            linewidth=vector_wall_linewidth,
+        )
+    elif wall_overlay != "none":
+        raise ValueError(f"Unsupported wall overlay mode: {wall_overlay!r}")
     ax.set_axis_off()
     if colorbar:
         cbar = fig.colorbar(image, ax=ax, fraction=0.025, pad=0.015)
@@ -422,6 +675,7 @@ def render_from_result_dir(
     vmax: float | None = 5.0,
     color_scale: str = "sequence-percentile",
     color_percentiles: tuple[float, float] = (2.0, 98.0),
+    cmap_name: str = "low-density",
     norm_mode: str = "power",
     gamma: float = 0.55,
     dpi: int = 220,
@@ -435,13 +689,24 @@ def render_from_result_dir(
     background_alpha: float = 1.0,
     density_alpha: float = 0.82,
     overlay_threshold: float = 0.05,
+    alpha_gamma: float = 0.35,
+    fusion_mode: str = "wall-preserve",
+    nonwalkable_fill: str = "nan",
+    scene: Path | None = None,
+    wall_overlay: str = "none",
+    vector_wall_color: str = "#111111",
+    vector_wall_alpha: float = 0.95,
+    vector_wall_linewidth: float | None = None,
 ) -> list[Path]:
     if output is not None and render_all:
         raise ValueError("--output can only be used for single-frame rendering")
 
     fields_dir = resolve_fields_dir(result_dir)
     background_path = None if no_background else resolve_background_path(background, fields_dir)
+    scene_path = resolve_scene_path(scene, fields_dir) if wall_overlay == "vector" else None
+    walls = load_wall_polylines(scene_path) if scene_path is not None else ()
     manifest = _load_manifest(fields_dir)
+    walkable_mask = load_walkable_mask(fields_dir, manifest)
     raw_entries = manifest.get("files")
     if not isinstance(raw_entries, list):
         raise ValueError(f"Manifest files must be a list: {fields_dir / 'fields_manifest.json'}")
@@ -450,7 +715,7 @@ def render_from_result_dir(
     sequence_color_limits = None
     if color_scale == "sequence-percentile":
         sequence_color_limits = density_percentile_limits(
-            (load_density_frame(fields_dir, entry).density for entry in _sorted_entries(entries)),
+            (load_density_frame(fields_dir, entry, walkable=walkable_mask).density for entry in _sorted_entries(entries)),
             percentiles=color_percentiles,
             threshold=overlay_threshold,
         )
@@ -460,7 +725,7 @@ def render_from_result_dir(
     target_dir = output_dir if output_dir is not None else fields_dir.parent / "refined_density"
     written: list[Path] = []
     for entry in selected_entries:
-        frame = load_density_frame(fields_dir, entry)
+        frame = load_density_frame(fields_dir, entry, walkable=walkable_mask)
         if color_scale == "absolute":
             frame_color_limits = (0.0, float(vmax if vmax is not None else np.nanmax(frame.density)))
         elif color_scale == "frame-percentile":
@@ -481,6 +746,7 @@ def render_from_result_dir(
             smooth_sigma=smooth_sigma,
             vmax=vmax,
             color_limits=frame_color_limits,
+            cmap_name=cmap_name,
             norm_mode=norm_mode,
             gamma=gamma,
             dpi=dpi,
@@ -493,6 +759,14 @@ def render_from_result_dir(
             background_alpha=background_alpha,
             density_alpha=density_alpha,
             overlay_threshold=overlay_threshold,
+            alpha_gamma=alpha_gamma,
+            fusion_mode=fusion_mode,
+            nonwalkable_fill=nonwalkable_fill,
+            walls=walls,
+            wall_overlay=wall_overlay,
+            vector_wall_color=vector_wall_color,
+            vector_wall_alpha=vector_wall_alpha,
+            vector_wall_linewidth=vector_wall_linewidth,
         )
         written.append(output_path)
     return written
@@ -517,6 +791,12 @@ def build_arg_parser() -> argparse.ArgumentParser:
         help="Density color scaling. sequence-percentile keeps all selected frames comparable while using relative limits.",
     )
     parser.add_argument("--color-percentiles", default="2,98", help="Percentile limits for relative color scaling, e.g. 2,98.")
+    parser.add_argument(
+        "--cmap",
+        choices=("low-density", "density", "turbo", "magma"),
+        default="low-density",
+        help="Density colormap. low-density uses non-uniform color stops to make low density more visible.",
+    )
     parser.add_argument("--norm", choices=("linear", "power"), default="power", help="Color normalization mode.")
     parser.add_argument("--gamma", type=float, default=0.55, help="PowerNorm gamma. Values below 1 brighten low densities.")
     parser.add_argument("--dpi", type=int, default=220, help="Output image DPI.")
@@ -530,6 +810,34 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--background-alpha", type=float, default=1.0, help="Scene background opacity.")
     parser.add_argument("--density-alpha", type=float, default=0.82, help="Density overlay opacity when a background is drawn.")
     parser.add_argument("--overlay-threshold", type=float, default=0.05, help="Density values below this threshold are transparent over the background.")
+    parser.add_argument("--alpha-gamma", type=float, default=0.35, help="Nonlinear alpha gamma below 1 makes low density less transparent.")
+    parser.add_argument(
+        "--fusion-mode",
+        choices=("wall-preserve", "overlay"),
+        default="wall-preserve",
+        help="wall-preserve colors every finite density cell, including zero density, while leaving wall/background cells visible; overlay keeps low density transparent.",
+    )
+    parser.add_argument(
+        "--nonwalkable-fill",
+        choices=("nan", "zero"),
+        default="nan",
+        help="How to render nonwalkable cells after smoothing. zero hides raster wall blocks under density color before vector wall overlay.",
+    )
+    parser.add_argument("--scene", default=None, help="Optional scene.toml path used for vector wall overlay. Defaults to case config snapshot.")
+    parser.add_argument(
+        "--wall-overlay",
+        choices=("none", "vector"),
+        default="none",
+        help="Draw continuous wall polylines from scene.toml over the density image.",
+    )
+    parser.add_argument("--vector-wall-color", default="#111111", help="Color for --wall-overlay vector.")
+    parser.add_argument("--vector-wall-alpha", type=float, default=0.95, help="Opacity for --wall-overlay vector.")
+    parser.add_argument(
+        "--vector-wall-linewidth",
+        type=float,
+        default=None,
+        help="Fixed vector wall line width in points. Defaults to scene wall width scaled by the render scale and DPI.",
+    )
     return parser
 
 
@@ -548,6 +856,7 @@ def main() -> None:
         vmax=args.vmax,
         color_scale=args.color_scale,
         color_percentiles=parse_percentile_pair(args.color_percentiles),
+        cmap_name=args.cmap,
         norm_mode=args.norm,
         gamma=args.gamma,
         dpi=args.dpi,
@@ -561,6 +870,14 @@ def main() -> None:
         background_alpha=args.background_alpha,
         density_alpha=args.density_alpha,
         overlay_threshold=args.overlay_threshold,
+        alpha_gamma=args.alpha_gamma,
+        fusion_mode=args.fusion_mode,
+        nonwalkable_fill=args.nonwalkable_fill,
+        scene=Path(args.scene) if args.scene else None,
+        wall_overlay=args.wall_overlay,
+        vector_wall_color=args.vector_wall_color,
+        vector_wall_alpha=args.vector_wall_alpha,
+        vector_wall_linewidth=args.vector_wall_linewidth,
     )
     for path in paths:
         print(path)

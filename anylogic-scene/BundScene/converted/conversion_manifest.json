@@ -1,17 +1,18 @@
 {
   "alp": "D:\\CrowdModels\\anylogic-scene\\BundScene\\BundScene.alp",
   "output_dir": "D:\\CrowdModels\\anylogic-scene\\BundScene\\converted",
-  "region_count": 16,
+  "region_count": 17,
   "wall_path_count": 5,
   "wall_point_mode": "anchors",
-  "wall_obstacle_region_count": 366,
+  "channel_route_mode": "pass_through",
+  "wall_obstacle_region_count": 392,
   "counts_by_kind": {
     "channel": 4,
     "exit": 1,
     "goal": 4,
     "initial": 1,
     "other": 0,
-    "route": 6,
+    "route": 7,
     "wall": 0
   },
   "outputs": {

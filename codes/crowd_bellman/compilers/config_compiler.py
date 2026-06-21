@@ -120,6 +120,101 @@ def _polyline_wall_mask(cfg: SimulationConfig, points: tuple[tuple[float, float]
     return mask
 
 
+def _dilate_mask(mask: np.ndarray, iterations: int) -> np.ndarray:
+    result = np.asarray(mask, dtype=bool).copy()
+    for _ in range(max(0, int(iterations))):
+        expanded = result.copy()
+        expanded[1:, :] |= result[:-1, :]
+        expanded[:-1, :] |= result[1:, :]
+        expanded[:, 1:] |= result[:, :-1]
+        expanded[:, :-1] |= result[:, 1:]
+        expanded[1:, 1:] |= result[:-1, :-1]
+        expanded[1:, :-1] |= result[:-1, 1:]
+        expanded[:-1, 1:] |= result[1:, :-1]
+        expanded[:-1, :-1] |= result[1:, 1:]
+        result = expanded
+    return result
+
+
+def _distance_to_mask(source_mask: np.ndarray) -> np.ndarray:
+    source = np.asarray(source_mask, dtype=bool)
+    distance = np.full(source.shape, np.inf, dtype=float)
+    distance[source] = 0.0
+    if not np.any(source):
+        return distance
+
+    ny, nx = source.shape
+    diagonal = float(np.sqrt(2.0))
+    for y in range(ny):
+        for x in range(nx):
+            value = distance[y, x]
+            if y > 0:
+                value = min(value, distance[y - 1, x] + 1.0)
+                if x > 0:
+                    value = min(value, distance[y - 1, x - 1] + diagonal)
+                if x + 1 < nx:
+                    value = min(value, distance[y - 1, x + 1] + diagonal)
+            if x > 0:
+                value = min(value, distance[y, x - 1] + 1.0)
+            distance[y, x] = value
+
+    for y in range(ny - 1, -1, -1):
+        for x in range(nx - 1, -1, -1):
+            value = distance[y, x]
+            if y + 1 < ny:
+                value = min(value, distance[y + 1, x] + 1.0)
+                if x > 0:
+                    value = min(value, distance[y + 1, x - 1] + diagonal)
+                if x + 1 < nx:
+                    value = min(value, distance[y + 1, x + 1] + diagonal)
+            if x + 1 < nx:
+                value = min(value, distance[y, x + 1] + 1.0)
+            distance[y, x] = value
+    return distance
+
+
+def _wall_cost_from_distance(cfg: SimulationConfig, walkable: np.ndarray, distance: np.ndarray) -> np.ndarray:
+    cost = np.ones(walkable.shape, dtype=float)
+    weight = float(cfg.wall_avoidance_weight)
+    if weight <= 0.0:
+        return cost
+    sigma = float(cfg.wall_avoidance_sigma_cells)
+    radius = float(cfg.wall_avoidance_radius_cells)
+    if sigma <= 0.0:
+        raise ValueError("wall_avoidance_sigma_cells must be positive when wall avoidance is enabled")
+    if radius < 0.0:
+        raise ValueError("wall_avoidance_radius_cells must be non-negative")
+    active = walkable & np.isfinite(distance) & (distance <= radius)
+    cost[active] = 1.0 + weight * np.exp(-distance[active] / sigma)
+    return cost
+
+
+def _direction_shift_slices(dy: int, dx: int) -> tuple[slice, slice, slice, slice]:
+    src_y = slice(None, -dy) if dy > 0 else slice(-dy, None) if dy < 0 else slice(None)
+    dst_y = slice(dy, None) if dy > 0 else slice(None, dy) if dy < 0 else slice(None)
+    src_x = slice(None, -dx) if dx > 0 else slice(-dx, None) if dx < 0 else slice(None)
+    dst_x = slice(dx, None) if dx > 0 else slice(None, dx) if dx < 0 else slice(None)
+    return src_y, src_x, dst_y, dst_x
+
+
+def _corner_block_mask(walkable: np.ndarray) -> np.ndarray:
+    blocked = np.zeros(walkable.shape, dtype=np.uint16)
+    for bit, dy, dx in zip(DIRECTIONS.bits, DIRECTIONS.dy, DIRECTIONS.dx):
+        dy_int = int(dy)
+        dx_int = int(dx)
+        if abs(dy_int) != 1 or abs(dx_int) != 1:
+            continue
+        src_y, src_x, dst_y, dst_x = _direction_shift_slices(dy_int, dx_int)
+        blocked_source = (
+            walkable[src_y, src_x]
+            & walkable[dst_y, dst_x]
+            & ((~walkable[dst_y, src_x]) | (~walkable[src_y, dst_x]))
+        )
+        target = blocked[src_y, src_x]
+        target[blocked_source] = np.uint16(target[blocked_source] | np.uint16(bit))
+    return blocked
+
+
 def _normalize_axis(axis: tuple[float, float], *, region_name: str) -> tuple[float, float]:
     norm = float(np.hypot(axis[0], axis[1]))
     if norm <= 1.0e-12:
@@ -240,14 +335,29 @@ def compile_scene(scene_spec: SceneSpec, cfg: SimulationConfig) -> CompiledScene
         region_masks[wall.name] = wall_mask
         wall_names.add(wall.name)
 
+    obstacle_union = np.zeros_like(walkable, dtype=bool)
     for obstacle_name in scene_spec.obstacles:
         obstacle_mask = region_masks.get(obstacle_name)
         if obstacle_mask is None:
             raise ValueError(f"Obstacle region not found: {obstacle_name}")
-        walkable[obstacle_mask] = False
+        obstacle_union |= obstacle_mask
 
+    wall_union = np.zeros_like(walkable, dtype=bool)
     for wall_name in wall_names:
-        walkable[region_masks[wall_name]] = False
+        wall_union |= region_masks[wall_name]
+
+    solid_union = obstacle_union | wall_union
+    walkable[solid_union] = False
+    clearance_cells = int(cfg.wall_clearance_cells)
+    if clearance_cells < 0:
+        raise ValueError("wall_clearance_cells must be non-negative")
+    if clearance_cells > 0 and np.any(solid_union):
+        walkable[_dilate_mask(solid_union, clearance_cells)] = False
+
+    wall_distance_cells = _distance_to_mask(~walkable)
+    wall_cost = _wall_cost_from_distance(cfg, walkable, wall_distance_cells)
+    corner_block_mask = _corner_block_mask(walkable) if cfg.block_diagonal_corner_cutting else np.zeros_like(walkable, dtype=np.uint16)
+
 
     exit_masks: dict[str, np.ndarray] = {}
     exit_union = np.zeros_like(walkable, dtype=bool)
@@ -278,6 +388,10 @@ def compile_scene(scene_spec: SceneSpec, cfg: SimulationConfig) -> CompiledScene
         channel_masks=channel_masks,
         probe_x=probe_x,
         channel_axes=channel_axes,
+        wall_mask=wall_union,
+        wall_distance_cells=wall_distance_cells,
+        wall_cost=wall_cost,
+        corner_block_mask=corner_block_mask,
         wall_x0=0,
         wall_x1=0,
         tooth_x1=0,
@@ -799,6 +913,9 @@ def compile_case(
                 m22=m22,
                 allowed_mask=allowed_mask,
             )
+
+        if np.any(bundle.scene.corner_block_mask):
+            allowed_mask = np.bitwise_and(allowed_mask, np.bitwise_not(bundle.scene.corner_block_mask))
 
         groups[stage.group_key] = GroupModel(
             key=stage.group_key,

@@ -14,6 +14,7 @@ from crowd_bellman.loaders.config_loader import load_scene_spec
 from crowd_bellman.scenes import SimulationConfig
 from crowd_bellman.spec.population_spec import PopulationSpec
 from crowd_bellman.spec.route_spec import CaseRouteSpec, ControlSpec, StageSpec
+from crowd_bellman.spec.scene_spec import RegionSpec, SceneSpec, WallSpec
 
 
 class SceneWallTests(unittest.TestCase):
@@ -272,6 +273,62 @@ class SceneWallTests(unittest.TestCase):
         self.assertTrue(bundle.scene.walkable[3, 2])
         self.assertTrue(bundle.scene.walkable[3, 4])
         self.assertIn("vertical_wall", bundle.region_masks)
+
+    def test_corner_cutting_diagonal_direction_is_removed_from_allowed_mask(self) -> None:
+        scene_spec = SceneSpec(
+            block_boundaries=False,
+            regions=(
+                RegionSpec(name="start", x0=1, x1=2, y0=1, y1=2),
+                RegionSpec(name="goal", x0=2, x1=3, y0=2, y1=3),
+                RegionSpec(name="east_block", x0=2, x1=3, y0=1, y1=2),
+                RegionSpec(name="north_block", x0=1, x1=2, y0=2, y1=3),
+            ),
+            obstacles=("east_block", "north_block"),
+        )
+        route_spec = CaseRouteSpec(
+            case_id="corner_cut",
+            title="corner cut",
+            stages=(
+                StageSpec(
+                    stage_id="to_goal",
+                    group_key=(1, 1),
+                    goal_regions=("goal",),
+                ),
+            ),
+        )
+        bundle = compile_scene(scene_spec, SimulationConfig(nx=5, ny=5, block_diagonal_corner_cutting=True))
+        _scene, case = compile_case(bundle=bundle, population_spec=PopulationSpec(), route_spec=route_spec)
+
+        diagonal_bit = int(DIRECTIONS.bits[DIRECTIONS.names.index("NE")])
+        self.assertEqual(int(case.groups[(1, 1)].allowed_mask[1, 1]) & diagonal_bit, 0)
+
+    def test_wall_avoidance_cost_is_precomputed_near_wall_only(self) -> None:
+        scene_spec = SceneSpec(
+            block_boundaries=False,
+            walls=(
+                WallSpec(
+                    name="vertical_wall",
+                    points=((3.0, 1.0), (3.0, 6.0)),
+                    width=1.0,
+                ),
+            ),
+        )
+
+        bundle = compile_scene(
+            scene_spec,
+            SimulationConfig(
+                nx=8,
+                ny=8,
+                wall_avoidance_weight=2.0,
+                wall_avoidance_sigma_cells=1.0,
+                wall_avoidance_radius_cells=2.0,
+            ),
+        )
+
+        self.assertFalse(bundle.scene.walkable[3, 3])
+        self.assertGreater(float(bundle.scene.wall_cost[3, 2]), 1.0)
+        self.assertGreater(float(bundle.scene.wall_cost[3, 2]), float(bundle.scene.wall_cost[3, 1]))
+        self.assertAlmostEqual(float(bundle.scene.wall_cost[3, 0]), 1.0)
 
 
 if __name__ == "__main__":

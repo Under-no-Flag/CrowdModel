@@ -21,6 +21,7 @@ DEFAULT_DX = 0.125
 DEFAULT_INITIAL_DENSITY = 2.0
 DEFAULT_INFLOW_RATE = 0.08
 DEFAULT_INFLOW_RHO_CAP = 4.8
+DEFAULT_CHANNEL_ROUTE_MODE = "pass_through"
 DEFAULT_ROUTE_SEQUENCE = (
     "goal_region2",
     "channel_3",
@@ -71,6 +72,7 @@ class ChannelRouteRegion:
     suffix: str
     post_name: str
     pre_name: str | None = None
+    waypoint_name: str | None = None
 
 
 @dataclass(frozen=True)
@@ -118,7 +120,7 @@ def _classify(name: str) -> str:
         return "initial"
     if lowered.startswith("goal_region"):
         return "goal"
-    if lowered.startswith(("decision_", "post_channel_", "pre_channel_", "merge_")):
+    if lowered.startswith(("decision_", "post_channel_", "pre_channel_", "merge_", "waypoint_")):
         return "route"
     if lowered in {"exit", "exits"} or lowered.startswith("exit_"):
         return "exit"
@@ -205,6 +207,10 @@ def _format_points(points: tuple[tuple[float, float], ...]) -> str:
     return "[" + ", ".join(f"[{_format_number(x)}, {_format_number(y)}]" for x, y in points) + "]"
 
 
+def _format_string_list(values: tuple[str, ...]) -> str:
+    return "[" + ", ".join(f'"{value}"' for value in values) + "]"
+
+
 def _longest_edge_axis(points: tuple[tuple[float, float], ...]) -> tuple[float, float]:
     best_axis = (1.0, 0.0)
     best_length2 = 0.0
@@ -249,6 +255,21 @@ def _pre_channel_inference_radius(channel: RegionRecord) -> float:
     return max(8.0, diagonal * 1.8)
 
 
+def _channel_waypoint_name(suffix: str, available_region_names: set[str]) -> str | None:
+    prefixes = (
+        f"waypoint_channel{suffix}_",
+        f"waypoint_channel_{suffix}_",
+    )
+    candidates = [
+        name
+        for name in available_region_names
+        if any(name.lower().startswith(prefix) for prefix in prefixes)
+    ]
+    if not candidates:
+        return None
+    return sorted(candidates, key=_natural_key)[0]
+
+
 def _channel_route_regions(records: list[RegionRecord], available_region_names: set[str]) -> list[ChannelRouteRegion]:
     routes: list[ChannelRouteRegion] = []
     goal_candidates = sorted((record for record in records if record.kind == "goal"), key=lambda item: _natural_key(item.name))
@@ -280,7 +301,15 @@ def _channel_route_regions(records: list[RegionRecord], available_region_names: 
                 pre_name = best_candidate.name
                 used_inferred_pre_regions.add(pre_name)
 
-        routes.append(ChannelRouteRegion(channel_name=channel.name, suffix=suffix, post_name=post_name, pre_name=pre_name))
+        routes.append(
+            ChannelRouteRegion(
+                channel_name=channel.name,
+                suffix=suffix,
+                post_name=post_name,
+                pre_name=pre_name,
+                waypoint_name=_channel_waypoint_name(suffix, available_region_names),
+            )
+        )
     return routes
 
 
@@ -289,7 +318,11 @@ def _append_channel_split_routes(
     *,
     channel_routes: list[ChannelRouteRegion],
     exit_region: str,
+    channel_route_mode: str = DEFAULT_CHANNEL_ROUTE_MODE,
 ) -> None:
+    if channel_route_mode not in {"pass_through", "direct_merge", "post_stage"}:
+        raise ValueError(f"Unsupported channel route mode: {channel_route_mode}")
+
     probability = 1.0 / len(channel_routes)
     routes_lines.extend(
         [
@@ -317,13 +350,19 @@ def _append_channel_split_routes(
     for channel_route in channel_routes:
         if channel_route.pre_name is None:
             continue
+        if channel_route_mode == "pass_through":
+            goal_line = f'goal_region = "{channel_route.channel_name}"'
+            decision_line = f"decision_regions = {_format_string_list((channel_route.pre_name, channel_route.channel_name))}"
+        else:
+            goal_line = f'goal_region = "{channel_route.pre_name}"'
+            decision_line = f'decision_region = "{channel_route.pre_name}"'
         routes_lines.extend(
             [
                 "[[stages]]",
                 f'stage_id = "to_pre_channel_{channel_route.suffix}"',
                 f"group_key = [1, {group_index}]",
-                f'goal_region = "{channel_route.pre_name}"',
-                f'decision_region = "{channel_route.pre_name}"',
+                goal_line,
+                decision_line,
                 f'next_stage = "to_channel_{channel_route.suffix}"',
                 'transition_direction = "inherit_target"',
                 "",
@@ -332,42 +371,69 @@ def _append_channel_split_routes(
         group_index += 1
 
     for channel_route in channel_routes:
+        if channel_route_mode == "post_stage":
+            goal_line = f'goal_region = "{channel_route.channel_name}"'
+            decision_line = f'decision_region = "{channel_route.channel_name}"'
+            next_stage = f"post_channel_{channel_route.suffix}"
+        elif channel_route_mode == "direct_merge":
+            goal_line = f'goal_region = "{channel_route.channel_name}"'
+            decision_line = f'decision_region = "{channel_route.channel_name}"'
+            next_stage = "to_merge_after_channels"
+        else:
+            if channel_route.waypoint_name is not None:
+                goal_line = f'goal_region = "{channel_route.waypoint_name}"'
+                decision_line = f'decision_region = "{channel_route.waypoint_name}"'
+            else:
+                goal_line = 'goal_region = "merge_after_channels"'
+                decision_line = (
+                    "decision_regions = "
+                    f"{_format_string_list((channel_route.channel_name, channel_route.post_name))}"
+                )
+            next_stage = "to_merge_after_channels"
         routes_lines.extend(
             [
                 "[[stages]]",
                 f'stage_id = "to_channel_{channel_route.suffix}"',
                 f"group_key = [1, {group_index}]",
-                f'goal_region = "{channel_route.channel_name}"',
-                f'decision_region = "{channel_route.channel_name}"',
-                f'next_stage = "post_channel_{channel_route.suffix}"',
+                goal_line,
+                decision_line,
+                f'next_stage = "{next_stage}"',
                 'transition_direction = "inherit_target"',
                 "",
             ]
         )
         group_index += 1
 
-    for channel_route in channel_routes:
-        routes_lines.extend(
-            [
-                "[[stages]]",
-                f'stage_id = "post_channel_{channel_route.suffix}"',
-                f"group_key = [1, {group_index}]",
-                f'goal_region = "{channel_route.post_name}"',
-                f'decision_region = "{channel_route.post_name}"',
-                'next_stage = "to_merge_after_channels"',
-                'transition_direction = "inherit_target"',
-                "",
-            ]
-        )
-        group_index += 1
+    if channel_route_mode == "post_stage":
+        for channel_route in channel_routes:
+            routes_lines.extend(
+                [
+                    "[[stages]]",
+                    f'stage_id = "post_channel_{channel_route.suffix}"',
+                    f"group_key = [1, {group_index}]",
+                    f'goal_region = "{channel_route.post_name}"',
+                    f'decision_region = "{channel_route.post_name}"',
+                    'next_stage = "to_merge_after_channels"',
+                    'transition_direction = "inherit_target"',
+                    "",
+                ]
+            )
+            group_index += 1
+
+    if channel_route_mode == "pass_through":
+        merge_goal_line = f'goal_region = "{exit_region}"'
+        merge_decision_line = f"decision_regions = {_format_string_list(('merge_after_channels', exit_region))}"
+    else:
+        merge_goal_line = 'goal_region = "merge_after_channels"'
+        merge_decision_line = 'decision_region = "merge_after_channels"'
 
     routes_lines.extend(
         [
             "[[stages]]",
             'stage_id = "to_merge_after_channels"',
             f"group_key = [1, {group_index}]",
-            'goal_region = "merge_after_channels"',
-            'decision_region = "merge_after_channels"',
+            merge_goal_line,
+            merge_decision_line,
             'next_stage = "to_exits"',
             'transition_direction = "inherit_target"',
             "",
@@ -622,6 +688,7 @@ def write_draft_toml(
     nx: int,
     ny: int,
     dx: float,
+    channel_route_mode: str = DEFAULT_CHANNEL_ROUTE_MODE,
 ) -> None:
     wall_paths = wall_paths or []
     wall_obstacles = wall_obstacles or []
@@ -751,6 +818,7 @@ def write_draft_toml(
             routes_lines,
             channel_routes=channel_routes,
             exit_region=exit_region,
+            channel_route_mode=channel_route_mode,
         )
     elif use_default_route_sequence:
         for index, region_name in enumerate(route_sequence):
@@ -938,6 +1006,12 @@ def main(argv: list[str] | None = None) -> int:
         default="anchors",
         help="anchors uses AnyLogic Path anchor points as solid walls; all preserves every XML point, including control points.",
     )
+    parser.add_argument(
+        "--channel-route-mode",
+        choices=("pass_through", "direct_merge", "post_stage"),
+        default=DEFAULT_CHANNEL_ROUTE_MODE,
+        help="pass_through decouples navigation goals from handoff regions; direct_merge skips post_channel_i stages; post_stage restores the legacy channel_i -> post_channel_i route chain.",
+    )
     args = parser.parse_args(argv)
 
     alp_path = args.alp.resolve()
@@ -963,7 +1037,15 @@ def main(argv: list[str] | None = None) -> int:
         ny=args.ny,
         dx=args.dx,
     )
-    write_draft_toml(output_dir, records, wall_paths=wall_paths, nx=args.nx, ny=args.ny, dx=args.dx)
+    write_draft_toml(
+        output_dir,
+        records,
+        wall_paths=wall_paths,
+        nx=args.nx,
+        ny=args.ny,
+        dx=args.dx,
+        channel_route_mode=args.channel_route_mode,
+    )
     draw_anylogic_overlay(output_dir / "anylogic_overlay.png", frame, records, wall_paths=wall_paths)
     draw_grid_overlay(
         output_dir / "grid_overlay.png",
@@ -980,6 +1062,7 @@ def main(argv: list[str] | None = None) -> int:
         "region_count": len(records),
         "wall_path_count": len(wall_paths),
         "wall_point_mode": args.wall_point_mode,
+        "channel_route_mode": args.channel_route_mode,
         "wall_obstacle_region_count": len(wall_obstacles),
         "counts_by_kind": {kind: sum(1 for record in records if record.kind == kind) for kind in sorted(COLORS)},
         "outputs": {

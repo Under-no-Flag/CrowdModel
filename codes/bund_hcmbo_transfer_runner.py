@@ -9,6 +9,7 @@ from pathlib import Path
 
 from bund_capacity_response_runner import (
     DEFAULT_BASE_DIR,
+    _format_scalar,
     _dump_routes_toml,
     _dump_run_toml,
     _load_toml,
@@ -176,6 +177,45 @@ def _capacity_controls_from_q(
     return controls
 
 
+def _dump_population_toml(payload: dict[str, object]) -> str:
+    lines: list[str] = []
+    for table_name in ("initial_groups", "inflow_groups"):
+        groups = payload.get(table_name, [])
+        if not isinstance(groups, list):
+            raise ValueError(f"population.{table_name} must be a list")
+        for group in groups:
+            if not isinstance(group, dict):
+                raise ValueError(f"population.{table_name} entries must be tables")
+            if lines:
+                lines.append("")
+            lines.append(f"[[{table_name}]]")
+            for key, value in group.items():
+                if value is None:
+                    continue
+                lines.append(f"{key} = {_format_scalar(value)}")
+    return "\n".join(lines) + "\n"
+
+
+def _population_with_scaled_inflows(
+    population: dict[str, object],
+    inflow_rate_scale: float,
+) -> dict[str, object]:
+    scale = float(inflow_rate_scale)
+    if scale <= 0.0:
+        raise ValueError("inflow_rate_scale must be positive")
+    scaled = deepcopy(population)
+    inflow_groups = scaled.get("inflow_groups", [])
+    if not isinstance(inflow_groups, list):
+        raise ValueError("population.inflow_groups must be a list")
+    for group in inflow_groups:
+        if not isinstance(group, dict):
+            raise ValueError("population.inflow_groups entries must be tables")
+        if "rate" not in group:
+            raise ValueError("population.inflow_groups entries must contain rate")
+        group["rate"] = float(group["rate"]) * scale
+    return scaled
+
+
 def _routes_from_hcmbo_control(
     base_routes: dict[str, object],
     control: dict[str, object],
@@ -187,6 +227,9 @@ def _routes_from_hcmbo_control(
     beta: float,
     waiting_width: int,
     capacity_scale: float,
+    transition_kappa: float | None = None,
+    include_direction_controls: bool = True,
+    include_capacity_controls: bool = True,
 ) -> dict[str, object]:
     directions = control.get("directions")
     q_by_gate = control.get("q_by_gate")
@@ -201,17 +244,26 @@ def _routes_from_hcmbo_control(
     case_table["title"] = "Bund AnyLogic with transferred G6 HCMBO control"
     routes["case"] = case_table
 
-    direction_controls = _direction_controls_from_g6(
-        directions,
-        channel_map=channel_map,
-        alpha=alpha,
-        beta=beta,
+    direction_controls = (
+        _direction_controls_from_g6(
+            directions,
+            channel_map=channel_map,
+            alpha=alpha,
+            beta=beta,
+        )
+        if include_direction_controls
+        else []
     )
     stages: list[dict[str, object]] = []
     for stage in routes.get("stages", []):
         if not isinstance(stage, dict):
             continue
         stage_copy = dict(stage)
+        has_transition = "next_stage" in stage_copy or bool(stage_copy.get("targets"))
+        if transition_kappa is not None and has_transition:
+            if float(transition_kappa) <= 0.0:
+                raise ValueError("transition_kappa must be positive")
+            stage_copy["kappa"] = float(transition_kappa)
         existing_controls = stage_copy.get("controls", [])
         copied_controls = (
             [dict(control_item) for control_item in existing_controls if isinstance(control_item, dict)]
@@ -222,19 +274,35 @@ def _routes_from_hcmbo_control(
         stage_copy["controls"] = copied_controls
         stages.append(stage_copy)
     routes["stages"] = stages
-    routes["capacity_controls"] = _capacity_controls_from_q(
-        q_by_gate,
-        channel_map=channel_map,
-        duration=duration,
-        waiting_width=waiting_width,
-        capacity_scale=capacity_scale,
+    routes["capacity_controls"] = (
+        _capacity_controls_from_q(
+            q_by_gate,
+            channel_map=channel_map,
+            duration=duration,
+            waiting_width=waiting_width,
+            capacity_scale=capacity_scale,
+        )
+        if include_capacity_controls
+        else []
     )
     return routes
 
 
 def _simulation_overrides_from_args(args: argparse.Namespace) -> dict[str, object]:
     overrides: dict[str, object] = {}
-    for key in ("steps", "time_horizon", "save_every", "bellman_every", "density_contour_levels"):
+    for key in (
+        "steps",
+        "time_horizon",
+        "save_every",
+        "bellman_every",
+        "rho_max",
+        "density_contour_levels",
+        "wall_avoidance_weight",
+        "wall_avoidance_sigma_cells",
+        "wall_avoidance_radius_cells",
+        "wall_clearance_cells",
+        "block_diagonal_corner_cutting",
+    ):
         value = getattr(args, key)
         if value is not None:
             overrides[key] = value
@@ -266,6 +334,14 @@ def _field_data_config_from_args(
     return config
 
 
+def _control_enablement_from_args(args: argparse.Namespace) -> tuple[bool, bool]:
+    apply_controls = bool(getattr(args, "apply_controls", True))
+    return (
+        apply_controls and not bool(args.disable_direction_controls),
+        apply_controls and not bool(args.disable_capacity_controls),
+    )
+
+
 def _duration_from_base_run(base_run: dict[str, object], simulation_overrides: dict[str, object]) -> float:
     if "time_horizon" in simulation_overrides:
         return float(simulation_overrides["time_horizon"])
@@ -286,6 +362,10 @@ def _write_transfer_config(
     beta: float,
     waiting_width: int,
     capacity_scale: float,
+    inflow_rate_scale: float,
+    transition_kappa: float | None,
+    include_direction_controls: bool,
+    include_capacity_controls: bool,
     simulation_overrides: dict[str, object],
 ) -> Path:
     base_run = _load_toml(base_dir / "run.toml")
@@ -295,6 +375,14 @@ def _write_transfer_config(
     generated_dir = output_root / "_generated_configs"
     generated_dir.mkdir(parents=True, exist_ok=True)
     routes_path = generated_dir / f"routes_{case_id}.toml"
+    population_path = (base_dir / str(base_run["population"]["file"])).resolve()
+    if not math.isclose(float(inflow_rate_scale), 1.0):
+        population_path = generated_dir / f"population_{case_id}.toml"
+        generated_population = _population_with_scaled_inflows(
+            _load_toml(base_dir / str(base_run["population"]["file"])),
+            float(inflow_rate_scale),
+        )
+        population_path.write_text(_dump_population_toml(generated_population), encoding="utf-8")
     run_path = generated_dir / f"run_{case_id}.toml"
 
     generated_routes = _routes_from_hcmbo_control(
@@ -307,15 +395,19 @@ def _write_transfer_config(
         beta=beta,
         waiting_width=waiting_width,
         capacity_scale=capacity_scale,
+        transition_kappa=transition_kappa,
+        include_direction_controls=include_direction_controls,
+        include_capacity_controls=include_capacity_controls,
     )
     generated_run = {
         "simulation": dict(base_run["simulation"]),
         "objective": dict(base_run.get("objective", {})),
         "scene": {"file": str((base_dir / str(base_run["scene"]["file"])).resolve())},
-        "population": {"file": str((base_dir / str(base_run["population"]["file"])).resolve())},
+        "population": {"file": str(population_path.resolve())},
         "routes": {"file": str(routes_path.resolve())},
         "outputs": {"output_root": str(output_root.resolve())},
     }
+    generated_run["simulation"].update(simulation_overrides)
     generated_run["objective"]["name"] = case_id
 
     routes_path.write_text(_dump_routes_toml(generated_routes), encoding="utf-8")
@@ -369,6 +461,7 @@ def run_hcmbo_transfer(args: argparse.Namespace) -> dict[str, object]:
     channel_map = parse_channel_mapping(args.channel_map)
     simulation_overrides = _simulation_overrides_from_args(args)
     field_data_config = _field_data_config_from_args(args, simulation_overrides)
+    direction_controls_enabled, capacity_controls_enabled = _control_enablement_from_args(args)
 
     config_path = _write_transfer_config(
         base_dir=base_dir,
@@ -380,6 +473,10 @@ def run_hcmbo_transfer(args: argparse.Namespace) -> dict[str, object]:
         beta=args.beta,
         waiting_width=args.waiting_width,
         capacity_scale=args.capacity_scale,
+        inflow_rate_scale=args.inflow_rate_scale,
+        transition_kappa=args.transition_kappa,
+        include_direction_controls=direction_controls_enabled,
+        include_capacity_controls=capacity_controls_enabled,
         simulation_overrides=simulation_overrides,
     )
 
@@ -393,6 +490,11 @@ def run_hcmbo_transfer(args: argparse.Namespace) -> dict[str, object]:
         "beta": float(args.beta),
         "waiting_width": int(args.waiting_width),
         "capacity_scale": float(args.capacity_scale),
+        "apply_controls": bool(args.apply_controls),
+        "direction_controls_enabled": direction_controls_enabled,
+        "capacity_controls_enabled": capacity_controls_enabled,
+        "inflow_rate_scale": float(args.inflow_rate_scale),
+        "transition_kappa": None if args.transition_kappa is None else float(args.transition_kappa),
         "simulation_overrides": simulation_overrides,
         "field_data": field_data_config,
         "generated_config": str(config_path.resolve()),
@@ -432,6 +534,11 @@ def run_hcmbo_transfer(args: argparse.Namespace) -> dict[str, object]:
         "beta": float(args.beta),
         "waiting_width": int(args.waiting_width),
         "capacity_scale": float(args.capacity_scale),
+        "apply_controls": bool(args.apply_controls),
+        "direction_controls_enabled": direction_controls_enabled,
+        "capacity_controls_enabled": capacity_controls_enabled,
+        "inflow_rate_scale": float(args.inflow_rate_scale),
+        "transition_kappa": None if args.transition_kappa is None else float(args.transition_kappa),
         "field_data": field_data_config,
         "generated_config": str(config_path.resolve()),
     }
@@ -458,11 +565,35 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--beta", type=float, default=0.35, help="Metric beta for transferred direction controls.")
     parser.add_argument("--waiting-width", type=int, default=8, help="Cells behind each oriented gate used for waiting-mass diagnostics.")
     parser.add_argument("--capacity-scale", type=float, default=1.0, help="Multiplier applied to transferred G6 q rates.")
+    parser.add_argument("--apply-controls", dest="apply_controls", action="store_true", default=True, help="Apply transferred G6 direction and gate-capacity controls. This is the default.")
+    parser.add_argument("--no-controls", dest="apply_controls", action="store_false", help="Disable all transferred G6 controls while keeping the same route and population settings.")
+    parser.add_argument("--disable-direction-controls", action="store_true", help="Do not write transferred G6 channel direction controls into generated routes.")
+    parser.add_argument("--disable-capacity-controls", action="store_true", help="Do not write transferred G6 q gate-capacity controls into generated routes.")
+    parser.add_argument("--inflow-rate-scale", type=float, default=1.0, help="Multiplier applied to Bund continuous inflow rates.")
+    parser.add_argument("--transition-kappa", type=float, default=None, help="Override kappa for all route stages that transition to another stage.")
     parser.add_argument("--steps", type=int, default=None, help="Override simulation steps.")
     parser.add_argument("--time-horizon", type=float, default=None, help="Override simulation time horizon.")
     parser.add_argument("--save-every", type=int, default=None, help="Override snapshot interval.")
     parser.add_argument("--bellman-every", type=int, default=None, help="Override Bellman recomputation interval.")
+    parser.add_argument("--rho-max", type=float, default=None, help="Override maximum density used by the simulation.")
     parser.add_argument("--density-contour-levels", type=int, default=None, help="Override density contour levels.")
+    parser.add_argument("--wall-avoidance-weight", type=float, default=None, help="Soft wall-avoidance cost weight. Defaults to simulation config.")
+    parser.add_argument("--wall-avoidance-sigma-cells", type=float, default=None, help="Soft wall-avoidance decay length in grid cells.")
+    parser.add_argument("--wall-avoidance-radius-cells", type=float, default=None, help="Maximum distance in grid cells affected by soft wall avoidance.")
+    parser.add_argument("--wall-clearance-cells", type=int, default=None, help="Optional hard wall clearance in grid cells. Defaults to simulation config.")
+    parser.add_argument(
+        "--block-diagonal-corner-cutting",
+        dest="block_diagonal_corner_cutting",
+        action="store_true",
+        default=None,
+        help="Remove diagonal Bellman moves that cut across blocked wall corners.",
+    )
+    parser.add_argument(
+        "--allow-diagonal-corner-cutting",
+        dest="block_diagonal_corner_cutting",
+        action="store_false",
+        help="Allow legacy diagonal corner cutting.",
+    )
     parser.add_argument("--freeze-potentials", action="store_true", help="Set bellman_every to steps + 1 for a faster frozen-potential check.")
     parser.add_argument("--no-snapshots", action="store_true", help="Set save_every to steps + 1.")
     parser.add_argument("--save-field-data", action="store_true", help="Save compressed rho/speed/vx/vy field arrays for high-resolution post-processing.")

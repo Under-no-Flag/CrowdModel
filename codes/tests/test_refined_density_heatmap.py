@@ -12,15 +12,20 @@ from matplotlib.colors import PowerNorm
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from render_refined_density_heatmap import (
+    _density_fusion_alpha,
+    _density_overlay_alpha,
     density_percentile_limits,
     crop_density,
+    load_wall_polylines,
     load_density_frame,
+    make_density_cmap,
     make_density_norm,
     parse_percentile_pair,
     render_density_heatmap,
     resize_image_to_shape,
     resolve_background_path,
     resolve_fields_dir,
+    resolve_scene_path,
     select_manifest_entries,
     smooth_density,
     upsample_density,
@@ -63,6 +68,29 @@ class RefinedDensityHeatmapTests(unittest.TestCase):
         summary_path.write_text(json.dumps({"scene_path": str(scene_path)}), encoding="utf-8")
         return background_path
 
+    def _write_wall_scene_fixture(self, root: Path) -> Path:
+        scene_dir = root / "case_a" / "config_snapshot"
+        scene_dir.mkdir(parents=True)
+        scene_path = scene_dir / "scene.toml"
+        scene_path.write_text(
+            """
+            block_boundaries = false
+
+            [[walls]]
+            name = "main_wall"
+            shape = "polyline"
+            points = [[1, 2], [3, 4], [5, 4]]
+            width = 1.5
+            """,
+            encoding="utf-8",
+        )
+        summary_path = root / "case_a" / "summary.json"
+        summary_path.write_text(
+            json.dumps({"config_snapshot": {"files": {"scene": str(scene_path)}}}),
+            encoding="utf-8",
+        )
+        return scene_path
+
     def test_resolves_case_or_output_root_to_fields_directory(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -79,6 +107,26 @@ class RefinedDensityHeatmapTests(unittest.TestCase):
             background_path = self._write_background_fixture(root)
 
             self.assertEqual(resolve_background_path(None, fields_dir), background_path)
+
+    def test_resolves_scene_path_from_config_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fields_dir = self._write_fields_fixture(root)
+            scene_path = self._write_wall_scene_fixture(root)
+
+            self.assertEqual(resolve_scene_path(None, fields_dir), scene_path)
+
+    def test_loads_wall_polylines_for_vector_overlay(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            scene_path = self._write_wall_scene_fixture(root)
+
+            walls = load_wall_polylines(scene_path)
+
+        self.assertEqual(len(walls), 1)
+        self.assertEqual(walls[0].name, "main_wall")
+        self.assertEqual(walls[0].points, ((1.0, 2.0), (3.0, 4.0), (5.0, 4.0)))
+        self.assertEqual(walls[0].width, 1.5)
 
     def test_select_manifest_entries_defaults_to_latest_or_exact_step(self) -> None:
         entries = [
@@ -100,6 +148,18 @@ class RefinedDensityHeatmapTests(unittest.TestCase):
         self.assertEqual(smoothed.shape, (6, 6))
         self.assertGreater(float(smoothed[2, 2]), 0.0)
         self.assertLess(float(smoothed[2, 2]), 6.0)
+
+    def test_smooth_density_keeps_nonwalkable_cells_transparent(self) -> None:
+        density = np.ones((5, 5), dtype=float)
+        density[:, 2] = 20.0
+        walkable = np.ones_like(density, dtype=bool)
+        walkable[:, 2] = False
+
+        smoothed = smooth_density(density, sigma=0.8, walkable=walkable)
+
+        self.assertTrue(np.all(np.isnan(smoothed[:, 2])))
+        self.assertTrue(np.all(np.isfinite(smoothed[walkable])))
+        self.assertTrue(np.all(smoothed[walkable] <= 1.0 + 1.0e-12))
 
     def test_crop_density_keeps_active_region_with_padding(self) -> None:
         density = np.zeros((8, 10), dtype=float)
@@ -138,6 +198,38 @@ class RefinedDensityHeatmapTests(unittest.TestCase):
 
         self.assertIsInstance(norm, PowerNorm)
 
+    def test_low_density_colormap_and_alpha_emphasize_small_values(self) -> None:
+        cmap = make_density_cmap("low-density")
+        low_delta = np.linalg.norm(np.asarray(cmap(0.06))[:3] - np.asarray(cmap(0.00))[:3])
+        high_delta = np.linalg.norm(np.asarray(cmap(0.96))[:3] - np.asarray(cmap(0.90))[:3])
+        alpha = _density_overlay_alpha(
+            np.array([[0.0, 0.2, 2.0]], dtype=float),
+            vmax=10.0,
+            density_alpha=0.9,
+            overlay_threshold=0.01,
+            alpha_gamma=0.35,
+        )
+
+        self.assertGreater(low_delta, high_delta)
+        self.assertEqual(float(alpha[0, 0]), 0.0)
+        self.assertGreater(float(alpha[0, 1]), 0.1)
+        self.assertGreater(float(alpha[0, 2]), float(alpha[0, 1]))
+
+    def test_wall_preserve_fusion_keeps_zero_density_visible_and_nan_transparent(self) -> None:
+        alpha = _density_fusion_alpha(
+            np.array([[np.nan, 0.0, 0.2, 2.0]], dtype=float),
+            fusion_mode="wall-preserve",
+            vmax=10.0,
+            density_alpha=0.85,
+            overlay_threshold=0.05,
+            alpha_gamma=0.35,
+        )
+
+        self.assertEqual(float(alpha[0, 0]), 0.0)
+        self.assertEqual(float(alpha[0, 1]), 0.85)
+        self.assertEqual(float(alpha[0, 2]), 0.85)
+        self.assertEqual(float(alpha[0, 3]), 0.85)
+
     def test_render_density_heatmap_writes_single_density_png_with_background(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -159,6 +251,34 @@ class RefinedDensityHeatmapTests(unittest.TestCase):
                 vmax=8.0,
                 dpi=80,
                 background_path=background_path,
+            )
+
+            self.assertTrue(output_path.exists())
+            self.assertGreater(output_path.stat().st_size, 0)
+
+    def test_render_density_heatmap_can_draw_vector_wall_overlay_without_raster_background(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            fields_dir = self._write_fields_fixture(root)
+            scene_path = self._write_wall_scene_fixture(root)
+            entry = select_manifest_entries(
+                json.loads((fields_dir / "fields_manifest.json").read_text(encoding="utf-8"))["files"],
+                step=4,
+                render_all=False,
+            )[0]
+            frame = load_density_frame(fields_dir, entry)
+            output_path = root / "density_vector_walls.png"
+
+            render_density_heatmap(
+                frame,
+                output_path,
+                scale=2,
+                smooth_sigma=0.5,
+                vmax=8.0,
+                dpi=80,
+                walls=load_wall_polylines(scene_path),
+                wall_overlay="vector",
+                nonwalkable_fill="zero",
             )
 
             self.assertTrue(output_path.exists())

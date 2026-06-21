@@ -32,6 +32,11 @@ class SimulationConfig:
     bellman_backend: str = "sweeping"
     direction_recovery_backend: str = "vectorized"
     density_contour_levels: tuple[float, ...] | int | None = 0
+    block_diagonal_corner_cutting: bool = True
+    wall_avoidance_weight: float = 0.0
+    wall_avoidance_sigma_cells: float = 2.0
+    wall_avoidance_radius_cells: float = 4.0
+    wall_clearance_cells: int = 0
 
 
 @dataclass(frozen=True)
@@ -44,6 +49,10 @@ class BaseScene:
     channel_masks: dict[str, np.ndarray]
     probe_x: dict[str, int]
     channel_axes: dict[str, tuple[float, float]]
+    wall_mask: np.ndarray
+    wall_distance_cells: np.ndarray
+    wall_cost: np.ndarray
+    corner_block_mask: np.ndarray
     wall_x0: int
     wall_x1: int
     tooth_x1: int
