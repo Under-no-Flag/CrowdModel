@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,6 +27,7 @@ from bund_pass_through_ablation_runner import (
     add_center_goal_regions,
     make_route_variant,
 )
+from crowd_bellman.metrics import channel_flux_variance
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -344,6 +346,240 @@ def _plot_timeseries(rows: list[dict[str, object]], metric: str, output: Path, *
     plt.close(fig)
 
 
+def _read_csv_rows(path: Path) -> list[dict[str, str]]:
+    with path.open("r", newline="", encoding="utf-8") as handle:
+        return list(csv.DictReader(handle))
+
+
+def _float_text(value: object, default: float = 0.0) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def _objective_setting(summary: dict[str, object], key: str, default: float) -> float:
+    for container_key in ("objective", "objective_config"):
+        raw = summary.get(container_key, {})
+        if isinstance(raw, dict) and key in raw:
+            return _float_text(raw.get(key), default)
+    return float(default)
+
+
+def _channel_columns(fieldnames: Iterable[str], prefix: str) -> list[str]:
+    return sorted(name for name in fieldnames if name.startswith(prefix))
+
+
+def _build_j5_series(
+    timeseries_rows: list[dict[str, str]],
+    *,
+    final_j5_eval: float,
+    j5_scale: float,
+) -> tuple[list[float], str]:
+    if not timeseries_rows:
+        return [], "missing"
+    fieldnames = list(timeseries_rows[0])
+    flux_columns = _channel_columns(fieldnames, "channel_flux_cumulative_")
+    if flux_columns:
+        raw_values = [
+            channel_flux_variance(
+                {column.removeprefix("channel_flux_cumulative_"): _float_text(row.get(column)) for column in flux_columns}
+            )
+            for row in timeseries_rows
+        ]
+        final_raw = raw_values[-1] if raw_values else 0.0
+        if final_raw > 1.0e-12 and math.isfinite(final_raw):
+            factor = float(final_j5_eval) / final_raw
+            return [float(value * factor) for value in raw_values], "channel_flux_cumulative_scaled_to_summary"
+        return [0.0 for _ in raw_values], "channel_flux_cumulative_zero"
+
+    density_columns = _channel_columns(fieldnames, "channel_density_")
+    if not density_columns:
+        return [0.0 for _ in timeseries_rows], "unavailable"
+
+    cumulative = {column.removeprefix("channel_density_"): 0.0 for column in density_columns}
+    proxy_values: list[float] = []
+    for row in timeseries_rows:
+        dt = _float_text(row.get("dt"))
+        for column in density_columns:
+            channel = column.removeprefix("channel_density_")
+            cumulative[channel] += max(_float_text(row.get(column)), 0.0) * max(dt, 0.0)
+        proxy_values.append(channel_flux_variance(cumulative))
+
+    final_proxy = proxy_values[-1] if proxy_values else 0.0
+    if final_proxy > 1.0e-12 and math.isfinite(final_proxy):
+        factor = float(final_j5_eval) / final_proxy
+        return [float(value * factor) for value in proxy_values], "channel_density_exposure_variance_proxy_scaled_to_summary"
+    if len(proxy_values) <= 1:
+        return [float(final_j5_eval) for _ in proxy_values], "channel_density_exposure_proxy_fallback"
+    return [
+        float(final_j5_eval) * index / float(len(proxy_values) - 1)
+        for index, _ in enumerate(proxy_values)
+    ], "linear_scaled_to_summary"
+
+
+def load_objective_timeseries(case_dir: Path, *, label: str) -> tuple[list[dict[str, object]], dict[str, object]]:
+    summary = _load_json(case_dir / "summary.json")
+    rows = _read_csv_rows(case_dir / "timeseries.csv")
+    if not rows:
+        return [], {"case": label, "j5_source": "missing", "rows": 0}
+
+    objective_payload = summary.get("objective", {})
+    if not isinstance(objective_payload, dict):
+        objective_payload = {}
+    normalization_context = summary.get("normalization_context", {})
+    if not isinstance(normalization_context, dict):
+        normalization_context = {}
+
+    j1_denominator = _float_text(normalization_context.get("j1_denominator"))
+    j2_denominator = _float_text(normalization_context.get("j2_denominator"))
+    j1_scale = _objective_setting(summary, "j1_scale", 1.0)
+    j2_scale = _objective_setting(summary, "j2_scale", 0.001)
+    j5_scale = _objective_setting(summary, "j5_scale", 1.0)
+    lambda_j1 = _objective_setting(summary, "lambda_j1", 1.0)
+    lambda_j2 = _objective_setting(summary, "lambda_j2", 1.0)
+    lambda_j5 = _objective_setting(summary, "lambda_j5", 1.0)
+    final_j5_eval = _float_text(objective_payload.get("j5_eval"), _float_from(summary, "j5_normalized") / max(j5_scale, 1.0e-12))
+    j5_series, j5_source = _build_j5_series(rows, final_j5_eval=final_j5_eval, j5_scale=j5_scale)
+
+    output_rows: list[dict[str, object]] = []
+    for index, row in enumerate(rows):
+        j1_raw = _float_text(row.get("travel_time_cumulative"))
+        j2_raw = _float_text(row.get("high_density_exposure_cumulative"), _float_text(row.get("j2_safety_risk_cumulative")))
+        j1_normalized = j1_raw / j1_denominator if j1_denominator > 1.0e-12 else 0.0
+        j2_normalized = j2_raw / j2_denominator if j2_denominator > 1.0e-12 else 0.0
+        j1_eval = j1_normalized / max(j1_scale, 1.0e-12)
+        j2_eval = j2_normalized / max(j2_scale, 1.0e-12)
+        j5_eval = float(j5_series[index]) if index < len(j5_series) else 0.0
+        objective_value = lambda_j1 * j1_eval + lambda_j2 * j2_eval + lambda_j5 * j5_eval
+        output_rows.append(
+            {
+                "case": label,
+                "step": int(index),
+                "time": _float_text(row.get("time")),
+                "j1_raw": j1_raw,
+                "j2_raw": j2_raw,
+                "j1_normalized": j1_normalized,
+                "j2_normalized": j2_normalized,
+                "j5_eval": j5_eval,
+                "j1_eval": j1_eval,
+                "j2_eval": j2_eval,
+                "objective_value": objective_value,
+                "j5_source": j5_source,
+            }
+        )
+
+    metadata = {
+        "case": label,
+        "rows": len(output_rows),
+        "j5_source": j5_source,
+        "final_objective_from_timeseries": output_rows[-1]["objective_value"],
+        "summary_objective_value": _float_from(summary, "objective_value"),
+        "final_j1_eval_from_timeseries": output_rows[-1]["j1_eval"],
+        "summary_j1_eval": _float_text(objective_payload.get("j1_eval"), _float_from(summary, "j1_normalized")),
+        "final_j2_eval_from_timeseries": output_rows[-1]["j2_eval"],
+        "summary_j2_eval": _float_text(objective_payload.get("j2_eval"), _float_from(summary, "j2_normalized") / max(j2_scale, 1.0e-12)),
+        "final_j5_eval_from_timeseries": output_rows[-1]["j5_eval"],
+        "summary_j5_eval": final_j5_eval,
+    }
+    return output_rows, metadata
+
+
+def _smooth(values: list[float], window: int = 9) -> np.ndarray:
+    data = np.asarray(values, dtype=float)
+    if data.size < 3 or window <= 1:
+        return data
+    actual_window = min(int(window), data.size)
+    if actual_window % 2 == 0:
+        actual_window -= 1
+    if actual_window <= 1:
+        return data
+    kernel = np.ones(actual_window, dtype=float) / float(actual_window)
+    pad = actual_window // 2
+    padded = np.pad(data, (pad, pad), mode="edge")
+    return np.convolve(padded, kernel, mode="valid")
+
+
+def _group_objective_rows(rows: list[dict[str, object]]) -> dict[str, list[dict[str, object]]]:
+    grouped: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        grouped.setdefault(str(row["case"]), []).append(row)
+    return {label: sorted(items, key=lambda item: float(item["time"])) for label, items in sorted(grouped.items())}
+
+
+def _plot_objective_stacked_timeseries(rows: list[dict[str, object]], output: Path) -> None:
+    grouped = _group_objective_rows(rows)
+    if not grouped:
+        return
+    fig, axes = plt.subplots(len(grouped), 1, figsize=(11.5, 3.4 * len(grouped)), dpi=180, sharex=True)
+    if not isinstance(axes, np.ndarray):
+        axes = np.asarray([axes])
+    colors = ["#cfe3ff", "#3b82f6", "#7c3aed"]
+    labels = ["J1 travel", "J2 density risk", "J5 balance"]
+    for ax, (case, items) in zip(axes, grouped.items()):
+        time = np.asarray([float(item["time"]) for item in items], dtype=float)
+        j1 = _smooth([float(item["j1_eval"]) for item in items])
+        j2 = _smooth([float(item["j2_eval"]) for item in items])
+        j5 = _smooth([float(item["j5_eval"]) for item in items])
+        objective = _smooth([float(item["objective_value"]) for item in items])
+        ax.stackplot(time, j1, j2, j5, labels=labels, colors=colors, alpha=0.96)
+        ax.plot(time, objective, color="#4338ca", linewidth=2.0, label="J total")
+        ax.set_title(f"{case}: objective terms over time")
+        ax.set_ylabel("J contribution")
+        ax.grid(axis="y", linestyle="--", alpha=0.3)
+        ax.legend(loc="upper left", ncols=4, fontsize=8)
+    axes[-1].set_xlabel("time")
+    fig.tight_layout()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output)
+    plt.close(fig)
+
+
+def _plot_objective_line_timeseries(rows: list[dict[str, object]], output: Path) -> None:
+    grouped = _group_objective_rows(rows)
+    if not grouped:
+        return
+    metrics = [
+        ("j1_eval", "J1 travel"),
+        ("j2_eval", "J2 density risk"),
+        ("j5_eval", "J5 balance"),
+        ("objective_value", "J total"),
+    ]
+    fig, axes = plt.subplots(len(metrics), 1, figsize=(11.0, 9.0), dpi=180, sharex=True)
+    for ax, (metric, title) in zip(axes, metrics):
+        for case, items in grouped.items():
+            time = [float(item["time"]) for item in items]
+            values = _smooth([float(item[metric]) for item in items])
+            ax.plot(time, values, linewidth=1.8, label=case)
+        ax.set_title(title)
+        ax.set_ylabel("value")
+        ax.grid(alpha=0.25)
+        ax.legend(loc="best", fontsize=8)
+    axes[-1].set_xlabel("time")
+    fig.tight_layout()
+    output.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output)
+    plt.close(fig)
+
+
+def generate_objective_timeseries_outputs(comparison_root: Path) -> dict[str, object]:
+    objective_rows: list[dict[str, object]] = []
+    metadata: list[dict[str, object]] = []
+    for spec in DEFAULT_CASE_SPECS:
+        rows, payload = load_objective_timeseries(comparison_root / spec.case_id / spec.case_id, label=spec.label)
+        objective_rows.extend(rows)
+        metadata.append(payload)
+    _write_csv(comparison_root / "objective_timeseries.csv", objective_rows)
+    (comparison_root / "objective_timeseries_metadata.json").write_text(
+        json.dumps({"cases": metadata}, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    figures_dir = comparison_root / "figures"
+    _plot_objective_stacked_timeseries(objective_rows, figures_dir / "all_j_timeseries_stacked.png")
+    _plot_objective_line_timeseries(objective_rows, figures_dir / "all_j_timeseries_lines.png")
+    return {"objective_timeseries_csv": str(comparison_root / "objective_timeseries.csv"), "objective_timeseries_metadata": metadata}
+
+
 def _plot_channel_flux_share(rows: list[dict[str, object]], output: Path) -> None:
     channels = sorted({key.split(".", 1)[1] for row in rows for key in row if key.startswith("channel_flux_share.")})
     if not channels:
@@ -374,8 +610,12 @@ def write_visualization_plan(path: Path) -> None:
                 "",
                 "- `comparison_summary.csv`: controlled/uncontrolled final metrics and flattened channel shares.",
                 "- `field_timeseries.csv`: every saved field frame, including density sum/mean/max and speed mean/max.",
+                "- `objective_timeseries.csv`: per-step J1/J2/J5/J-total time series reconstructed from case timeseries.",
+                "- `objective_timeseries_metadata.json`: reconstruction source and final-value consistency checks.",
                 "- `figures/final_metrics_bar.png`: objective, sink, mass, peak density summary.",
                 "- `figures/objective_terms_bar.png`: normalized J1/J2/J5 comparison.",
+                "- `figures/all_j_timeseries_stacked.png`: stacked J1/J2/J5 contribution curves over time.",
+                "- `figures/all_j_timeseries_lines.png`: line comparison for J1, J2, J5, and total objective over time.",
                 "- `figures/density_sum_timeseries.png`: saved density mass proxy over time.",
                 "- `figures/density_max_timeseries.png`: peak density over time.",
                 "- `figures/density_nonzero_cells_timeseries.png`: occupied-area proxy over time.",
@@ -436,8 +676,9 @@ def generate_comparison_outputs(comparison_root: Path) -> dict[str, object]:
         ylabel="cells",
     )
     _plot_timeseries(field_rows, "speed_mean", figures_dir / "speed_mean_timeseries.png", title="Mean Active Speed Over Time", ylabel="speed")
+    objective_outputs = generate_objective_timeseries_outputs(comparison_root)
     write_visualization_plan(comparison_root / "visualization_plan.md")
-    return {"summary_rows": summary_rows, "field_rows": field_rows, "case_dirs": case_dirs}
+    return {"summary_rows": summary_rows, "field_rows": field_rows, "case_dirs": case_dirs, **objective_outputs}
 
 
 def render_high_resolution_density(
@@ -594,6 +835,7 @@ def run_comparison(args: argparse.Namespace) -> dict[str, object]:
         "field_timeseries_csv": str(comparison_root / "field_timeseries.csv"),
         "figures_dir": str(comparison_root / "figures"),
         "visualization_plan": str(comparison_root / "visualization_plan.md"),
+        "objective_timeseries_csv": str(comparison_root / "objective_timeseries.csv"),
         "high_resolution_density_dirs": {
             spec.label: str(comparison_root / spec.case_id / spec.case_id / "refined_density_vector_walls_vmax6_full_every10")
             for spec in DEFAULT_CASE_SPECS

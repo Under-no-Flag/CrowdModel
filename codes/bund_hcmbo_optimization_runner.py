@@ -441,6 +441,137 @@ def _comparison_row(label: str, summary: dict[str, object], metrics: dict[str, o
     }
 
 
+def _load_json(path: Path) -> dict[str, object]:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _summary_sort_key(path: Path) -> tuple[int, str]:
+    try:
+        summary = _load_json(path)
+    except (OSError, json.JSONDecodeError):
+        return (10**9, str(path))
+    meta = summary.get("bund_hcmbo_optimization", {})
+    if isinstance(meta, dict):
+        try:
+            return (int(meta.get("eval_id", 10**9)), str(path))
+        except (TypeError, ValueError):
+            pass
+    return (10**9, str(path))
+
+
+def _summary_paths(root: Path) -> list[Path]:
+    if not root.exists():
+        return []
+    paths = [
+        path
+        for path in root.rglob("summary.json")
+        if "_generated_configs" not in path.parts
+    ]
+    return sorted(paths, key=_summary_sort_key)
+
+
+def _control_from_optimization_metadata(metadata: dict[str, object]) -> V2ControlVector:
+    control = metadata.get("control", {})
+    if not isinstance(control, dict):
+        raise ValueError("Missing HCMBO control metadata")
+    directions_raw = control.get("directions", {})
+    q_raw = control.get("q_by_gate", {})
+    if not isinstance(directions_raw, dict) or not isinstance(q_raw, dict):
+        raise ValueError("Invalid HCMBO control metadata")
+    directions = tuple(str(directions_raw[name]).upper() for name in CHANNEL_NAMES)
+    q_by_gate = tuple(
+        tuple(float(value) for value in q_raw.get(gate_id, []))
+        for gate_id in ALL_GATE_IDS
+    )
+    return V2ControlVector(directions=directions, q_by_gate=q_by_gate).normalized()
+
+
+def _record_from_summary_path(
+    path: Path,
+    *,
+    config: HCMBOConfig,
+    qbar_by_gate: dict[str, float],
+) -> V2EvaluationRecord:
+    summary = _load_json(path)
+    metadata = summary.get("bund_hcmbo_optimization", {})
+    if not isinstance(metadata, dict):
+        raise ValueError(f"{path} does not contain bund_hcmbo_optimization metadata")
+    control = _control_from_optimization_metadata(metadata)
+    metrics = compute_v2_objective(
+        summary=summary,
+        control=control,
+        qbar_by_gate=qbar_by_gate,
+        config=config,
+    )
+    return V2EvaluationRecord(
+        eval_id=int(metadata.get("eval_id", 0)),
+        phase=str(metadata.get("phase", "")),
+        source=str(metadata.get("source", "")),
+        fidelity=str(metadata.get("fidelity", "")),
+        control=control,
+        objective_value=float(metrics["objective_value"]),
+        metrics=metrics,
+        summary=summary,
+        config_path=str(metadata.get("config_path", summary.get("config_path", ""))),
+    )
+
+
+def _load_records_from_existing_summaries(
+    root: Path,
+    *,
+    config: HCMBOConfig,
+    qbar_by_gate: dict[str, float],
+) -> list[V2EvaluationRecord]:
+    records: list[V2EvaluationRecord] = []
+    for path in _summary_paths(root):
+        records.append(_record_from_summary_path(path, config=config, qbar_by_gate=qbar_by_gate))
+    return records
+
+
+def _preload_records(evaluator: BundHCMBOEvaluationCache, records: list[V2EvaluationRecord]) -> None:
+    for record in sorted(records, key=lambda item: item.eval_id):
+        normalized = record.control.normalized()
+        if normalized in evaluator._cache:
+            continue
+        evaluator.records.append(record)
+        evaluator._cache[normalized] = record
+
+
+def _load_planned_direction_candidates(path: Path) -> list[tuple[str, ...]]:
+    if not path.exists():
+        return []
+    payload = _load_json(path)
+    raw_candidates = payload.get("candidates", [])
+    if not isinstance(raw_candidates, list):
+        return []
+    candidates: list[tuple[str, ...]] = []
+    for raw in raw_candidates:
+        if not isinstance(raw, dict):
+            continue
+        candidates.append(tuple(str(raw[name]).upper() for name in CHANNEL_NAMES))
+    return candidates
+
+
+def _load_no_control_reference(
+    *,
+    output_root: Path,
+    config: HCMBOConfig,
+    qbar_by_gate: dict[str, float],
+) -> tuple[dict[str, object], dict[str, float | str | bool | None]] | None:
+    paths = _summary_paths(output_root)
+    if not paths:
+        return None
+    summary = _load_json(paths[0])
+    no_cap = make_no_cap_control(tuple("FREE" for _ in CHANNEL_NAMES), config.time_segments)
+    metrics = compute_v2_objective(
+        summary=summary,
+        control=no_cap,
+        qbar_by_gate=qbar_by_gate,
+        config=config,
+    )
+    return summary, metrics
+
+
 def parse_direction_candidates(raw_values: list[str] | None) -> list[tuple[str, ...]]:
     if not raw_values:
         return []
@@ -684,6 +815,201 @@ def _actual_inflow_rate(base_dir: Path) -> float | None:
     return float(first["rate"])
 
 
+def _resolve_or_prepare_base_dir(args: argparse.Namespace, output_root: Path, *, resume_existing: bool) -> Path:
+    generated_base = output_root / "_generated_base" / str(args.route_variant)
+    if resume_existing and args.route_variant != "base" and (generated_base / "run.toml").exists():
+        return generated_base
+    return prepare_bund_hcmbo_base_dir(
+        source_base_dir=_resolve_path(args.base_dir),
+        output_root=output_root,
+        route_variant=args.route_variant,
+        transition_kappa=args.transition_kappa,
+        inflow_rate_scale=args.inflow_rate_scale,
+    )
+
+
+def run_bund_hcmbo_resume(args: argparse.Namespace) -> dict[str, object]:
+    output_root = _resolve_path(args.output_root)
+    config = build_small_budget_config(args)
+    budgets = RunBudgets(
+        screen_steps=args.screen_steps,
+        optimization_steps=args.optimization_steps,
+        high_fidelity_steps=args.high_fidelity_steps,
+        screen_time_horizon=args.screen_time_horizon,
+        optimization_time_horizon=args.optimization_time_horizon,
+        high_fidelity_time_horizon=args.high_fidelity_time_horizon,
+    )
+    base_dir = _resolve_or_prepare_base_dir(args, output_root, resume_existing=True)
+    baseline_config = base_dir / "run.toml"
+    optimization_overrides = _simulation_overrides(
+        steps=budgets.optimization_steps,
+        time_horizon=budgets.optimization_time_horizon,
+        rho_max=args.rho_max,
+    )
+    high_fidelity_overrides = _simulation_overrides(
+        steps=budgets.high_fidelity_steps,
+        time_horizon=budgets.high_fidelity_time_horizon,
+        rho_max=args.rho_max,
+    )
+    qbar_reference_gate = {gate_id: math.inf for gate_id in ALL_GATE_IDS}
+    reference_records = _load_records_from_existing_summaries(
+        output_root / "_reference",
+        config=config,
+        qbar_by_gate=qbar_reference_gate,
+    )
+    if reference_records:
+        reference_record = reference_records[0]
+    else:
+        reference_evaluator = BundHCMBOEvaluationCache(
+            baseline_config=baseline_config,
+            output_root=output_root / "_reference",
+            objective_config=config,
+            simulation_overrides=optimization_overrides,
+            fidelity="reference",
+            alpha=args.alpha,
+            beta=args.beta,
+            waiting_width=args.waiting_width,
+        )
+        reference_record = reference_evaluator.evaluate(
+            make_no_cap_control(tuple("FREE" for _ in CHANNEL_NAMES), config.time_segments),
+            source="qbar_reference_all_free",
+            phase="reference",
+            qbar_by_gate=qbar_reference_gate,
+        )
+    qbar_by_gate = qbar_from_bund_reference(reference_record.summary, config=config)
+    screen_records = _load_records_from_existing_summaries(
+        output_root / "_screen",
+        config=config,
+        qbar_by_gate=qbar_by_gate,
+    )
+    hcmbo_records = _load_records_from_existing_summaries(
+        output_root / "_optimization",
+        config=config,
+        qbar_by_gate=qbar_by_gate,
+    )
+    if not screen_records:
+        raise RuntimeError(f"Cannot resume: no screen summaries found under {output_root / '_screen'}")
+    if not hcmbo_records:
+        raise RuntimeError(f"Cannot resume: no optimization summaries found under {output_root / '_optimization'}")
+
+    planned_candidates = _load_planned_direction_candidates(output_root / "planned_direction_candidates.json")
+    if planned_candidates:
+        direction_candidates = planned_candidates
+    else:
+        direction_candidates = resolve_direction_candidates(
+            args.direction_candidate,
+            config=config,
+            rng=np.random.default_rng(config.random_seed),
+        )
+    shortlisted = shortlist_directions(screen_records, config.shortlist_size)
+    ranked_mid = sorted(screen_records + hcmbo_records, key=lambda item: item.objective_value)
+    unique_controls: list[V2ControlVector] = []
+    seen: set[V2ControlVector] = set()
+    for record in ranked_mid:
+        if record.control in seen:
+            continue
+        unique_controls.append(record.control)
+        seen.add(record.control)
+        if len(unique_controls) >= config.high_fidelity_top_k:
+            break
+
+    hf_evaluator = BundHCMBOEvaluationCache(
+        baseline_config=baseline_config,
+        output_root=output_root / "_high_fidelity",
+        objective_config=config,
+        simulation_overrides=high_fidelity_overrides,
+        fidelity="hf",
+        alpha=args.alpha,
+        beta=args.beta,
+        waiting_width=args.waiting_width,
+    )
+    existing_hf_records = _load_records_from_existing_summaries(
+        output_root / "_high_fidelity",
+        config=config,
+        qbar_by_gate=qbar_by_gate,
+    )
+    _preload_records(hf_evaluator, existing_hf_records)
+    hf_records: list[V2EvaluationRecord] = []
+    for control in unique_controls:
+        cached = hf_evaluator._cache.get(control.normalized())
+        if cached is not None:
+            hf_records.append(cached)
+            continue
+        hf_records.append(
+            hf_evaluator.evaluate(
+                control,
+                source="high_fidelity_recheck",
+                phase="high_fidelity",
+                qbar_by_gate=qbar_by_gate,
+            )
+        )
+
+    best = min(hf_records or hcmbo_records, key=lambda item: item.objective_value)
+    no_control_loaded = _load_no_control_reference(
+        output_root=output_root / "_no_control",
+        config=config,
+        qbar_by_gate=qbar_by_gate,
+    )
+    if no_control_loaded is None:
+        no_control_summary, no_control_metrics = run_no_control_reference(
+            baseline_config=baseline_config,
+            output_root=output_root / "_no_control",
+            config=config,
+            simulation_overrides=high_fidelity_overrides,
+            qbar_by_gate=qbar_by_gate,
+        )
+    else:
+        no_control_summary, no_control_metrics = no_control_loaded
+
+    all_records = [reference_record] + screen_records + hcmbo_records + hf_records
+    _write_csv(output_root / "bund_hcmbo_evaluation_log.csv", _record_rows(all_records))
+    _write_csv(output_root / "bund_hcmbo_top_candidates.csv", _record_rows(sorted(hf_records or hcmbo_records, key=lambda item: item.objective_value)))
+    comparison_rows = [
+        _comparison_row("hcmbo_controlled", best.summary, best.metrics),
+        _comparison_row("no_control", no_control_summary, no_control_metrics),
+    ]
+    _write_csv(output_root / "bund_hcmbo_vs_no_control.csv", comparison_rows)
+    save_json(output_root / "bund_hcmbo_best_control.json", best.control.to_dict())
+    payload = {
+        "created_at": datetime.now().astimezone().isoformat(),
+        "resumed_from_existing": True,
+        "output_root": str(output_root),
+        "base_dir": str(base_dir),
+        "baseline_config": str(baseline_config),
+        "route_variant": args.route_variant,
+        "inflow_rate_scale": float(args.inflow_rate_scale),
+        "actual_inflow_rate": _actual_inflow_rate(base_dir),
+        "rho_max": float(args.rho_max),
+        "config": config.__dict__,
+        "budgets": budgets.__dict__,
+        "direction_candidates": [dict(zip(CHANNEL_NAMES, item)) for item in direction_candidates],
+        "shortlisted_directions": [dict(zip(CHANNEL_NAMES, item)) for item in shortlisted],
+        "qbar_by_gate": qbar_by_gate,
+        "loaded_existing_counts": {
+            "reference": len(reference_records),
+            "screen": len(screen_records),
+            "optimization": len(hcmbo_records),
+            "high_fidelity_before_resume": len(existing_hf_records),
+            "high_fidelity_total": len(hf_records),
+        },
+        "best_high_fidelity": best.to_row(),
+        "no_control": {
+            "summary": _comparison_row("no_control", no_control_summary, no_control_metrics),
+            "metrics": no_control_metrics,
+        },
+        "comparison_rows": comparison_rows,
+        "outputs": {
+            "evaluation_log": str(output_root / "bund_hcmbo_evaluation_log.csv"),
+            "top_candidates": str(output_root / "bund_hcmbo_top_candidates.csv"),
+            "best_control": str(output_root / "bund_hcmbo_best_control.json"),
+            "comparison": str(output_root / "bund_hcmbo_vs_no_control.csv"),
+        },
+        "intermediate_data_policy": "No field arrays or high-resolution visualizations are generated by default.",
+    }
+    save_json(output_root / "bund_hcmbo_optimization_summary.json", payload)
+    return payload
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Small-budget Bund HCMBO optimization for control inputs, compared with no control.")
     parser.add_argument("--base-dir", default=str(DEFAULT_BASE_DIR), help="Converted BundScene directory.")
@@ -723,11 +1049,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         help="Comma-separated HCMBO direction states for top,middle,lower_middle,bottom. Can be repeated.",
     )
+    parser.add_argument(
+        "--resume-existing",
+        action="store_true",
+        help="Reuse completed summaries in output-root and only run missing high-fidelity/no-control work.",
+    )
     return parser
 
 
 def main() -> None:
-    payload = run_bund_hcmbo_optimization(build_arg_parser().parse_args())
+    args = build_arg_parser().parse_args()
+    payload = run_bund_hcmbo_resume(args) if args.resume_existing else run_bund_hcmbo_optimization(args)
     print(json.dumps(
         {
             "summary": payload["outputs"],

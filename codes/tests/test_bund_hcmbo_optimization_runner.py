@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import json
 import sys
 import tempfile
 import unittest
@@ -11,6 +12,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from bund_hcmbo_optimization_runner import (
+    _load_records_from_existing_summaries,
     build_arg_parser,
     build_bund_controlled_routes,
     build_small_budget_config,
@@ -107,6 +109,51 @@ class BundHCMBOOptimizationRunnerTests(unittest.TestCase):
         self.assertEqual(args.high_fidelity_steps, 240)
         self.assertEqual(args.rho_max, 4.0)
         self.assertEqual(args.direction_candidate_limit, 12)
+        self.assertFalse(args.resume_existing)
+
+    def test_resume_record_loader_rebuilds_control_from_summary(self) -> None:
+        args = build_arg_parser().parse_args(["--time-segments", "2"])
+        config = build_small_budget_config(args)
+        with tempfile.TemporaryDirectory() as tmp:
+            case_dir = Path(tmp) / "case"
+            case_dir.mkdir()
+            q_by_gate = {gate_id: [0.1, 0.2] for gate_id in ALL_GATE_IDS}
+            summary = {
+                "case_id": "case",
+                "final_time": 1.0,
+                "final_cap_removed_cumulative": 0.0,
+                "normalization_context": {"total_mass_reference": 1.0, "evaluation_time": 1.0},
+                "objective": {"j1_eval": 1.0, "j2_eval": 2.0, "j5_eval": 3.0},
+                "bund_hcmbo_optimization": {
+                    "source": "resume_test",
+                    "phase": "high_fidelity",
+                    "fidelity": "hf",
+                    "eval_id": 7,
+                    "control": {
+                        "directions": {
+                            "top": "FREE",
+                            "middle": "E",
+                            "lower_middle": "W",
+                            "bottom": "FREE",
+                        },
+                        "q_by_gate": q_by_gate,
+                    },
+                    "config_path": "run.toml",
+                },
+            }
+            (case_dir / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+
+            records = _load_records_from_existing_summaries(
+                Path(tmp),
+                config=config,
+                qbar_by_gate={gate_id: 1.0 for gate_id in ALL_GATE_IDS},
+            )
+
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0].eval_id, 7)
+        self.assertEqual(records[0].phase, "high_fidelity")
+        self.assertEqual(records[0].control.directions, ("FREE", "E", "W", "FREE"))
+        self.assertEqual(records[0].control.q_by_gate[0], (0.1, 0.2))
 
     def test_default_direction_candidates_generate_twelve_hcmbo_candidates(self) -> None:
         args = build_arg_parser().parse_args([])
