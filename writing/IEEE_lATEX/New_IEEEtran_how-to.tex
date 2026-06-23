@@ -31,7 +31,7 @@ Open scenic areas and major event venues often face systematic stampede risks ca
 In such scenarios, the principal operational controls are to set channel directions, including one-way, two-way, and closed states, and to regulate time-varying entrance release intensities; however, the coupled effects of these two types of controls on global pedestrian flow still lack quantitative modeling and optimization tools.
 To address this problem, this paper proposes a macroscopic crowd dynamics modeling and control-measure optimization method for fine-grained large-scale crowd management.
 The model is built upon the Hughes continuum framework.
-To represent operational rules in a continuum setting, local admissible direction sets are introduced to characterize discrete control states such as one-way movement, two-way movement, and channel closure, while anisotropic metrics describe the geometric guidance exerted by channel layouts on pedestrian flow.
+To represent operational rules in a continuum setting, local admissible direction sets are introduced to characterize discrete control states such as one-way movement, two-way movement, and channel closure, while anisotropic mobility tensors describe the geometric guidance exerted by channel layouts on pedestrian flow.
 On this basis, internal channel entrance flow-rate control is further introduced, enabling a control strategy to jointly specify travel directions and time-varying release intensities.
 To solve the resulting mixed-variable optimization problem composed of discrete direction configurations and continuous release intensities, this paper designs a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm for searching optimal crowd control strategies.
 Experiments on a simplified scenic-platform scenario show that the proposed macroscopic model can capture the complex interactions among multi-stage behavior, channel geometric guidance, and direction constraints.
@@ -85,7 +85,7 @@ Third, in open scenic area scenarios with multiple entrances, passages, and stag
 Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
 
 To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, fixed geometric guidance, multi-stage route behavior, and internal entrance capacity control, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario.
-At the modeling level, this paper constructs a Bellman--conservation-law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set; and a fixed anisotropic metric tensor $M(x;\eta_0)$ characterizes geometric channel alignment.
+At the modeling level, this paper constructs a Bellman--conservation-law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set; and a fixed anisotropic mobility tensor $M(x;\eta_0)$ characterizes geometric channel alignment.
 We further introduce internal entrance capacity variables $q_c^\pm(t)$ to distinguish attempted entrance flow from actually admitted flow, so that excessive demand remains as upstream waiting rather than disappearing from the system.
 At the optimization level, the controllable variable is $z=(s,q)$, whereas visitor route preferences $\hat p$ and the geometric guidance parameter $\eta_0$ are fixed model inputs.
 The scalarized objective combines total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and capacity-control smoothness.
@@ -97,7 +97,7 @@ The main contributions of this paper are as follows.
 \item A ``waterfront platform--multi-stepped passage'' crowd flow modeling framework for open scenic areas is proposed, representing visitor behavior as a multi-stage, multi-route continuum flow process, where different subpopulations possess independent potential functions while sharing collective congestion feedback.
 
 \item A Bellman--conservation law coupled model integrating passage constraints and geometric guidance is constructed.
-The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic metric tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
+The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic mobility tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
 
 \item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, realized channel-flow variance, entrance waiting, and control smoothness).
 
@@ -147,7 +147,7 @@ To overcome non-physical behaviors such as supersonic information propagation th
 The Aw--Rascle (AR) framework was subsequently adapted to pedestrian flows \cite{RN2104}, where the congestion pressure term successfully reproduces characteristic phenomena including stop-and-go waves and spontaneous lane formation.
 
 Beyond the classical Hughes-type framework, extensions have incorporated control and guidance mechanisms relevant to crowd management.
-Anisotropic formulations using metric tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}, allowing for continuous geometric guidance without explicit prohibition.
+Anisotropic formulations using mobility tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}, allowing for continuous geometric guidance without explicit prohibition.
 Constrained Hamilton-Jacobi-Bellman (HJB) formulations have been employed to model strict directional constraints such as one-way corridors, with the Bellman optimality principle providing a natural framework for unifying anisotropic geometric guidance with discrete directional constraints.
 
 Despite these advances, existing approaches often treat control parameters as fixed or manually tuned.
@@ -206,7 +206,7 @@ This function captures the feedback that pedestrians move close to free-flow spe
 
 The classical Hughes model assumes that all movement directions are feasible and isotropic.
 This assumption is insufficient for crowd management scenarios involving one-way rules, temporary closures, entrance metering, and channel-axis alignment.
-The following subsections introduce admissible direction sets, fixed anisotropic metrics, and internal entrance capacity control into the Bellman--conservation-law framework.
+The following subsections introduce admissible direction sets, anisotropic mobility tensors, and internal entrance capacity control into the Bellman--conservation-law framework.
 
 \subsubsection{Multi-Stage Multi-Route Density Decomposition}
 
@@ -265,21 +265,22 @@ U_c(x;s_c)=
 Thus, $s_c$ changes the local feasible direction set.
 A closed channel has no admissible direction, a one-way channel retains only one reference tangent, and a bidirectional channel retains both opposite tangential directions.
 
-\subsubsection{Fixed Anisotropic Metric}
+\subsubsection{Anisotropic Mobility Tensor}
 \label{sec:guidance}
 
 The admissible set $U(x;s)$ represents hard feasibility, but it does not capture the soft geometric guidance induced by narrow channels.
 Pedestrians approaching a passage often pre-align with the channel axis before entering it.
-To represent this effect, a fixed anisotropic metric tensor $M(x;\eta_0)$ is introduced.
+To represent this effect, an anisotropic mobility tensor $M(x;\eta_0)$ is introduced.
+Equivalently, it is the inverse of a local travel-cost metric.
 For channel $c$, let $\tau_c$ and $n_c$ denote its tangent and normal directions.
-The metric tensor is defined as
+The mobility tensor is defined as
 \begin{equation}
 M_c(x;\eta_0)=\beta_c\left(\eta_0\,\tau_c\tau_c^\top+n_c n_c^\top\right),
 \qquad \eta_0\ge 1,
-\label{eq:metric_tensor}
+\label{eq:mobility_tensor}
 \end{equation}
-where $\beta_c$ is a channel weight and $\eta_0$ controls the preference strength along the channel axis.
-Larger $\eta_0$ reduces the effective cost of tangential motion and promotes upstream pre-alignment.
+where $\beta_c$ is a channel weight and $\eta_0$ controls the mobility preference strength along the channel axis.
+Larger $\eta_0$ increases tangential mobility, equivalently reducing the effective cost of tangential motion and promoting upstream pre-alignment.
 In this paper, $\eta_0$ is fixed and is not optimized as a control variable.
 
 \subsubsection{Constrained Bellman Equation}
@@ -349,7 +350,7 @@ This treatment changes channel usage and risk distribution while preserving the 
 
 The walkable region, obstacles, channel areas, and internal entrance interfaces are discretized on a uniform two-dimensional grid.
 At each time step, the total density is first computed from all stage--route subpopulations and used to update $f(\rho)$.
-For each subpopulation, the admissible direction set and fixed metric tensor are then constructed, and the corresponding discrete Bellman equation is solved.
+For each subpopulation, the admissible direction set and mobility tensor are then constructed, and the corresponding discrete Bellman equation is solved.
 After the velocity direction is recovered, an upwind finite-volume update advances the conservation law, while internal entrance fluxes are modified by $\theta_c^\pm(t)$.
 Finally, stage transition terms are applied to update the subpopulation densities.
 
@@ -521,7 +522,7 @@ A high-fidelity best candidate is called feasible if the density-cap removal mas
 \label{sec:mechanism}
 
 The first experiment verifies whether the two local modeling components have the intended behavioral meanings.
-The fixed anisotropic metric $M(x;\eta_0)$ should reshape the channel attraction domain and induce entrance pre-alignment, whereas the admissible direction set $U(x;s)$ should remove prohibited directions and reroute flow through feasible passages.
+The fixed anisotropic mobility tensor $M(x;\eta_0)$ should reshape the channel attraction domain and induce entrance pre-alignment, whereas the admissible direction set $U(x;s)$ should remove prohibited directions and reroute flow through feasible passages.
 When $M$ is applied to the middle channel, its flow share increases from $48.78\%$ in the baseline to $100.00\%$.
 When a one-way rule excludes the originally dominant middle-channel direction, the middle-channel share becomes zero and the flow is redistributed to the upper, lower-middle, and bottom channels with shares $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
 In a bidirectional inflow test, imposing an eastbound one-way rule reduces the westbound middle-channel share, reverse-direction mass time, and counterflow cell time from $73.18\%$, $415.75$, and $1213.76$ to zero.
@@ -855,7 +856,7 @@ Future work will combine real geometric data with multi-source pedestrian observ
 \label{sec:conclusion}
 
 This paper proposed a Bellman--conservation-law crowd management framework for open pedestrian zones with multi-channel direction rules and internal entrance-rate control.
-The admissible direction set $U(x;s)$ represents hard operational rules such as one-way, bidirectional, and closed passages; the fixed metric tensor $M(x;\eta_0)$ represents geometric guidance; and the multi-stage route structure describes entry, viewing, exit, and return movements.
+The admissible direction set $U(x;s)$ represents hard operational rules such as one-way, bidirectional, and closed passages; the fixed mobility tensor $M(x;\eta_0)$ represents geometric guidance; and the multi-stage route structure describes entry, viewing, exit, and return movements.
 The controllable variable is $z=(s,q)$, where $s$ is the channel direction configuration and $q$ is the internal entrance-rate upper-bound profile; behavioral preference $\hat p$ and geometric guidance strength $\eta_0$ are fixed model inputs.
 
 The numerical experiments support three conclusions.
