@@ -32,6 +32,24 @@ python codes\render_refined_density_heatmap.py codes\results\bund_hcmbo_transfer
 
 参数约定：`--scale` 控制密度场插值倍率，`--smooth-sigma` 控制平滑强度，`--color-scale frame-percentile` 使每帧颜色相对当前密度分布更明显，`--cmap low-density` 使用低密度强化的非均匀色阶，`--gamma 0.42` 强化低密度颜色响应，`--fusion-mode wall-preserve` 会保留墙/障碍背景，同时让所有非墙有限密度单元都按密度色表填充，包括密度为 0 的区域，`--density-alpha 1.0` 使密度层完全覆盖非墙背景。脚本会自动从 `summary.json` 或配置快照定位 `grid_overlay.png` 作为场景结构背景；若背景定位失败，可显式传入 `--background <grid_overlay.png>`。生成外滩论文或汇报图时，优先使用 `refined_density_wall_aware_hq/density_step_1599.png` 等高清图。
 
+## 外滩有/无管控密度热力图拼图
+
+对 `bund_control_comparison_*` 对比实验目录，若需要生成 2 行 4 列的有/无管控高清密度对比图，使用 `codes/render_bund_comparison_panel.py`。该脚本读取 `controlled/controlled/fields` 与 `uncontrolled/uncontrolled/fields` 中保存的 `field_step_XXXX.npz`，按 `scene.toml` 中的 `[[walls]]` polyline 范围自动裁剪外滩主体区域，避免整张网格带来过多留白；两行分别为 `Uncontrolled` 与 `Controlled`，四列为输入的 4 个 step，并使用统一色条。
+
+推荐命令如下，将 `<comparison_dir>` 替换为某个外滩对比实验目录，后面 4 个数字替换为需要展示的 step：
+
+```powershell
+python codes\render_bund_comparison_panel.py <comparison_dir> 40 400 800 1590 --output <comparison_dir>\figures\bund_comparison_density_panel_steps_0040_0400_0800_1590.png --scale 8 --smooth-sigma 5 --vmax 6 --dpi 240
+```
+
+示例：
+
+```powershell
+python codes\render_bund_comparison_panel.py codes\results\bund_control_comparison_hcmbo 40 400 800 1590 --output codes\results\bund_control_comparison_hcmbo\figures\bund_comparison_density_panel_steps_0040_0400_0800_1590.png --scale 8 --smooth-sigma 5 --vmax 6 --dpi 240
+```
+
+注意：输入的 step 必须已在 `fields_manifest.json` 中保存，例如每 10 step 保存时可使用 `40 400 800 1590`，最终帧可能是 `1599` 而不是 `1600`。若希望自动使用最近保存帧，可追加 `--nearest`。常用参数中，`--crop-padding` 控制墙线范围外保留的网格边距，默认 10；`--vmax` 控制右侧色条最大密度；`--gamma 0.42` 与低密度强化色阶配合，使低密度区域也可见。
+
 ## 写作要点
 - 撰写论文内容段落时，句子之间逻辑严密，切题。
 - 不要分点要成一个段落、尽量不使用双引号和破折号。
