@@ -35,7 +35,7 @@ To represent operational rules in a continuum setting, local admissible directio
 On this basis, internal channel entrance flow-rate control is further introduced, enabling a control strategy to jointly specify travel directions and time-varying release intensities.
 To solve the resulting mixed-variable optimization problem composed of discrete direction configurations and continuous release intensities, this paper designs a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm for searching optimal crowd control strategies.
 Experiments on a simplified scenic-platform scenario show that the proposed macroscopic model can capture the complex interactions among multi-stage behavior, channel geometric guidance, and direction constraints.
-Under a composite objective formed by weighted indicators including total travel time, high-density exposure, and realized channel-load imbalance, repeated experiments show that HCMBO achieves the lowest mean objective value.
+Under a dimensionless composite objective obtained by weighting normalized travel-time, high-density-exposure, channel-load-imbalance, waiting, and control-smoothness terms, repeated experiments show that HCMBO achieves the lowest mean objective value.
 It reduces the objective by approximately 4.0\% compared with the second-best TPE-style mixed Bayesian optimization method, and also outperforms random search, pure simulated annealing, differential evolution, and other baseline methods.
 The proposed method provides a quantitative and interpretable decision-support tool for crowd routing and entrance flow control in open public spaces.
 \end{abstract}
@@ -404,17 +404,60 @@ J_5(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right
 Here $k$ indexes the capacity-control time segment.
 $J_4$ discourages excessive entrance metering that creates upstream queues, while $J_5$ discourages abrupt high-frequency changes in capacity profiles.
 
-\subsubsection{Standardized Scalar Objective}
+\subsubsection{Normalization and Scalar Objectives}
 
-Because the evaluation terms have different units and magnitudes, they are standardized before weighting:
+The raw metrics above have different physical units and numerical scales.
+Therefore, the reported scalar objectives are computed from dimensionless normalized quantities.
+Let
 \[
-\tilde J_1,\quad \tilde J_2,\quad \tilde J_3,\quad \tilde J_4,\quad \tilde J_5.
+M_{\mathrm{ref}}=M_0+M_{\mathrm{in}},\qquad T_e=T,
 \]
+where $M_0$ is the initial crowd mass, $M_{\mathrm{in}}$ is the cumulative external inflow during $[0,T]$, and $T_e$ is the evaluation horizon.
+Let $|\Omega_w|$ be the walkable area, $R_{\mathrm{tot}}=\sum_{c=1}^{C}R_c(T)$, and
+\[
+D_R=R_{\mathrm{tot}}^2\frac{C-1}{C^2}.
+\]
+The basic normalized terms are
+\[
+\bar J_1=\frac{J_1}{M_{\mathrm{ref}}T_e},\qquad
+\bar J_2=\frac{J_2}{|\Omega_w|T_e},
+\]
+\[
+\bar J_3=\frac{J_3}{D_R+\varepsilon_R},\qquad
+\bar J_4=\frac{J_4}{M_{\mathrm{ref}}T_e}.
+\]
+For segmented entrance-rate profiles, the smoothness term is normalized by the corresponding entrance-rate bounds:
+\[
+\bar J_5=
+\frac{1}{N_q}
+\sum_{c,k,\sigma\in\{+,-\}}
+\left(
+\frac{q_{c,k+1}^{\sigma}-q_{c,k}^{\sigma}}
+{\bar q_c^{\sigma}+\varepsilon_q}
+\right)^2 .
+\]
+Here $N_q$ is the number of active finite differences, $\bar q_c^\sigma$ is the reference upper bound of the corresponding entrance, and $\varepsilon_R$ and $\varepsilon_q$ only avoid zero denominators.
+Thus, $\bar J_1$ is a relative system-residence measure, $\bar J_2$ is the average hard exposure or soft safety-risk intensity over the walkable space-time domain, and $\bar J_3$ is zero for perfectly balanced realized channel use and approaches one when all realized channel throughput concentrates on one channel.
+
+The reported terms use scale factors
+\begin{equation}
+\tilde J_k=\frac{\bar J_k}{a_k}.
+\label{eq:scaled_terms}
+\end{equation}
+The main experiments use
+\[
+(a_1,a_2,a_3,a_4,a_5)=(1,10^{-3},1,1,1).
+\]
+Therefore, the reported $\tilde J_2$ values are scaled normalized safety terms and should not be read directly as space-time percentages; the basic normalized value is $\bar J_2=10^{-3}\tilde J_2$.
 Given weights $\lambda=(\lambda_1,\ldots,\lambda_5)$, the scalarized objective is
 \begin{equation}
 J(z) = \sum_{k=1}^{5}\lambda_k\tilde{J}_k(z),
 \label{eq:scalarized}
 \end{equation}
+with the main-experiment setting
+\[
+(\lambda_1,\lambda_2,\lambda_3,\lambda_4,\lambda_5)=(1,1,1,1,0.1).
+\]
 and the optimization problem is
 \begin{equation}
 \min_{z \in \mathcal{Z}} J(z), \qquad z=(s,q).
@@ -422,6 +465,20 @@ and the optimization problem is
 \end{equation}
 The paper solves this fixed-weight scalarized management problem.
 Different weights can represent different management preferences, but the algorithm itself does not depend on one specific objective term being independently optimal.
+Although $J$, $J^{(3)}$, and $\tilde J_k$ are dimensionless ranking quantities, their interpretation is anchored by the normalization above.
+When physical interpretation is needed, the experiments also report raw or ratio-based diagnostics such as channel-flow shares, unreleased attempted mass, binding-time ratios, system mass, and density peaks.
+
+For mechanism-verification experiments and fixed-strategy diagnostic experiments that only test direction rules, geometric guidance, or fixed entrance-rate responses, this paper uses the reduced three-term objective
+\begin{equation}
+J^{(3)}(z)=
+\lambda_1\tilde J_1(z)
++\lambda_2\tilde J_2(z)
++\lambda_3\tilde J_3(z).
+\label{eq:reduced_objective}
+\end{equation}
+In these experiments, the entrance-waiting term $\tilde J_4$ is either reported only as a diagnostic quantity or is not applicable, and the smoothness term $\tilde J_5$ is meaningful only for segmented capacity-profile optimization.
+Equivalently, reduced-objective experiments use $\lambda_4=\lambda_5=0$.
+The numerical values of $J$ and $J^{(3)}$ are not compared across experiment groups.
 
 \subsection{Hierarchical Constrained Mixed-Variable Black-Box Optimization}
 \label{sec:optimization}
@@ -509,7 +566,16 @@ The domain is discretized on a $128\times96$ grid with spacing $\Delta x=0.5$.
 The passage width is $2$, the controlled internal entrance interface width is $8$, the free-flow speed is $v_{\max}=1.5$, the maximum density is $\rho_{\max}=5.0$, the initial density is $\rho_{\mathrm{init}}=2.2$, and the CFL factor is $0.9$.
 Mechanism and response experiments use the corresponding validation horizons, whereas the optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, horizon $160$, and Bellman updates every five steps.
 Final optimizer rankings are based on the high-fidelity objective in Section~\ref{sec:metrics}.
+Unless otherwise stated, optimization experiments are ranked by the full five-term scalar objective $J$ after high-fidelity rechecking.
+Mechanism-validation, directional-response, fixed-rate response, and supplementary transfer diagnostics use the reduced objective $J^{(3)}=\lambda_1\tilde J_1+\lambda_2\tilde J_2+\lambda_3\tilde J_3$.
+For these reduced-objective experiments, $\tilde J_4$ is only an entrance-waiting diagnostic or is not applicable, and $\tilde J_5$ is not applicable; equivalently, $\lambda_4=\lambda_5=0$.
+Therefore, the numerical values of $J$ and $J^{(3)}$ should not be compared across experiment groups; comparisons are meaningful only within the same objective definition, normalization rule, and weight setting.
 A high-fidelity best candidate is called feasible if the density-cap removal mass is no more than $2\%$ of the reference mass.
+Unless otherwise stated, cumulative flow, waiting mass, unreleased attempted flow, and system mass are reported in simulation mass units.
+Mass-time quantities are reported in simulation mass-time units, and counterflow cell-time is reported in grid-cell-time units.
+Channel-flow shares are computed from realized cumulative channel throughputs, $R_c(T)/\sum_jR_j(T)$.
+Scalar objectives and normalized terms are dimensionless.
+Raw cumulative quantities are rounded to three significant digits in the text, while tables retain four decimals for dimensionless objective terms.
 
 \begin{figure}[!t]
 \centering
@@ -525,7 +591,25 @@ The first experiment verifies whether the two local modeling components have the
 The fixed anisotropic mobility tensor $M(x;\eta_0)$ should reshape the channel attraction domain and induce entrance pre-alignment, whereas the admissible direction set $U(x;s)$ should remove prohibited directions and reroute flow through feasible passages.
 When $M$ is applied to the middle channel, its flow share increases from $48.78\%$ in the baseline to $100.00\%$.
 When a one-way rule excludes the originally dominant middle-channel direction, the middle-channel share becomes zero and the flow is redistributed to the upper, lower-middle, and bottom channels with shares $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
-In a bidirectional inflow test, imposing an eastbound one-way rule reduces the westbound middle-channel share, reverse-direction mass time, and counterflow cell time from $73.18\%$, $415.75$, and $1213.76$ to zero.
+For the bidirectional validation case, we use two diagnostic quantities.
+The reverse-direction mass time is
+\[
+\mathrm{RMT}=
+\sum_n\sum_{i\in\Omega_c}
+\rho_i^n
+\mathbf 1\{\mathbf u_i^n\cdot\tau_c<0\}
+\Delta x^2\Delta t,
+\]
+which measures the cumulative simulation mass-time moving against the prescribed channel direction.
+The counterflow cell-time is
+\[
+\mathrm{CCT}=
+\sum_n\sum_{i\in\Omega_c}
+\mathbf 1\{\rho_{i,+}^n>0,\rho_{i,-}^n>0\}\Delta t,
+\]
+which counts the cumulative grid-cell-time during which opposite-direction subpopulations coexist in the same channel region.
+In the baseline bidirectional inflow test, the westbound middle-channel share, RMT, and CCT are $73.18\%$, $415.75$ simulation mass-time units, and $1213.76$ grid-cell-time units, respectively.
+After imposing the eastbound one-way rule, all three quantities are reduced to zero.
 
 \begin{figure*}[!t]
 \centering
@@ -548,12 +632,14 @@ The direction code is ordered as $[T,M,LM,B]$, where $E$, $W$, $F$, and $X$ deno
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=0.92\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
-\caption{Directional-control design matrix and objective-space trade-off. Color encodes $\tilde J_3$, marker size encodes $\tilde J=\tilde J_1+\tilde J_2+\tilde J_3$, and diamonds indicate non-dominated cases.}
+\caption{Directional-control design matrix and objective-space trade-off. Color encodes $\tilde J_3$, marker size encodes the reduced dimensionless diagnostic objective $J^{(3)}$, and diamonds indicate non-dominated cases.}
 \label{fig:g2_control_tradeoff}
 \end{figure*}
 
 Fig.~\ref{fig:g2_control_tradeoff} and Table~\ref{tab:g2_nondominated} show that no single direction configuration dominates all objectives.
-C8 (SR-LM, EEWE) obtains the lowest aggregate value $\tilde J=0.5102$, C1 gives the lowest safety exposure $\tilde J_2=0.00785$, C3 gives the best efficiency term $\tilde J_1=0.3141$, and C9 gives the best load-balance term $\tilde J_3=0.1138$.
+This directional-response experiment summarizes the three reported terms by $J^{(3)}$; since no entrance-capacity curve is optimized, $\tilde J_4$ and $\tilde J_5$ are not used for ranking.
+C8 (SR-LM, EEWE) obtains the lowest reduced objective $J^{(3)}=0.5102$, which is only $0.84\%$ lower than the all-free baseline C1.
+C1 gives the lowest safety exposure $\tilde J_2=0.00785$, C3 gives the best efficiency term $\tilde J_1=0.3141$, and C9 gives the best load-balance term $\tilde J_3=0.1138$.
 This non-monotonic response motivates automatic mixed-variable optimization rather than manual selection from a small set of rules.
 
 \begin{table*}[!t]
@@ -564,16 +650,18 @@ This non-monotonic response motivates automatic mixed-variable optimization rath
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{c c c c c c c l}
 \hline
-Case & Policy & Code & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $\tilde J$ & Main characteristic \\
+Case & Policy & Code & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $J^{(3)}$ & Main characteristic \\
 \hline
 C1 & BSL & FFFF & 0.3535 & \textbf{0.00785} & 0.1531 & 0.5145 & Lowest exposure \\
 C3 & SE-M & WEWW & \textbf{0.3141} & 0.01680 & 0.2741 & 0.6049 & Best efficiency but risk-concentrated \\
 C4 & SE-LM & WWEW & 0.3335 & 0.01662 & 0.3131 & 0.6632 & Efficient but load-imbalanced \\
 C6 & SR-T & WEEE & 0.4029 & 0.01174 & 0.1335 & 0.5482 & High return throughput \\
-C8 & SR-LM & EEWE & 0.3395 & 0.01311 & 0.1576 & \textbf{0.5102} & Lowest aggregate objective \\
+C8 & SR-LM & EEWE & 0.3395 & 0.01311 & 0.1576 & \textbf{0.5102} & Lowest reduced objective \\
 C9 & SR-B & EEEW & 0.4377 & 0.01344 & \textbf{0.1138} & 0.5649 & Most balanced channel loads \\
 \hline
 \end{tabular}
+\vspace{1mm}
+\parbox{0.95\textwidth}{\scriptsize All objective terms in this table are dimensionless scaled normalized quantities. The reduced objective uses $\lambda_4=\lambda_5=0$ and is used only for directional-response diagnosis; it is not directly comparable with the full five-term objective in Table~\ref{tab:optimizer_summary}.}
 \end{table*}
 
 \subsection{Entrance-Rate Response}
@@ -584,6 +672,18 @@ We therefore fix $[T,M,LM,B]=[F,E,W,F]$ and scan four internal entrance-rate lev
 The rate upper bound acts on internal entrance crossing flow.
 When attempted flow exceeds the upper bound, only the admitted flow crosses the interface, and the unreleased attempted flow remains upstream as waiting mass.
 The entrance binding-time ratio is defined as the fraction of time steps in which attempted entrance flow exceeds the rate upper bound and creates unreleased attempted flow.
+The unreleased attempted flow is
+\[
+U_{\mathrm{rel}}=
+\int_0^T\sum_{c=1}^{C}
+\left[
+(A_c^+(t)-\hat A_c^+(t))_+
++
+(A_c^-(t)-\hat A_c^-(t))_+
+\right]dt,
+\]
+in simulation mass units, and its demand ratio is $r_{\mathrm{rel}}=U_{\mathrm{rel}}/\int_0^T\sum_c(A_c^+(t)+A_c^-(t))dt$.
+This scan is a fixed-rate diagnostic experiment rather than a final optimizer-ranking experiment; the table therefore reports $J^{(3)}$, treats entrance waiting as a diagnostic quantity, and sets the smoothness contribution to zero because each policy uses a fixed rate level.
 
 \begin{table*}[!t]
 \centering
@@ -591,27 +691,30 @@ The entrance binding-time ratio is defined as the fraction of time steps in whic
 \label{tab:entrance_rate_response}
 \scriptsize
 \setlength{\tabcolsep}{5pt}
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrrrr}
 \hline
-Level & $\tilde J_1$ & $\tilde J_2^{\mathrm{eval}}$ & $\tilde J_3$ & Objective & Unreleased attempted flow & Binding ratio \\
+Level & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $J^{(3)}$ & $U_{\mathrm{rel}}$ & $r_{\mathrm{rel}}$ & Binding ratio \\
 \hline
-No limit & 0.6274 & 0.174 & 0.8838 & 1.6851 & 0.00 & 0.000 \\
-High & 0.6262 & 0.358 & 0.8814 & 1.8652 & 241.40 & 0.605 \\
-Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 329.26 & 0.666 \\
-Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 427.89 & 0.721 \\
+No limit & 0.6274 & 0.174 & 0.8838 & 1.6851 & 0.00 & 0 & 0.000 \\
+High & 0.6262 & 0.358 & 0.8814 & 1.8652 & 241.40 & 70.8\% & 0.605 \\
+Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 329.26 & 82.6\% & 0.666 \\
+Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 427.89 & 92.1\% & 0.721 \\
 \hline
 \end{tabular}
+\vspace{1mm}
+\parbox{0.95\textwidth}{\scriptsize $U_{\mathrm{rel}}$ is reported in simulation mass units. The safety column is a scaled normalized safety term, not a direct space-time percentage.}
 \end{table*}
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{../images/experiment_result_archive/g2/g2_capacity_levels.png}
-\caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow.}
+\caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow; the latter is reported in simulation mass units.}
 \label{fig:entrance_rate_response}
 \end{figure}
 
 Table~\ref{tab:entrance_rate_response} and Fig.~\ref{fig:entrance_rate_response} show that tightening the rate upper bound does not simply improve safety.
-From the no-limit case to the low level, unreleased attempted flow increases from $0$ to $427.89$, the binding ratio increases from $0$ to $0.721$, and $\tilde J_2^{\mathrm{eval}}$ increases from $0.174$ to $0.466$.
+From the no-limit case to the low level, unreleased attempted flow increases from $0$ to $427.89$ simulation mass units, corresponding to $r_{\mathrm{rel}}=92.1\%$ of attempted entrance demand.
+The binding ratio increases from $0$ to $0.721$, and the scaled normalized safety term $\tilde J_2$ increases from $0.174$ to $0.466$.
 Thus, $q$ is a genuine continuous control variable that changes system response and must be optimized jointly with $s$.
 
 \subsection{Horizontal Optimization Comparison}
@@ -623,7 +726,7 @@ The final HCMBO data are taken from the G7-D mainline, whereas the other baselin
 
 \begin{table*}[!t]
 \centering
-\caption{High-Fidelity Performance in the Direction--Entrance-Rate Optimization Comparison}
+\caption{High-Fidelity Performance Under the Full Five-Term Dimensionless Objective}
 \label{tab:optimizer_summary}
 \scriptsize
 \setlength{\tabcolsep}{4pt}
@@ -639,9 +742,13 @@ Enum-DE & 3.0597 & 0.1932 & 3.1004 & 2.7329 & 3.2500 & 40\% \\
 Prior Baseline & 5.4774 & 0.0000 & 5.4774 & 5.4774 & 5.4774 & 0\% \\
 \hline
 \end{tabular}
+\vspace{1mm}
+\parbox{0.95\textwidth}{\scriptsize The reported objective is the full dimensionless scalar objective $J=\sum_{k=1}^{5}\lambda_k\tilde J_k$ after unified high-fidelity rechecking. These values are not directly comparable with the reduced diagnostic objective $J^{(3)}$ in Tables~\ref{tab:g2_nondominated}, \ref{tab:entrance_rate_response}, and \ref{tab:bund_transfer_metrics}.}
 \end{table*}
 
 Table~\ref{tab:optimizer_summary} shows that HCMBO achieves the lowest mean objective, lowest median objective, lowest best objective, and highest feasible rate.
+In relative terms, the mean objective of HCMBO is $3.9\%$ lower than that of TPE-Mixed BO, since $(2.7403-2.6338)/2.7403=3.9\%$.
+Because this is a normalized scalar objective, the percentage reduction should be interpreted as an improvement in the fixed-weight management score, rather than as a direct reduction in travel time or density exposure alone.
 Relative to TPE-Mixed BO, HCMBO is better in $4/5$ paired seeds, with an average objective difference of $-0.1066$.
 It also outperforms Random Search in all five seeds and outperforms Pure SA and Enum-DE in four of five seeds.
 The remaining high objective in one HCMBO seed is mainly driven by a larger safety exposure term, indicating a residual need for stronger safety-constraint awareness.
@@ -649,7 +756,7 @@ The remaining high objective in one HCMBO seed is mainly driven by a larger safe
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_best_objective.png}
-\caption{Best high-fidelity objective across seeds. Range bars show the seed-wise spread, and the short vertical mark indicates the median.}
+\caption{Best high-fidelity full objective $J$ across seeds. The objective is dimensionless and lower is better. Range bars show the seed-wise spread, and the short vertical mark indicates the median.}
 \label{fig:optimizer_best_objective}
 \end{figure}
 
@@ -678,7 +785,7 @@ The ablation experiments examine whether the control variables and search mechan
 First, direction and entrance-rate variables must be optimized jointly.
 Optimizing only direction with a fixed high rate gives best high-fidelity objective $3.3751$, while optimizing only rates under prior directions gives $3.3140$; both are clearly worse than joint optimization.
 Second, short-horizon low-fidelity hard screening increases the best objective to $2.9441$ and yields an infeasible best candidate, because early simulations do not reliably reflect long-horizon entrance waiting and load redistribution.
-Third, removing the entrance-waiting penalty slightly reduces the scalar objective to $2.6015$, but increases unreleased attempted flow to $3239.295$, showing that waiting should remain in the management objective.
+Third, removing the entrance-waiting penalty slightly reduces the scalar objective to $2.6015$, but increases unreleased attempted flow to approximately $3.24\times10^3$ simulation mass units, showing that waiting should remain in the management objective.
 
 \begin{table*}[!t]
 \centering
@@ -688,20 +795,22 @@ Third, removing the entrance-waiting penalty slightly reduces the scalar objecti
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrrrl}
 \hline
-Variant & Best objective & Feasible rate & $J_2$ & Unreleased flow & Main meaning \\
+Variant & Best objective & Feasible rate & $\tilde J_2$ & Unreleased flow (sim. mass) & Main meaning \\
 \hline
-HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & 2545.508 & Structured direction-wise rate search \\
-Queue-aware LCB & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} & Queue-aware acquisition \\
-RF-style constrained BO & 2.6162 & 100\% & 1.8521 & \textbf{2412.404} & Constraint surrogate variant \\
-Adaptive racing & 2.6561 & 100\% & 1.9474 & 3204.194 & Stage-wise budget concentration \\
-Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & 2664.373 & Combined racing and queue signal \\
-Trust-region search & 3.0317 & 100\% & 1.9224 & 3967.226 & Local trust-region search \\
+HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & $2.55{\times}10^3$ & Structured direction-wise rate search \\
+Queue-aware LCB & 2.6162 & 100\% & 1.8521 & $\mathbf{2.41{\times}10^3}$ & Queue-aware acquisition \\
+RF-style constrained BO & 2.6162 & 100\% & 1.8521 & $\mathbf{2.41{\times}10^3}$ & Constraint surrogate variant \\
+Adaptive racing & 2.6561 & 100\% & 1.9474 & $3.20{\times}10^3$ & Stage-wise budget concentration \\
+Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & $2.66{\times}10^3$ & Combined racing and queue signal \\
+Trust-region search & 3.0317 & 100\% & 1.9224 & $3.97{\times}10^3$ & Local trust-region search \\
 \hline
 \end{tabular}
+\vspace{1mm}
+\parbox{0.95\textwidth}{\scriptsize Unreleased flow is unreleased attempted entrance flow in simulation mass units.}
 \end{table*}
 
 Table~\ref{tab:search_ablation} shows that the final HCMBO mainline obtains the lowest scalar objective among the tested variants.
-Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to $2412.404$, but their scalar objective increases to $2.6162$.
+Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to approximately $2.41\times10^3$ simulation mass units, but their scalar objective increases to $2.6162$.
 Thus, queue information is useful for executable and safety-aware extensions, whereas the final mainline should retain structured direction-wise rate search as the primary budget allocation mechanism.
 
 \subsection{Transfer Validation on a Bund-Inspired Scenario}
@@ -727,8 +836,9 @@ Both the controlled and uncontrolled groups use $1600$ steps and a time horizon 
 For the controlled group, the transferred entrance-rate bounds are multiplied by a capacity-scale factor of $3$, providing a less restrictive entrance-capacity setting.
 
 The controlled group uses the best HCMBO policy obtained from the multi-direction high-fidelity recheck.
-Its high-fidelity objective in the optimization stage is $0.7350$, and its direction structure leaves the upper and lower channels bidirectional while assigning opposite dominant directions to the two middle channels.
+Its reduced high-fidelity objective in the optimization stage is $0.7350$, and its direction structure leaves the upper and lower channels bidirectional while assigning opposite dominant directions to the two middle channels.
 Table~\ref{tab:bund_transfer_q} reports the effective two-segment entrance-rate upper bounds after applying the capacity-scale factor of $3$.
+The rate upper bounds are measured in simulation mass per unit time.
 
 \begin{table*}[!t]
 \centering
@@ -753,8 +863,10 @@ Experimental channel & Local channel name & Entrance side & Segment 1 & Segment 
 \end{table*}
 
 Table~\ref{tab:bund_transfer_metrics} compares the controlled and uncontrolled groups under the same high-fidelity protocol.
-The scalar objective decreases from $1.0140$ to $0.7410$, corresponding to an absolute reduction of approximately $0.2730$ and a relative reduction of $26.9\%$.
-The main improvement comes from the load-balance term $J_3$, which decreases from $0.6043$ to $0.2908$.
+It separates dimensionless normalized terms from raw simulation diagnostics.
+The reduced objective $J^{(3)}$ decreases from $1.0140$ to $0.7410$, corresponding to an absolute reduction of approximately $0.2730$ and a relative reduction of $26.9\%$.
+The main improvement comes from the load-balance term $\tilde J_3$, which decreases by $51.9\%$, from $0.6043$ to $0.2908$.
+In contrast, $\tilde J_1$ increases by $8.7\%$ and $\tilde J_2$ increases by $25.7\%$.
 This indicates that the transferred policy changes how pedestrians use the channels, rather than merely reducing all density values uniformly.
 
 \begin{table*}[!t]
@@ -762,23 +874,31 @@ This indicates that the transferred policy changes how pedestrians use the chann
 \caption{Controlled and Uncontrolled Results in the Bund Transfer Experiment}
 \label{tab:bund_transfer_metrics}
 \scriptsize
-\setlength{\tabcolsep}{5pt}
-\begin{tabular}{l r r}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{l r r r}
 \hline
-Metric & Controlled & Uncontrolled \\
+Dimensionless term & Controlled & Uncontrolled & Relative change \\
 \hline
-Objective $J$ & 0.7410 & 1.0140 \\
-$J_1$ & 0.4145 & 0.3813 \\
-$J_2^{\mathrm{eval}}$ & 0.0357 & 0.0284 \\
-$J_3$ & 0.2908 & 0.6043 \\
-Final cumulative sink flow & 6.8237 & 8.5673 \\
-Final cumulative inflow & 11.9193 & 11.9995 \\
-Final system mass & 7.8455 & 6.1822 \\
-Peak density maximum & $\approx 4.0$ & $\approx 4.0$ \\
-Average mean density & 0.003470 & 0.003210 \\
-Attempted entrance flow & 7.6454 & 0 \\
-Actual entrance flow & 5.7793 & 0 \\
-Unreleased attempted flow & 1.8660 & 0 \\
+$J^{(3)}$ & 0.7410 & 1.0140 & $-26.9\%$ \\
+$\tilde J_1$ & 0.4145 & 0.3813 & $+8.7\%$ \\
+$\tilde J_2$ & 0.0357 & 0.0284 & $+25.7\%$ \\
+$\tilde J_3$ & 0.2908 & 0.6043 & $-51.9\%$ \\
+\hline
+\end{tabular}
+
+\vspace{1.5mm}
+\begin{tabular}{l r r l}
+\hline
+Raw diagnostic & Controlled & Uncontrolled & Unit \\
+\hline
+Final cumulative sink flow & 6.82 & 8.57 & sim. mass \\
+Final cumulative inflow & 11.92 & 12.00 & sim. mass \\
+Final system mass & 7.85 & 6.18 & sim. mass \\
+Peak density maximum & $\approx 4.0$ & $\approx 4.0$ & sim. mass/area \\
+Average mean density & $3.47{\times}10^{-3}$ & $3.21{\times}10^{-3}$ & sim. mass/area \\
+Attempted entrance flow & 7.65 & 0 & sim. mass \\
+Actual entrance flow & 5.78 & 0 & sim. mass \\
+Unreleased attempted flow & 1.87 & 0 & sim. mass \\
 \hline
 \end{tabular}
 \end{table*}
@@ -803,6 +923,8 @@ Channel & Local name & Controlled & Uncontrolled \\
 \texttt{channel\_4} & Bund Ch. 6 & 5.83\% & 82.30\% \\
 \hline
 \end{tabular}
+\vspace{1mm}
+\parbox{\columnwidth}{\scriptsize Channel-flow shares are computed as $R_c(T)/\sum_{j=1}^{C}R_j(T)$, where $R_c(T)$ is the realized cumulative admitted throughput of channel $c$ during the simulation horizon.}
 \end{table}
 
 \begin{figure*}[!t]
@@ -818,11 +940,11 @@ At later stages, the uncontrolled case remains more concentrated around the term
 This visual evidence is consistent with the channel-share statistics and confirms that the main effect of the HCMBO policy is load redistribution across channels.
 
 The supplementary transfer experiment also reveals an important trade-off.
-The controlled group has a higher efficiency term ($J_1$ increases from $0.3813$ to $0.4145$), a slightly higher safety-exposure evaluation term ($J_2^{\mathrm{eval}}$ increases from $0.0284$ to $0.0357$), a smaller cumulative sink flow ($6.8237$ versus $8.5673$), and a larger final system mass ($7.8455$ versus $6.1822$).
+The controlled group has a higher efficiency term ($\tilde J_1$ increases from $0.3813$ to $0.4145$), a slightly higher safety-exposure term ($\tilde J_2$ increases from $0.0284$ to $0.0357$), a smaller cumulative sink flow ($6.82$ versus $8.57$ simulation mass units), and a larger final system mass ($7.85$ versus $6.18$ simulation mass units).
 Therefore, the transferred HCMBO policy should not be interpreted as uniformly improving safety and efficiency.
-Rather, under the present weights, it reduces the scalar objective mainly by improving channel-load balance, while sacrificing part of the exit throughput and travel efficiency.
-The capacity-scale factor of $3$ reduces unreleased attempted flow to $1.8660$, but it does not remove the efficiency cost of the control policy.
-Overall, the supplementary Bund-inspired experiment shows that the optimized HCMBO policy can still reduce the scalar objective and redistribute flow away from the dominant terminal channel in a simplified real-world spatial abstraction.
+Rather, under the present reduced-objective weights, it reduces $J^{(3)}$ mainly by improving channel-load balance, while sacrificing part of the exit throughput and travel efficiency.
+The capacity-scale factor of $3$ reduces unreleased attempted flow to $1.87$ simulation mass units, but it does not remove the efficiency cost of the control policy.
+Overall, the supplementary Bund-inspired experiment shows that the optimized HCMBO policy can still reduce the reduced objective and redistribute flow away from the dominant terminal channel in a simplified real-world spatial abstraction.
 However, the improvement is accompanied by unreleased attempted entrance flow, lower exit throughput, and higher residual mass in the system.
 Future deployment-oriented extensions should therefore include explicit throughput constraints, waiting upper bounds, or multi-weight scenario analysis to avoid obtaining policies that improve load balance at the cost of overly strong metering.
 
@@ -864,8 +986,8 @@ First, the lower-level simulator produces interpretable mechanisms: $U(x;s)$ rem
 Second, both control variables are necessary.
 Directional settings produce non-monotonic efficiency--safety--load-balance trade-offs, and entrance-rate upper bounds significantly change unreleased attempted flow, binding-time ratios, and safety exposure.
 Third, the final HCMBO optimizer effectively exploits the direction--rate hierarchy.
-Under five random seeds, $B=400$ candidate evaluations, and unified high-fidelity rechecks, HCMBO obtains the lowest mean objective of $2.6338$ and the highest feasible rate of $100\%$, outperforming TPE-Mixed BO, Random Search, Pure SA, Enum-DE, and the prior baseline.
-Compared with TPE-Mixed BO, HCMBO is better in $4/5$ paired seeds, with an average objective difference of $-0.1066$.
+Under five random seeds, $B=400$ candidate evaluations, and unified high-fidelity rechecks, HCMBO obtains the lowest mean dimensionless full objective, reducing the fixed-weight management score by $3.9\%$ relative to TPE-Mixed BO while maintaining the highest feasible rate of $100\%$.
+This improvement should not be interpreted as an isolated reduction in travel time, density exposure, or waiting alone.
 Ablation results further show that joint direction--rate optimization, removal of low-fidelity hard screening, and structured direction-wise rate search are key contributors to this performance.
 
 The current study still has limitations.
