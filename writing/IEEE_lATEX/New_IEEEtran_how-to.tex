@@ -1,5 +1,6 @@
 \documentclass[lettersize,journal]{IEEEtran}
 \usepackage{amsmath,amsfonts}
+\usepackage{algorithm}
 \usepackage{algorithmic}
 \usepackage{array}
 \usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
@@ -16,7 +17,7 @@
 
 \begin{document}
 
-\title{Macroscopic Crowd Control with Direction Constraints and Entrance-Rate Control for Urban Pedestrian Zones}
+\title{Macroscopic Crowd Flow Control with Direction Constraints and Entrance-Rate Control for Urban Pedestrian Zones}
 
 \author{Author Name
 \thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
@@ -35,32 +36,34 @@ To represent operational rules in a continuum setting, local admissible directio
 On this basis, internal channel entrance flow-rate control is further introduced, enabling a control strategy to jointly specify travel directions and time-varying release intensities.
 To solve the resulting mixed-variable optimization problem composed of discrete direction configurations and continuous release intensities, this paper designs a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm for searching optimal crowd control strategies.
 Experiments on a simplified scenic-platform scenario show that the proposed macroscopic model can capture the complex interactions among multi-stage behavior, channel geometric guidance, and direction constraints.
-Under a dimensionless composite objective obtained by weighting normalized travel-time, high-density-exposure, channel-load-imbalance, waiting, and control-smoothness terms, repeated experiments show that HCMBO achieves the lowest mean objective value.
-It reduces the objective by approximately 4.0\% compared with the second-best TPE-style mixed Bayesian optimization method, and also outperforms random search, pure simulated annealing, differential evolution, and other baseline methods.
+Under a weighted composite of efficiency, safety, load-balance, waiting, and smoothness terms, repeated experiments show that HCMBO achieves the lowest mean objective value.
+It reduces the objective by approximately 3.9\% compared with the second-best TPE-style mixed Bayesian optimization method, and also outperforms random search, pure simulated annealing, differential evolution, and other baseline methods.
 The proposed method provides a quantitative and interpretable decision-support tool for crowd routing and entrance flow control in open public spaces.
 \end{abstract}
 
 \begin{IEEEkeywords}
-Macroscopic crowd dynamics,  modeling, channel optimization, Hamilton-Jacobi-Bellman equation, bi-level optimization.
+Crowd dynamics modeling, crowd flow control, mixed-variable black-box optimization.
 \end{IEEEkeywords}
 
 \section{Introduction}
 \label{sec:introduction}
 
-\IEEEPARstart{L}{arge-scale} crowd gathering risks not only threaten individual safety but may also escalate into stampede incidents that disrupt social order and public security; the effectiveness of crowd management directly tests urban governance capacity and the modernization level of social safety governance systems \cite{RN2147,RN1998}.
+\IEEEPARstart{L}{arge-scale} crowd gathering poses risks not only to individual safety but also to public order, as localized congestion can escalate into stampede incidents. Effective crowd management is therefore a critical component of urban public-safety governance \cite{RN2147,RN1998}.
 With the increasing frequency of high-density pedestrian activities such as holiday tourism, urban public events, commercial district promotions, New Year celebrations, and major sports events, core urban areas must accommodate pedestrian demands far exceeding daily levels within short time windows, posing enormous challenges for on-site organization, passage management, risk early warning, and emergency dispatch \cite{RN2154,RN1193,RN673}.
 Against this backdrop, scientific modeling, numerical simulation, and optimization methods for formulating and evaluating crowd control strategies---improving the efficiency of large-scale event organization and reducing local congestion risks---have become critical scientific problems demanding urgent breakthroughs in social safety and urban governance \cite{RN1226,RN2059}.
 
 Crowds in large-scale events constitute typical complex systems.
 Numerous individuals with heterogeneous desired speeds, destinations, and route preferences interact through multi-scale, nonlinear mechanisms in confined spaces, generating spatiotemporal patterns at the collective level \cite{RN1100,RN1193}.
 Macroscopically, these patterns manifest as destination-oriented flow, passage convergence, bottleneck queuing, exit competition, and directional responses to control regulations \cite{RN2056,RN2102}; microscopically, individuals are influenced by surrounding density, visible paths, obstacle boundaries, and guidance facilities \cite{RN2174}.
-For open scenic areas, crowd behavior additionally exhibits pronounced phase dependence: visitors may first move toward the viewing platform, then tour along the main viewing direction, and subsequently choose different exit passages based on preferences \cite{RN2302}.
+For open scenic areas, crowd behavior additionally exhibits pronounced phase dependence: visitors may first move toward a sightseeing platform, then tour along the main viewing direction, and subsequently choose different exit passages based on preferences \cite{RN2302}.
 These characteristics of multi-stage, multi-route coexistence with shared congestion mean that traditional static capacity analysis or single shortest-path models cannot adequately support refined management decisions.
 
-Among various urban crowd gathering scenarios, open scenic areas, waterfront viewing platforms, and historic commercial districts are highly representative.
-Unlike enclosed venues such as stadiums and subway stations with well-defined boundaries \cite{RN761,RN2194}, such areas consist of open spaces, main tourist corridors, multiple lateral connecting passages, and return flow lines; visitors typically undergo a continuous behavioral chain of ``entry--touring along the main corridor--choosing passages to leave--returning'' \cite{RN2301}, with crowd movement governed jointly by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303,RN2301}.
-Taking the Shanghai Nanjing East Road--Bund area as a concrete example, visitors approach the Bund from Nanjing East Road, ascend to the viewing platform via multiple stepped passages, tour along the waterfront, then exit through several southern passages and return along lower streets.
-This scenario can be abstracted as the typical ``waterfront platform--multi-stepped passage'' crowd flow scenario.
+Among various urban crowd gathering scenarios, open scenic areas, waterfront sightseeing platforms, and historic commercial districts are highly representative.
+Unlike enclosed venues such as stadiums and subway stations with well-defined boundaries \cite{RN761,RN2194}, such areas consist of open spaces, main tourist corridors, multiple lateral connecting passages, and return flow lines.
+In these settings, visitors typically undergo a continuous behavioral chain of ``entry--touring along the main corridor--choosing passages to leave--returning'' \cite{RN2301}.
+Their movement is therefore governed jointly by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303}.
+Taking the Shanghai Nanjing East Road--Bund area as a concrete example, visitors approach the Bund from Nanjing East Road, ascend to the Bund sightseeing platform via multiple stepped passages, tour along the waterfront, then exit through several southern passages and return along lower streets.
+This scenario can be abstracted as the typical ``Bund sightseeing platform--multi-stepped passage'' crowd flow scenario.
 In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas.
 
 \begin{figure*}[!t]
@@ -70,7 +73,7 @@ In such scenarios, management difficulties manifest in three aspects: first, mul
 \hfill
 \subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/入口容量控制.png}
 \label{fig:bund_scene_capacity}}
-\caption{Field-control context of the Shanghai Nanjing East Road--Bund area. (a) Large-scale holiday crowd under one-way passage organization. (b) Entrance-capacity control at a main visitor inflow location.}
+\caption{Field-control context of the Shanghai Nanjing East Road--Bund area. (a) Large-scale holiday crowd under one-way passage organization; image source: \cite{qq2024huangpu_security}. (b) Entrance-capacity control at a main visitor inflow location; image source: \cite{chinanews2019bund_flow_guidance}.}
 \label{fig:bund_scene}
 \end{figure*}
 
@@ -78,32 +81,27 @@ Existing large-scale event security management practices typically integrate sys
 These measures include deploying security personnel at critical locations, erecting temporary barriers for isolation and diversion, implementing one-way passage on key channels, and applying batch release in core areas \cite{RN2181,RN1978}.
 For instance, during major holidays, the Shanghai Bund area adopts batch release, passage direction regulation, south-entry north-exit routing, and reduction of head-on conflicts \cite{RN2129}; similarly, Nanluoguxiang main street in Beijing implements one-way passage measures (south entry, north exit) during peak periods \cite{RN2130}, consistent in control mechanism with the Shanghai Bund approach.
 
-However, current management measures for urban high-pedestrian-flow areas still rely considerably on manual experience and static contingency plans, with deficiencies remaining in scientific evaluation and refined optimization \cite{RN1662}.
-First, many control schemes are formulated based on historical experience, lacking quantitative characterization of the impact of passage direction settings, entrance release capacities, and phase-dependent behavioral preferences.
-Second, existing methods tend to focus on single-point statistics or local density monitoring, making it difficult to describe the dynamic coupling among ``passage direction rules--entrance flow control--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}.
-Third, in open scenic area scenarios with multiple entrances, passages, and stages, neglecting visitor route preferences and phase transition behaviors can easily lead to misjudgment of passage loads and high-risk area locations.
-Finally, many existing simulation or optimization methods treat the crowd model as a black-box evaluator, failing to exploit the structural information among passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146}, resulting in insufficient efficiency in control strategy search \cite{RN2122}.
+However, current management practices in urban high-pedestrian-flow areas remain heavily reliant on manual experience and static contingency plans, and still fall short in scientific evaluation and fine-grained optimization \cite{RN1662}.
+First, many control schemes are derived from historical experience and lack a quantitative characterization of how passage direction settings, entrance release capacities, and phase-dependent behavioral preferences shape crowd dynamics.
+Second, existing methods tend to rely on single-point statistics or local density monitoring, which makes it difficult to capture the dynamic coupling among ``passage direction rules--entrance flow control--local optimal directions--collective density evolution--exit load distribution'' \cite{RN2124}.
+Third, in open scenic areas with multiple entrances, passages, and stages, neglecting visitor route preferences and phase-transition behaviors can lead to misjudgment of passage loads and high-risk locations.
+Fourth, many simulation- and optimization-based methods treat the crowd model as a black-box evaluator and fail to exploit the structural information embedded in passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146}, which renders control-strategy search inefficient \cite{RN2122}.
+Finally, although evacuation-model verification and validation studies have emphasized component-level testing and emergent-behavior validation \cite{ronchi2016vv_evacuation_models}, existing crowd-control optimization studies still lack an evaluation structure that explicitly separates mechanism diagnostics from strategy-level management objectives.
 
-To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization method incorporating passage constraints, fixed geometric guidance, multi-stage route behavior, and internal entrance capacity control, targeting the ``waterfront platform--multi-stepped passage'' open scenic area scenario.
-At the modeling level, this paper constructs a Bellman--conservation-law coupled crowd continuum model: different stage--route subpopulations possess independent potential functions with optimal directions computed via the discrete Bellman equation, while sharing the speed--density relationship determined by total density; one-way, bidirectional, and closed passage states are formulated as constraints on the local admissible direction set; and a fixed anisotropic mobility tensor $M(x;\eta_0)$ characterizes geometric channel alignment.
-We further introduce internal entrance capacity variables $q_c^\pm(t)$ to distinguish attempted entrance flow from actually admitted flow, so that excessive demand remains as upstream waiting rather than disappearing from the system.
-At the optimization level, the controllable variable is $z=(s,q)$, whereas visitor route preferences $\hat p$ and the geometric guidance parameter $\eta_0$ are fixed model inputs.
-The scalarized objective combines total travel time, high-density exposure, realized channel-load imbalance, entrance waiting, and capacity-control smoothness.
-A hierarchical constrained mixed-variable black-box optimization framework (HCMBO) is designed to solve this direction-capacity problem under limited high-fidelity simulation budgets.
+To address the above issues, this paper proposes a macroscopic crowd modeling and control optimization framework for the ``Bund sightseeing platform--multi-stepped passage'' open scenic area scenario.
+The framework connects multi-stage pedestrian movement, channel direction management, geometric guidance, and entrance release control in a unified simulation-and-optimization workflow.
+It aims to provide a quantitative basis for comparing candidate crowd-control strategies under limited simulation budgets, rather than relying only on empirical rules or post-event assessment.
 
 The main contributions of this paper are as follows.
 
 \begin{enumerate}
-\item A ``waterfront platform--multi-stepped passage'' crowd flow modeling framework for open scenic areas is proposed, representing visitor behavior as a multi-stage, multi-route continuum flow process, where different subpopulations possess independent potential functions while sharing collective congestion feedback.
+\item We formulate a multi-stage, multi-route macroscopic model for the open scenic-area class represented by the Bund sightseeing platform and its connected passages. Unlike single-origin--destination or single-potential Hughes-type formulations, the model lets entry, sightseeing, exit, return movement, and route redistribution arise through shared congestion.
 
-\item A Bellman--conservation law coupled model integrating passage constraints and geometric guidance is constructed.
-The admissible direction set first encodes one-way, bidirectional, and closed channel states, while an anisotropic mobility tensor simulates pre-alignment, smooth convergence, and streamline reorganization near passage entrances.
+\item We develop a Bellman--conservation-law operator that combines hard direction rules, anisotropic mobility guidance, and internal entrance-rate metering. This unified macroscopic operator represents one-way, two-way, and closed passages, channel pre-alignment, open-but-metered entrances, and upstream waiting under mass-consistent dynamics.
 
-\item An evaluation framework distinguishing mechanism verification from strategy optimization is established, categorizing indicators into behavioral mechanism indicators (direction consistency, approach angle distribution, channel capture domain) and management optimization indicators (total travel time, high-density exposure time, realized channel-flow variance, entrance waiting, and control smoothness).
+\item We establish an evaluation protocol that separates behavioral-mechanism diagnostics from strategy-level management objectives. The protocol first checks whether direction constraints and geometric guidance behave as intended, and then compares policies by efficiency, high-density exposure, load balance, entrance waiting, and control smoothness.
 
-\item A hierarchical constrained mixed-variable black-box optimization framework is designed for the controllable direction--entrance-rate variable $z=(s,q)$ under fixed historically identified preference parameters and fixed geometric guidance.
-The final HCMBO mainline concentrates the budget on direction-wise structured entrance-rate optimization and high-fidelity rechecking.
-The framework is evaluated against random search, pure simulated annealing, enumeration plus differential evolution, and TPE-based mixed-variable Bayesian optimization.
+\item We design a hierarchical constrained mixed-variable black-box optimization framework (HCMBO) for joint direction and entrance-rate control. By exploiting the direction--capacity structure and applying unified high-fidelity rechecking, HCMBO achieves the best mean objective among representative mixed-variable baselines under the tested budget.
 \end{enumerate}
 
 \section{Related Work}
@@ -519,33 +517,49 @@ z^*=\operatorname*{arg\,min}_{z\in\mathcal C_{\mathrm{HF}}}J_{\mathrm{HF}}(z).
 \end{equation}
 This mechanism prevents surrogate error, low-fidelity bias, or intermediate search ranking from directly becoming the final performance claim.
 
-The main workflow of HCMBO is summarized in Table~\ref{tab:hcmbo_workflow}.
+Algorithm~\ref{alg:hcmbo} gives the reproducible HCMBO procedure used in the experiments.
+The loop terminates after the finite optimization budget has been allocated across direction candidates, and the reported optimum is selected only after the high-fidelity rechecking stage.
 
-\begin{table}[!t]
-\caption{Main Workflow of HCMBO}
-\label{tab:hcmbo_workflow}
-\centering
+\begin{algorithm}[!t]
+\caption{HCMBO for Joint Direction and Entrance-Rate Control}
+\label{alg:hcmbo}
 \small
-\setlength{\tabcolsep}{3pt}
-\renewcommand{\arraystretch}{1.15}
-\begin{tabular}{|p{0.12\columnwidth}|p{0.78\columnwidth}|}
-\hline
-\textbf{Step} & \textbf{Operation} \\
-\hline
-1 & Generate the direction candidate set $\mathcal S_{\mathrm{cand}}$ and remove configurations violating operational or connectivity constraints. \\
-\hline
-2 & For each direction $s$, construct the direction-aware capacity map $q=T_s(x)$. \\
-\hline
-3 & Perform structured black-box search in the capacity parameter space $x\in[0,1]^d$. \\
-\hline
-4 & Evaluate candidates with $\mathcal S(z;\hat p,\eta_0)$ and update surrogate information. \\
-\hline
-5 & Select near-optimal candidates for unified high-fidelity rechecking. \\
-\hline
-6 & Output the final policy $z^*$ according to the high-fidelity objective value. \\
-\hline
-\end{tabular}
-\end{table}
+\raggedright
+\begin{algorithmic}[1]
+\REQUIRE Direction constraints $\Omega_s$; simulator $\mathcal S$; objective $J$; gate-rate bounds $\bar q$; budget $B$; initial design size $n_0$; pool size $P$; LCB coefficient $\kappa$; high-fidelity shortlist size $K$.
+\ENSURE Best high-fidelity policy $z^*$.
+\STATE Generate $\mathcal S_{\mathrm{cand}}$ by enumerating $s\in\Omega_s$ and retaining only configurations satisfying open-channel and connectivity constraints.
+\STATE Rank $\mathcal S_{\mathrm{cand}}$ using the prescribed priority templates and direction proxy score, and then truncate it to the direction-candidate limit.
+\STATE Set $b_s=\lfloor B/|\mathcal S_{\mathrm{cand}}|\rfloor$ and assign one extra evaluation to the first $B\bmod|\mathcal S_{\mathrm{cand}}|$ directions.
+\STATE Initialize the global evaluation log $\mathcal D\leftarrow\emptyset$.
+\FORALL{$s\in\mathcal S_{\mathrm{cand}}$}
+\STATE Construct $T_s:[0,1]^{d_s}\rightarrow q$ by applying the direction mask, gate bounds $\bar q$, and time segmentation.
+\STATE Initialize $\mathcal D_s\leftarrow\emptyset$ and generate $X_s^{0}$ from high-, medium-, and low-rate profiles plus random fill-up points.
+\FORALL{$x\in X_s^{0}$}
+\IF{$|\mathcal D_s|<b_s$}
+\STATE Evaluate $z=(s,T_s(x))$ with the optimization-fidelity simulator and append $(x,z,J(z))$ and feasibility metrics to $\mathcal D_s$ and $\mathcal D$.
+\ENDIF
+\ENDFOR
+\WHILE{$|\mathcal D_s|<b_s$}
+\STATE Let $x_s^{\mathrm{best}}$ be the evaluated point with the lowest objective in $\mathcal D_s$.
+\STATE Draw $\mathcal P_s$ from $P$ uniform samples in $[0,1]^{d_s}$ and $\max(4,\lfloor P/4\rfloor)$ Gaussian perturbations of $x_s^{\mathrm{best}}$, clipped to $[0,1]^{d_s}$.
+\STATE Set the kernel length scale $\ell_s=\max\{0.18,1/\sqrt{d_s}\}$.
+\FORALL{$u\in\mathcal P_s$}
+\STATE Estimate $\hat\mu_s(u)$ by weighted averaging with $w_i(u)=\exp(-\|x_i-u\|_2^2/(2\ell_s^2))$ over $(x_i,z_i,J_i)\in\mathcal D_s$.
+\STATE Set $\hat\sigma_s(u)=\min\{1,\min_{(x_i,z_i,J_i)\in\mathcal D_s}\|u-x_i\|_2/\sqrt{d_s}\}$.
+\STATE Compute $a_s(u)=\hat\mu_s(u)-\kappa\,\operatorname{std}(\mathcal D_s)\hat\sigma_s(u)$.
+\ENDFOR
+\STATE Select $x_{\mathrm{next}}\leftarrow\arg\min_{u\in\mathcal P_s}a_s(u)$.
+\STATE Evaluate $z_{\mathrm{next}}=(s,T_s(x_{\mathrm{next}}))$ and append the result to $\mathcal D_s$ and $\mathcal D$.
+\ENDWHILE
+\ENDFOR
+\STATE Select the top $K$ unique controls $\mathcal C_{\mathrm{HF}}$ from $\mathcal D$ by the optimization-fidelity objective.
+\FORALL{$z\in\mathcal C_{\mathrm{HF}}$}
+\STATE Re-evaluate $z$ under the unified high-fidelity simulator setting to obtain $J_{\mathrm{HF}}(z)$.
+\ENDFOR
+\RETURN $z^*=\operatorname*{arg\,min}_{z\in\mathcal C_{\mathrm{HF}}}J_{\mathrm{HF}}(z)$.
+\end{algorithmic}
+\end{algorithm}
 
 Compared with generic mixed-variable optimization, HCMBO explicitly exploits direction-capacity consistency.
 The direction variable determines the effective feasible structure of the capacity variable, and the capacity variable determines the continuous response of entrance release, waiting, and channel load.
@@ -555,8 +569,8 @@ This structured treatment reduces invalid candidates and concentrates the finite
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-This section validates the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from a waterfront viewing area.
-The scenario consists of an inflow region, a viewing and exit region, a central wall, and four connecting passages: upper, middle, lower-middle, and bottom passages.
+This section validates the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from the Bund sightseeing platform setting.
+The scenario consists of an inflow region, a Bund sightseeing platform and exit region, a central wall, and four connecting passages: upper, middle, lower-middle, and bottom passages.
 The experiments follow the same logic as the Chinese experimental outline: mechanism validation, directional-response analysis, entrance-rate response, horizontal optimizer comparison, and HCMBO ablation.
 
 \subsection{Experimental Setup}
@@ -819,17 +833,17 @@ Thus, queue information is useful for executable and safety-aware extensions, wh
 The preceding experiments use a standardized four-channel platform scenario to verify modeling mechanisms and optimization behavior under controlled conditions.
 As a supplementary validation, we further construct a simplified abstract scenario inspired by the spatial form of the Shanghai Bund waterfront.
 This experiment does not claim to reproduce all architectural details of the real site.
-Instead, it preserves the main waterfront platform, the lateral channel connections, the major inflow location, and the dominant movement direction, so as to examine whether an HCMBO-derived policy can still change the load distribution in a more realistic spatial outline.
+Instead, it preserves the Bund sightseeing platform, the lateral channel connections, the major inflow location, and the dominant movement direction, so as to examine whether an HCMBO-derived policy can still change the load distribution in a more realistic spatial outline.
 
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=0.82\textwidth]{../图表/visio架构图/外滩场景示意图_页-7.jpg}
-\caption{Real Bund scene and its simplified simulation abstraction. The abstraction retains the waterfront platform boundary, the main entrance, and the channel connections used for control validation.}
+\caption{Real Bund scene and its simplified simulation abstraction. The abstraction retains the Bund sightseeing platform boundary, the main entrance, and the channel connections used for control validation. The satellite basemap was obtained from Google Maps. The right-side local photographs were shot in the Shanghai Bund waterfront walkway area by the Tongji Public Safety Experimental Team, June 21, 2026.}
 \label{fig:bund_transfer_scene}
 \end{figure*}
 
 The computational grid has resolution $512\times224$ with $\Delta x=0.125$.
-Pedestrians enter from the outer-side entrance, pass through the middle connecting channels, and move toward the waterfront platform and the central platform target region.
+Pedestrians enter from the outer-side entrance, pass through the middle connecting channels, and move toward the Bund sightseeing platform and its central target region.
 The inflow-rate multiplier is $3.0$, corresponding to an actual inflow rate of $0.24$; the maximum density is $\rho_{\max}=4.0$, and the transition smoothing parameter is $\kappa=32$.
 The experimental channels \texttt{channel\_1}, \texttt{channel\_2}, \texttt{channel\_3}, and \texttt{channel\_4} correspond to the locally named Bund Channels 3, 4, 5, and 6, respectively.
 Both the controlled and uncontrolled groups use $1600$ steps and a time horizon of $50$.
@@ -935,8 +949,8 @@ Channel & Local name & Controlled & Uncontrolled \\
 \end{figure*}
 
 Fig.~\ref{fig:bund_transfer_density_panel} visualizes the density evolution at steps $50$, $350$, $900$, and $1500$.
-Both groups initially form a local density concentration near the right-side platform target region, reflecting the same inflow and target-attraction structure.
-At later stages, the uncontrolled case remains more concentrated around the terminal channel and the adjacent platform area, whereas the controlled case develops a more stable flow band through the middle-channel group.
+Both groups initially form a local density concentration near the right-side target region of the Bund sightseeing platform, reflecting the same inflow and target-attraction structure.
+At later stages, the uncontrolled case remains more concentrated around the terminal channel and the adjacent Bund sightseeing platform area, whereas the controlled case develops a more stable flow band through the middle-channel group.
 This visual evidence is consistent with the channel-share statistics and confirms that the main effect of the HCMBO policy is load redistribution across channels.
 
 The supplementary transfer experiment also reveals an important trade-off.
@@ -955,13 +969,13 @@ Future deployment-oriented extensions should therefore include explicit throughp
 
 This study uses the Shanghai Nanjing East Road--Bund area as a real-world prototype for a class of open pedestrian-zone management problems involving multi-channel connections, one-way passage rules, diversion organization, and entrance-rate control.
 The proposed method does not depend on a complete geometric reconstruction of one specific site.
-Instead, it abstracts the essential structure of a ``viewing platform--multi-channel connection'' scenario and builds a macroscopic crowd dynamics model and control optimization framework for this scenario class.
+Instead, it abstracts the essential structure of a ``Bund sightseeing platform--multi-channel connection'' scenario and builds a macroscopic crowd dynamics model and control optimization framework for this scenario class.
 Accordingly, the Nanjing East Road--Bund case mainly provides the practical background and modeling motivation, while the simplified numerical scenario is used to verify model mechanisms and optimization behavior under controlled conditions.
 
 \subsection{Interpretation of the Simplified Experiments}
 
 The simplified simulation scenario is not intended to reproduce the exact pedestrian flow of a particular time period at the Nanjing East Road--Bund area.
-Its purpose is to preserve the key structural and operational elements observed in such real settings, including the platform region, connecting passages, channel direction constraints, geometric guidance, entrance release control, and channel-load redistribution.
+Its purpose is to preserve the key structural and operational elements observed in such real settings, including the Bund sightseeing platform region, connecting passages, channel direction constraints, geometric guidance, entrance release control, and channel-load redistribution.
 This abstraction makes it possible to examine, in a transparent way, whether the model can represent one-way passage, channel closure, geometric pre-alignment, and multi-stage route transfer.
 It also enables a fair comparison of different optimization algorithms under the same simulation evaluator.
 Therefore, the experimental results should be interpreted as evidence of methodological effectiveness and mechanistic interpretability, rather than as a direct operational control plan for the Nanjing East Road--Bund site.

@@ -68,6 +68,12 @@ P.~X. Liu, X.~Xiao, J.~Zhang, R.~H. Wu, and H.~L. Zhang, ``Spatial configuration
 \bibitem{RN2303}
 A.~M. Caldeira and E.~Kastenholz, ``Spatiotemporal tourist behaviour in urban destinations: a framework of analysis,'' \emph{Tourism Geographies}, vol.~22, no.~1, pp. 22--50, 2020.
 
+\bibitem{qq2024huangpu_security}
+{Jingmin Zhitongche Shanghai}, ``Tourism, shopping festival, and commercial markets bring overlapping visitor flows: Shanghai huangpu police implement holiday security measures,'' Tencent News. [Online]. Available: \url{https://news.qq.com/rain/a/20240503A05LRO00}, May 2024, (in Chinese). Accessed: Jun. 25, 2026.
+
+\bibitem{chinanews2019bund_flow_guidance}
+L.~Yin, ``Instantaneous visitor flow in the core bund scenic area reaches 71,000; police activate crowd-guidance measures,'' China News Service, Chinanews.com. [Online]. Available: \url{https://www.chinanews.com.cn/tp/hd2011/2019/10-03/906114.shtml}, Oct. 2019, (in Chinese). Accessed: Jun. 25, 2026.
+
 \bibitem{RN2176}
 M.~Haghani, M.~Coughlan, B.~Crabb, A.~Dierickx, C.~Feliciani, R.~van Gelder, P.~Geoerg, N.~Hocaoglu, S.~Laws, R.~Lovreglio, Z.~Miles, A.~Nicolas, W.~J. O'Toole, S.~Schaap, T.~Semmens, Z.~Shahhoseini, R.~Spaaij, A.~Tatrai, J.~Webster, and A.~Wilson, ``A roadmap for the future of crowd safety research and practice: Introducing the swiss cheese model of crowd safety and the imperative of a vision zero target,'' \emph{Safety Science}, vol. 168, p. 106292, 2023.
 
@@ -97,6 +103,9 @@ N.~Molyneaux and M.~Bierlaire, ``Controlling pedestrian flows with moving walkwa
 
 \bibitem{RN2122}
 X.~C. Liao, W.~N. Chen, X.~Q. Guo, J.~Zhong, and D.~J. Wang, ``Drift: A dynamic crowd inflow control system using lstm-based deep reinforcement learning,'' \emph{IEEE Transactions on Systems, Man, and Cybernetics: Systems}, vol.~55, no.~6, pp. 4202--4215, 2025.
+
+\bibitem{ronchi2016vv_evacuation_models}
+E.~Ronchi, D.~Nilsson, E.~D. Kuligowski, R.~D. Peacock, and P.~A. Reneke, ``Assessing the verification and validation of building fire evacuation models,'' \emph{Fire Technology}, vol.~52, no.~1, pp. 197--219, 2016.
 
 \bibitem{RN2000}
 H.~M. Al-Ahmadi, I.~Reza, A.~Jamal, W.~S. Alhalabi, and K.~J. Assi, ``Preparedness for mass gatherings: A simulation-based framework for flow control and management using crowd monitoring data,'' \emph{Arabian Journal for Science and Engineering}, vol.~46, no.~5, pp. 4985--4997, 2021.
