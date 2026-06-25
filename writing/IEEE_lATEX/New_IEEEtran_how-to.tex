@@ -17,13 +17,13 @@
 
 \begin{document}
 
-\title{Macroscopic Crowd Flow Control with Direction Constraints and Entrance-Rate Control for Urban Pedestrian Zones}
+\title{Joint Direction and Entrance-Rate Optimization for Crowd Control in Open Pedestrian Zones: A Bellman–Conservation-Law Approach}
 
 \author{Author Name
 \thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
 
-\markboth{Journal Name,~Vol.~XX, No.~X, Month~2026}%
-{Author: Channel Optimization for Crowd Management}
+% \markboth{Journal Name,~Vol.~XX, No.~X, Month~2026}%
+% {Author: Channel Optimization for Crowd Management}
 
 \maketitle
 
@@ -156,8 +156,8 @@ The joint optimization of discrete channel direction configurations and internal
 
 \subsection{Problem Definition and Overall Framework}
 
-This paper addresses a multi-channel crowd management problem in open scenic areas.
-The proposed method combines a Bellman--conservation-law crowd dynamics model with a joint direction-capacity control formulation.
+We address a multi-channel crowd management problem in open scenic areas.
+The proposed method combines a Bellman--conservation-law crowd dynamics model \cite{hughes2003,RN2078} with a joint direction-capacity control formulation.
 The controllable management variable is defined as
 \begin{equation}
 z=(s,q)\in\mathcal Z,
@@ -179,7 +179,7 @@ The overall method framework is shown in Fig.~\ref{fig:method_framework}.
 The key modeling assumption is that direction rules and entrance capacities should be optimized jointly.
 The direction configuration $s$ changes the local feasible direction set, whereas the entrance capacity $q$ changes the realized admitted flux at channel entrances.
 These two controls jointly affect channel loading, local high-density exposure, and upstream waiting.
-Therefore, the paper formulates crowd management as a mixed-variable simulation-based optimization problem rather than as two independent subproblems.
+Therefore, we formulate crowd management as a mixed-variable simulation-based optimization problem rather than as two independent subproblems, consistent with recent simulation-based passenger-flow and entrance-control studies \cite{RN2122,jiang2018coordinated_inflow,liu2021queuing_network_flow_control}.
 
 \subsection{Bellman--Conservation-Law Crowd Dynamics}
 
@@ -202,7 +202,7 @@ f(\rho) = v_{\max}\left(1 - \frac{\rho}{\rho_{\max}}\right)_+,
 where $v_{\max}$ is the free-flow speed, $\rho_{\max}$ is the maximum admissible density, and $(\cdot)_+$ denotes nonnegative truncation.
 This function captures the feedback that pedestrians move close to free-flow speed in low-density regions and slow down as density approaches congestion.
 
-The classical Hughes model assumes that all movement directions are feasible and isotropic.
+The classical Hughes model assumes that all movement directions are feasible and isotropic \cite{hughes2003}.
 This assumption is insufficient for crowd management scenarios involving one-way rules, temporary closures, entrance metering, and channel-axis alignment.
 The following subsections introduce admissible direction sets, anisotropic mobility tensors, and internal entrance capacity control into the Bellman--conservation-law framework.
 
@@ -235,7 +235,7 @@ Q_{(\sigma,r)\to(\sigma+1,k)}(x,t)
 \label{eq:transition}
 \end{equation}
 where $\kappa_{\sigma,r}$ is the stage-switching rate and $\chi_{G_{\sigma,r}}$ is the indicator function of the completion region.
-The parameter $\hat p$ represents historically inferred or scenario-given route preferences and is fixed in the optimization problem.
+The parameter $\hat p$ represents historically inferred or scenario-given route preferences and is fixed in the optimization problem \cite{RN2302,RN2301,RN2303}.
 
 \subsection{Direction Constraints and Geometric Guidance}
 
@@ -268,7 +268,7 @@ A closed channel has no admissible direction, a one-way channel retains only one
 
 The admissible set $U(x;s)$ represents hard feasibility, but it does not capture the soft geometric guidance induced by narrow channels.
 Pedestrians approaching a passage often pre-align with the channel axis before entering it.
-To represent this effect, an anisotropic mobility tensor $M(x;\eta_0)$ is introduced.
+To represent this effect, an anisotropic mobility tensor $M(x;\eta_0)$ is introduced \cite{cristiani2016,priuli2015control,RN2080}.
 Equivalently, it is the inverse of a local travel-cost metric.
 For channel $c$, let $\tau_c$ and $n_c$ denote its tangent and normal directions.
 The mobility tensor is defined as
@@ -279,7 +279,7 @@ M_c(x;\eta_0)=\beta_c\left(\eta_0\,\tau_c\tau_c^\top+n_c n_c^\top\right),
 \end{equation}
 where $\beta_c$ is a channel weight and $\eta_0$ controls the mobility preference strength along the channel axis.
 Larger $\eta_0$ increases tangential mobility, equivalently reducing the effective cost of tangential motion and promoting upstream pre-alignment.
-In this paper, $\eta_0$ is fixed and is not optimized as a control variable.
+The parameter $\eta_0$ is fixed and is not optimized as a control variable.
 
 \subsubsection{Constrained Bellman Equation}
 
@@ -310,7 +310,7 @@ Thus, direction rules, geometric guidance, and density-dependent congestion are 
 
 \subsection{Internal Entrance Capacity Control}
 
-Direction rules alone cannot represent the management action in which a channel is open but its entrance must be metered.
+Direction rules alone cannot represent the management action in which a channel is open but its entrance must be metered \cite{jiang2018coordinated_inflow,liu2021queuing_network_flow_control,hu2025passenger_capacity_allocation}.
 For each channel, we introduce maximum internal entrance rates
 \begin{equation}
 q=\{q_c^+(t),q_c^-(t)\}_{c=1}^C,
@@ -349,7 +349,7 @@ This treatment changes channel usage and risk distribution while preserving the 
 The walkable region, obstacles, channel areas, and internal entrance interfaces are discretized on a uniform two-dimensional grid.
 At each time step, the total density is first computed from all stage--route subpopulations and used to update $f(\rho)$.
 For each subpopulation, the admissible direction set and mobility tensor are then constructed, and the corresponding discrete Bellman equation is solved.
-After the velocity direction is recovered, an upwind finite-volume update advances the conservation law, while internal entrance fluxes are modified by $\theta_c^\pm(t)$.
+After the velocity direction is recovered, an upwind finite-volume update advances the conservation law, while internal entrance fluxes are modified by $\theta_c^\pm(t)$ \cite{RN2078}.
 Finally, stage transition terms are applied to update the subpopulation densities.
 
 For any feasible control variable $z=(s,q)$, the complete numerical workflow defines a lower-level simulation operator
@@ -365,7 +365,7 @@ The channel balance metric below is computed from the realized throughputs $R_c$
 
 \subsubsection{Efficiency, Safety, and Load Balance}
 
-The total travel time metric is
+Following recent passenger-flow-control and crowd-evacuation simulation-optimization studies \cite{hu2025passenger_capacity_allocation,RN2145,RN2119}, the total travel time metric is
 \begin{equation}
 J_1(z) = \int_0^T \int_{\Omega_w} \rho(x,t) \, dx \, dt.
 \label{eq:j1}
@@ -400,7 +400,7 @@ J_5(z)=\sum_{c,k}\left[(q_{c,k+1}^+-q_{c,k}^+)^2+(q_{c,k+1}^--q_{c,k}^-)^2\right
 \label{eq:j5}
 \end{equation}
 Here $k$ indexes the capacity-control time segment.
-$J_4$ discourages excessive entrance metering that creates upstream queues, while $J_5$ discourages abrupt high-frequency changes in capacity profiles.
+$J_4$ discourages excessive entrance metering that creates upstream queues, while $J_5$ discourages abrupt high-frequency changes in capacity profiles \cite{jiang2018coordinated_inflow,liu2021queuing_network_flow_control,hu2025passenger_capacity_allocation,RN2196}.
 
 \subsubsection{Normalization and Scalar Objectives}
 
@@ -435,7 +435,7 @@ For segmented entrance-rate profiles, the smoothness term is normalized by the c
 \right)^2 .
 \]
 Here $N_q$ is the number of active finite differences, $\bar q_c^\sigma$ is the reference upper bound of the corresponding entrance, and $\varepsilon_R$ and $\varepsilon_q$ only avoid zero denominators.
-Thus, $\bar J_1$ is a relative system-residence measure, $\bar J_2$ is the average hard exposure or soft safety-risk intensity over the walkable space-time domain, and $\bar J_3$ is zero for perfectly balanced realized channel use and approaches one when all realized channel throughput concentrates on one channel.
+Thus, $\bar J_1$ is a relative system-residence measure, $\bar J_2$ is the average hard exposure or soft safety-risk intensity over the walkable space-time domain \cite{RN2059}, and $\bar J_3$ is zero for perfectly balanced realized channel use and approaches one when all realized channel throughput concentrates on one channel.
 
 The reported terms use scale factors
 \begin{equation}
@@ -463,10 +463,10 @@ and the optimization problem is
 \end{equation}
 The paper solves this fixed-weight scalarized management problem.
 Different weights can represent different management preferences, but the algorithm itself does not depend on one specific objective term being independently optimal.
-Although $J$, $J^{(3)}$, and $\tilde J_k$ are dimensionless ranking quantities, their interpretation is anchored by the normalization above.
+Although $J$, $J^{(3)}$, and $\tilde J_k$ are dimensionless ranking quantities, their interpretation is anchored by the normalization above \cite{marler2004survey_moo_engineering,RN2123}.
 When physical interpretation is needed, the experiments also report raw or ratio-based diagnostics such as channel-flow shares, unreleased attempted mass, binding-time ratios, system mass, and density peaks.
 
-For mechanism-verification experiments and fixed-strategy diagnostic experiments that only test direction rules, geometric guidance, or fixed entrance-rate responses, this paper uses the reduced three-term objective
+For mechanism-verification experiments and fixed-strategy diagnostic experiments that only test direction rules, geometric guidance, or fixed entrance-rate responses, we use the reduced three-term objective
 \begin{equation}
 J^{(3)}(z)=
 \lambda_1\tilde J_1(z)
@@ -481,8 +481,8 @@ The numerical values of $J$ and $J^{(3)}$ are not compared across experiment gro
 \subsection{Hierarchical Constrained Mixed-Variable Black-Box Optimization}
 \label{sec:optimization}
 
-Since $s$ is discrete, $q$ is continuous or piecewise continuous, and each objective evaluation requires the expensive simulator $\mathcal S$, the resulting problem is an expensive mixed-variable black-box optimization problem.
-This paper proposes HCMBO, a Hierarchical Constrained Mixed-variable Black-box Optimization method, to exploit the structural relation between direction variables and capacity variables.
+Since $s$ is discrete, $q$ is continuous or piecewise continuous, and each objective evaluation requires the expensive simulator $\mathcal S$, the resulting problem is an expensive mixed-variable black-box optimization problem \cite{sheikh2022mixed_variable_mobo,ramirez2022mixed_variables_bo,dreczkowski2023mixed_variable_bo}.
+We propose HCMBO, a Hierarchical Constrained Mixed-variable Black-box Optimization method, to exploit the structural relation between direction variables and capacity variables.
 
 \subsubsection{Direction Candidates and Capacity Parameterization}
 
@@ -569,9 +569,9 @@ This structured treatment reduces invalid candidates and concentrates the finite
 \section{Numerical Experiments}
 \label{sec:experiments}
 
-This section validates the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from the Bund sightseeing platform setting.
+We validate the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from the Bund sightseeing platform setting.
 The scenario consists of an inflow region, a Bund sightseeing platform and exit region, a central wall, and four connecting passages: upper, middle, lower-middle, and bottom passages.
-The experiments follow the same logic as the Chinese experimental outline: mechanism validation, directional-response analysis, entrance-rate response, horizontal optimizer comparison, and HCMBO ablation.
+The experiments are organized as mechanism validation, directional-response analysis, entrance-rate response, horizontal optimizer comparison, and HCMBO ablation.
 
 \subsection{Experimental Setup}
 \label{sec:setup}
@@ -601,7 +601,7 @@ Raw cumulative quantities are rounded to three significant digits in the text, w
 \subsection{Mechanism Validation}
 \label{sec:mechanism}
 
-The first experiment verifies whether the two local modeling components have the intended behavioral meanings.
+We first verify whether the two local modeling components have the intended behavioral meanings.
 The fixed anisotropic mobility tensor $M(x;\eta_0)$ should reshape the channel attraction domain and induce entrance pre-alignment, whereas the admissible direction set $U(x;s)$ should remove prohibited directions and reroute flow through feasible passages.
 When $M$ is applied to the middle channel, its flow share increases from $48.78\%$ in the baseline to $100.00\%$.
 When a one-way rule excludes the originally dominant middle-channel direction, the middle-channel share becomes zero and the flow is redistributed to the upper, lower-middle, and bottom channels with shares $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
@@ -967,7 +967,7 @@ Future deployment-oriented extensions should therefore include explicit throughp
 
 \subsection{Role of the Real-World Scenario Prototype}
 
-This study uses the Shanghai Nanjing East Road--Bund area as a real-world prototype for a class of open pedestrian-zone management problems involving multi-channel connections, one-way passage rules, diversion organization, and entrance-rate control.
+We use the Shanghai Nanjing East Road--Bund area as a real-world prototype for a class of open pedestrian-zone management problems involving multi-channel connections, one-way passage rules, diversion organization, and entrance-rate control.
 The proposed method does not depend on a complete geometric reconstruction of one specific site.
 Instead, it abstracts the essential structure of a ``Bund sightseeing platform--multi-channel connection'' scenario and builds a macroscopic crowd dynamics model and control optimization framework for this scenario class.
 Accordingly, the Nanjing East Road--Bund case mainly provides the practical background and modeling motivation, while the simplified numerical scenario is used to verify model mechanisms and optimization behavior under controlled conditions.
@@ -991,7 +991,7 @@ Future work will combine real geometric data with multi-source pedestrian observ
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper proposed a Bellman--conservation-law crowd management framework for open pedestrian zones with multi-channel direction rules and internal entrance-rate control.
+We proposed a Bellman--conservation-law crowd management framework for open pedestrian zones with multi-channel direction rules and internal entrance-rate control.
 The admissible direction set $U(x;s)$ represents hard operational rules such as one-way, bidirectional, and closed passages; the fixed mobility tensor $M(x;\eta_0)$ represents geometric guidance; and the multi-stage route structure describes entry, viewing, exit, and return movements.
 The controllable variable is $z=(s,q)$, where $s$ is the channel direction configuration and $q$ is the internal entrance-rate upper-bound profile; behavioral preference $\hat p$ and geometric guidance strength $\eta_0$ are fixed model inputs.
 
