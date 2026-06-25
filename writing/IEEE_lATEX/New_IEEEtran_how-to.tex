@@ -49,12 +49,15 @@ Crowd dynamics modeling, crowd flow control, mixed-variable black-box optimizati
 \label{sec:introduction}
 
 \IEEEPARstart{L}{arge-scale} crowd gathering poses risks not only to individual safety but also to public order, as localized congestion can escalate into stampede incidents. Effective crowd management is therefore a critical component of urban public-safety governance \cite{RN2147,RN1998}.
-With the increasing frequency of high-density pedestrian activities such as holiday tourism, urban public events, commercial district promotions, New Year celebrations, and major sports events, core urban areas must accommodate pedestrian demands far exceeding daily levels within short time windows, posing enormous challenges for on-site organization, passage management, risk early warning, and emergency dispatch \cite{RN2154,RN1193,RN673}.
-Against this backdrop, scientific modeling, numerical simulation, and optimization methods for formulating and evaluating crowd control strategies---improving the efficiency of large-scale event organization and reducing local congestion risks---have become critical scientific problems demanding urgent breakthroughs in social safety and urban governance \cite{RN1226,RN2059}.
+High-density pedestrian activities, such as holiday tourism, public events, and major sports gatherings, are becoming increasingly frequent.
+As a result, core urban areas must accommodate pedestrian demands far exceeding daily levels within short time windows, which poses major challenges for on-site organization, risk early warning, and emergency dispatch \cite{RN2154,RN1193,RN673}.
+Against this backdrop, scientific modeling, numerical simulation, and optimization of crowd-control strategies have become critical research problems for social safety and urban governance \cite{RN1226,RN2059}.
+Such methods aim to improve the efficiency of large-scale event organization while reducing local congestion risks.
 
 Crowds in large-scale events constitute typical complex systems.
 Numerous individuals with heterogeneous desired speeds, destinations, and route preferences interact through multi-scale, nonlinear mechanisms in confined spaces, generating spatiotemporal patterns at the collective level \cite{RN1193,RN1100}.
-Macroscopically, these patterns manifest as destination-oriented flow, passage convergence, bottleneck queuing, exit competition, and directional responses to control regulations \cite{RN2056,RN2102}; microscopically, individuals are influenced by surrounding density, visible paths, obstacle boundaries, and guidance facilities \cite{RN2174}.
+Macroscopically, these patterns appear as destination-oriented flow, passage convergence, bottleneck queuing, and directional responses to control regulations \cite{RN2056,RN2102}.
+Microscopically, individuals are influenced by surrounding density, visible paths, obstacles, and guidance facilities \cite{RN2174}.
 For open scenic areas, crowd behavior additionally exhibits pronounced phase dependence: visitors may first move toward a sightseeing platform, then tour along the main viewing direction, and subsequently choose different exit passages based on preferences \cite{RN2302}.
 These characteristics of multi-stage, multi-route coexistence with shared congestion mean that traditional static capacity analysis or single shortest-path models cannot adequately support refined management decisions.
 
@@ -64,7 +67,10 @@ In these settings, visitors typically undergo a continuous behavioral chain of `
 Their movement is therefore governed jointly by spatial geometry, control regulations, and historical behavioral preferences \cite{RN2303}.
 Taking the Shanghai Nanjing East Road--Bund area as a concrete example, visitors approach the Bund from Nanjing East Road, ascend to the Bund sightseeing platform via multiple stepped passages, tour along the waterfront, then exit through several southern passages and return along lower streets.
 This scenario can be abstracted as the typical ``Bund sightseeing platform--multi-stepped passage'' crowd flow scenario.
-In such scenarios, management difficulties manifest in three aspects: first, multiple passages simultaneously serve entry, exit, and diversion functions, and local direction settings can alter overall flow organization; second, distinct phase-dependent behavioral transitions exist between the main tourist corridor and lateral passages, making single origin--destination models insufficient; third, local congestion and global route choice form mutual feedback loops, where control changes in one passage may trigger load redistribution in adjacent areas.
+In such scenarios, management difficulties appear in three aspects.
+First, multiple passages simultaneously serve entry, exit, and diversion functions, so local direction settings can alter the overall flow organization.
+Second, behavioral transitions between the main tourist corridor and lateral passages make single origin--destination models insufficient.
+Third, local congestion and global route choice form feedback loops, where control changes in one passage may redistribute loads in adjacent areas.
 
 \begin{figure*}[!t]
 \centering
@@ -435,7 +441,9 @@ For segmented entrance-rate profiles, the smoothness term is normalized by the c
 \right)^2 .
 \]
 Here $N_q$ is the number of active finite differences, $\bar q_c^\sigma$ is the reference upper bound of the corresponding entrance, and $\varepsilon_R$ and $\varepsilon_q$ only avoid zero denominators.
-Thus, $\bar J_1$ is a relative system-residence measure, $\bar J_2$ is the average hard exposure or soft safety-risk intensity over the walkable space-time domain \cite{RN2059}, and $\bar J_3$ is zero for perfectly balanced realized channel use and approaches one when all realized channel throughput concentrates on one channel.
+Thus, $\bar J_1$ is a relative system-residence measure.
+The term $\bar J_2$ is the average hard exposure or soft safety-risk intensity over the walkable space-time domain \cite{RN2059}.
+The term $\bar J_3$ is zero for perfectly balanced realized channel use and approaches one when all realized channel throughput concentrates on one channel.
 
 The reported terms use scale factors
 \begin{equation}
@@ -464,7 +472,7 @@ and the optimization problem is
 The paper solves this fixed-weight scalarized management problem.
 Different weights can represent different management preferences, but the algorithm itself does not depend on one specific objective term being independently optimal.
 Although $J$, $J^{(3)}$, and $\tilde J_k$ are dimensionless ranking quantities, their interpretation is anchored by the normalization above \cite{RN2123,marler2004survey_moo_engineering}.
-When physical interpretation is needed, the experiments also report raw or ratio-based diagnostics such as channel-flow shares, unreleased attempted mass, binding-time ratios, system mass, and density peaks.
+When physical interpretation is needed, the experiments also report raw or ratio-based diagnostics such as channel-flow shares, system mass, and density peaks.
 
 For mechanism-verification experiments and fixed-strategy diagnostic experiments that only test direction rules, geometric guidance, or fixed entrance-rate responses, we use the reduced three-term objective
 \begin{equation}
@@ -577,16 +585,21 @@ The experiments are organized as mechanism validation, directional-response anal
 \label{sec:setup}
 
 The domain is discretized on a $128\times96$ grid with spacing $\Delta x=0.5$.
-The channel width is $2$, the controlled internal entrance interface width is $8$, the free-flow speed is $v_{\max}=1.5$, the maximum density is $\rho_{\max}=5.0$, the initial density is $\rho_{\mathrm{init}}=2.2$, and the CFL factor is $0.9$.
-Mechanism and response experiments use the corresponding validation horizons, whereas the optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, horizon $160$, and Bellman updates every five steps.
+The channel width is $2$, and the controlled internal entrance interface width is $8$.
+The free-flow speed is $v_{\max}=1.5$, the maximum density is $\rho_{\max}=5.0$, the initial density is $\rho_{\mathrm{init}}=2.2$, and the CFL factor is $0.9$.
+Mechanism and response experiments use the corresponding validation horizons.
+The optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, horizon $160$, and Bellman updates every five steps.
 Final optimizer rankings are based on the high-fidelity objective in Section~\ref{sec:metrics}.
 Unless otherwise stated, optimization experiments are ranked by the full five-term scalar objective $J$ after high-fidelity rechecking.
 Mechanism-validation, directional-response, fixed-rate response, and supplementary transfer diagnostics use the reduced objective $J^{(3)}=\lambda_1\tilde J_1+\lambda_2\tilde J_2+\lambda_3\tilde J_3$.
-For these reduced-objective experiments, $\tilde J_4$ is only an entrance-waiting diagnostic or is not applicable, and $\tilde J_5$ is not applicable; equivalently, $\lambda_4=\lambda_5=0$.
-Therefore, the numerical values of $J$ and $J^{(3)}$ should not be compared across experiment groups; comparisons are meaningful only within the same objective definition, normalization rule, and weight setting.
+For these reduced-objective experiments, $\tilde J_4$ is only an entrance-waiting diagnostic or is not applicable, and $\tilde J_5$ is not applicable.
+Equivalently, $\lambda_4=\lambda_5=0$.
+Therefore, the numerical values of $J$ and $J^{(3)}$ should not be compared across experiment groups.
+Comparisons are meaningful only within the same objective definition, normalization rule, and weight setting.
 A high-fidelity best candidate is called feasible if the density-cap removal mass is no more than $2\%$ of the reference mass.
 Unless otherwise stated, cumulative flow, waiting mass, unreleased attempted flow, and system mass are reported in simulation mass units.
-Mass-time quantities are reported in simulation mass-time units, and counterflow cell-time is reported in grid-cell-time units.
+Mass-time quantities are reported in simulation mass-time units.
+Counterflow cell-time is reported in grid-cell-time units.
 Channel-flow shares are computed from realized cumulative channel throughputs, $R_c(T)/\sum_jR_j(T)$.
 Scalar objectives and normalized terms are dimensionless.
 Raw cumulative quantities are rounded to three significant digits in the text, while tables retain four decimals for dimensionless objective terms.
@@ -954,7 +967,8 @@ At later stages, the uncontrolled case remains more concentrated around the term
 This visual evidence is consistent with the channel-share statistics and confirms that the main effect of the HCMBO policy is load redistribution across channels.
 
 The supplementary transfer experiment also reveals an important trade-off.
-The controlled group has a higher efficiency term ($\tilde J_1$ increases from $0.3813$ to $0.4145$), a slightly higher safety-exposure term ($\tilde J_2$ increases from $0.0284$ to $0.0357$), a smaller cumulative sink flow ($6.82$ versus $8.57$ simulation mass units), and a larger final system mass ($7.85$ versus $6.18$ simulation mass units).
+Compared with the uncontrolled group, the controlled group shows a higher efficiency term ($\tilde J_1$ increases from $0.3813$ to $0.4145$) and a slightly higher safety-exposure term ($\tilde J_2$ increases from $0.0284$ to $0.0357$).
+At the same time, its cumulative sink flow is smaller ($6.82$ versus $8.57$ simulation mass units) and its final system mass is larger ($7.85$ versus $6.18$).
 Therefore, the transferred HCMBO policy should not be interpreted as uniformly improving safety and efficiency.
 Rather, under the present reduced-objective weights, it reduces $J^{(3)}$ mainly by improving channel-load balance, while sacrificing part of the exit throughput and travel efficiency.
 The capacity-scale factor of $3$ reduces unreleased attempted flow to $1.87$ simulation mass units, but it does not remove the efficiency cost of the control policy.
@@ -962,31 +976,7 @@ Overall, the supplementary Bund-inspired experiment shows that the optimized HCM
 However, the improvement is accompanied by unreleased attempted entrance flow, lower exit throughput, and higher residual mass in the system.
 Future deployment-oriented extensions should therefore include explicit throughput constraints, waiting upper bounds, or multi-weight scenario analysis to avoid obtaining policies that improve load balance at the cost of overly strong metering.
 
-\section{Discussion}
-\label{sec:discussion}
 
-\subsection{Role of the Real-World Scenario Prototype}
-
-We use the Shanghai Nanjing East Road--Bund area as a real-world prototype for a class of open pedestrian-zone management problems involving multi-passage connections, one-way passage rules, diversion organization, and entrance-rate control.
-The proposed method does not depend on a complete geometric reconstruction of one specific site.
-Instead, it abstracts the essential structure of a ``Bund sightseeing platform--multi-passage connection'' scenario and builds a macroscopic crowd dynamics model and control optimization framework for this scenario class.
-Accordingly, the Nanjing East Road--Bund case mainly provides the practical background and modeling motivation, while the simplified numerical scenario is used to verify model mechanisms and optimization behavior under controlled conditions.
-
-\subsection{Interpretation of the Simplified Experiments}
-
-The simplified simulation scenario is not intended to reproduce the exact pedestrian flow of a particular time period at the Nanjing East Road--Bund area.
-Its purpose is to preserve the key structural and operational elements observed in such real settings, including the Bund sightseeing platform region, connecting passages, passage direction rules, geometric guidance, entrance release control, and passage-load redistribution.
-This abstraction makes it possible to examine, in a transparent way, whether the model can represent one-way passage, channel closure, geometric pre-alignment, and multi-stage route transfer.
-It also enables a fair comparison of different optimization algorithms under the same simulation evaluator.
-Therefore, the experimental results should be interpreted as evidence of methodological effectiveness and mechanistic interpretability, rather than as a direct operational control plan for the Nanjing East Road--Bund site.
-
-\subsection{Requirements for Field Validation}
-
-Real-scene experiments are not conducted in the present study because they require additional data acquisition, model calibration, and field implementation conditions.
-Practical deployment would require observations of time-varying inflow, local density, velocity fields, passage flow, queue length, and pedestrian route choices.
-It would also require calibration of the speed--density relationship, route preferences, stage-transition parameters, passage capacities, and entrance-rate upper bounds.
-Moreover, one-way passage settings, batch release, and on-site guidance measures are tied to staff deployment, temporary facilities, emergency response plans, and safety approval procedures; simulation-based optimization cannot directly replace these operational processes.
-Future work will combine real geometric data with multi-source pedestrian observations, calibrate the proposed model against field measurements, and incorporate executable management rules into the optimization constraints so that the framework can be extended toward scenario-specific validation and decision support for the Nanjing East Road--Bund area and other open public spaces.
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -996,11 +986,13 @@ The framework links an interpretable crowd-flow simulator with HCMBO, so that di
 
 The experiments show that the model components produce the intended behavioral effects and that the two control dimensions are not interchangeable.
 Direction settings create non-monotonic trade-offs among efficiency, safety exposure, and load balance, while entrance-rate limits change unreleased attempted flow, binding-time ratios, and local risk patterns.
-Under five random seeds and unified high-fidelity rechecking, HCMBO obtains the lowest mean full management objective among the tested baselines, reducing the fixed-weight score by 3.9\% relative to TPE-Mixed BO and maintaining a 100\% feasible rate.
+Under five random seeds and unified high-fidelity rechecking, HCMBO obtains the lowest mean full management objective among the tested baselines.
+It reduces the fixed-weight score by 3.9 percent relative to TPE-Mixed BO and maintains a 100 percent feasible rate.
 Ablation results indicate that joint direction--rate optimization, avoiding short-horizon hard screening, and using structured direction-wise rate search are central to this performance.
 
 The Bund-inspired transfer experiment further shows that an HCMBO-derived policy can still alter flow organization in a simplified real-world spatial abstraction.
-In that experiment, the reduced objective decreases by 26.9\%, mainly because the policy redistributes flow away from the dominant terminal channel and improves load balance across the middle-channel group.
+In that experiment, the reduced objective decreases by 26.9 percent.
+This reduction mainly occurs because the policy redistributes flow away from the dominant terminal channel and improves load balance across the middle-channel group.
 However, this gain is accompanied by higher residual system mass, lower exit throughput, and unreleased attempted entrance flow.
 Therefore, the transfer result should be interpreted as evidence of mechanistic transferability and load-redistribution capability, not as a ready-to-deploy operational plan for the Bund area.
 
