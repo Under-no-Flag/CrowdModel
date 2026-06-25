@@ -17,7 +17,7 @@
 
 \begin{document}
 
-\title{Joint Passage Direction and Entrance-Rate Optimization for Crowd Control in Open Pedestrian Zones: A Bellman Conservation Law Approach}
+\title{Joint Passage Direction and Entrance-Rate Optimization for Large-Scale Crowd Control in Open Pedestrian Zones: A Bellman Conservation Law Approach}
 
 \author{Author Name
 \thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
@@ -991,22 +991,22 @@ Future work will combine real geometric data with multi-source pedestrian observ
 \section{Conclusion}
 \label{sec:conclusion}
 
-We proposed a Bellman--conservation-law crowd management framework for open pedestrian zones with multi-channel direction rules and internal entrance-rate control.
-The admissible direction set $U(x;s)$ represents hard operational rules such as one-way, bidirectional, and closed channels; the fixed mobility tensor $M(x;\eta_0)$ represents geometric guidance; and the multi-stage route structure describes entry, viewing, exit, and return movements.
-The controllable variable is $z=(s,q)$, where $s$ is the channel direction configuration and $q$ is the internal entrance-rate upper-bound profile; behavioral preference $\hat p$ and geometric guidance strength $\eta_0$ are fixed model inputs.
+We proposed a macroscopic crowd management framework for open pedestrian zones that jointly models passage-direction rules, geometric guidance, multi-stage route behavior, and internal entrance-rate control.
+The framework links an interpretable crowd-flow simulator with HCMBO, so that direction settings and entrance-rate profiles can be optimized together under a limited simulation budget.
 
-The numerical experiments support three conclusions.
-First, the lower-level simulator produces interpretable mechanisms: $U(x;s)$ removes prohibited local directions, $M(x;\eta_0)$ changes channel attraction domains and entrance pre-alignment, and the combined $U+M$ mechanism transfers across controlled-channel locations.
-Second, both control variables are necessary.
-Directional settings produce non-monotonic efficiency--safety--load-balance trade-offs, and entrance-rate upper bounds significantly change unreleased attempted flow, binding-time ratios, and safety exposure.
-Third, the final HCMBO optimizer effectively exploits the direction--rate hierarchy.
-Under five random seeds, $B=400$ candidate evaluations, and unified high-fidelity rechecks, HCMBO obtains the lowest mean dimensionless full objective, reducing the fixed-weight management score by $3.9\%$ relative to TPE-Mixed BO while maintaining the highest feasible rate of $100\%$.
-This improvement should not be interpreted as an isolated reduction in travel time, density exposure, or waiting alone.
-Ablation results further show that joint direction--rate optimization, removal of low-fidelity hard screening, and structured direction-wise rate search are key contributors to this performance.
+The experiments show that the model components produce the intended behavioral effects and that the two control dimensions are not interchangeable.
+Direction settings create non-monotonic trade-offs among efficiency, safety exposure, and load balance, while entrance-rate limits change unreleased attempted flow, binding-time ratios, and local risk patterns.
+Under five random seeds and unified high-fidelity rechecking, HCMBO obtains the lowest mean full management objective among the tested baselines, reducing the fixed-weight score by 3.9\% relative to TPE-Mixed BO and maintaining a 100\% feasible rate.
+Ablation results indicate that joint direction--rate optimization, avoiding short-horizon hard screening, and using structured direction-wise rate search are central to this performance.
+
+The Bund-inspired transfer experiment further shows that an HCMBO-derived policy can still alter flow organization in a simplified real-world spatial abstraction.
+In that experiment, the reduced objective decreases by 26.9\%, mainly because the policy redistributes flow away from the dominant terminal channel and improves load balance across the middle-channel group.
+However, this gain is accompanied by higher residual system mass, lower exit throughput, and unreleased attempted entrance flow.
+Therefore, the transfer result should be interpreted as evidence of mechanistic transferability and load-redistribution capability, not as a ready-to-deploy operational plan for the Bund area.
 
 The current study still has limitations.
-The experiments are based on a four-channel abstract scenario, objective weights and finite random seeds affect optimizer ranking, one HCMBO seed still exhibits relatively high safety exposure, and real crowd calibration and online demand updates are not yet included.
-Future work will extend the framework to more complex real geometries, broader demand levels and random-seed sets, stronger constraint-aware Bayesian optimization or SMAC-style baselines, multi-weight Pareto analysis, and calibration against field observations.
+The experiments are based on simplified geometries, fixed objective weights, and finite random seeds; one HCMBO seed still exhibits relatively high safety exposure; and real crowd calibration, online demand updates, and executable field constraints are not yet included.
+Future work will extend the framework to richer real geometries, broader demand and seed settings, stronger constraint-aware optimization baselines, multi-weight Pareto analysis, and calibration against field observations.
 
 \balance
 
