@@ -11,6 +11,8 @@ matplotlib.use("Agg", force=True)
 import matplotlib.pyplot as plt
 import numpy as np
 
+from paper_physical_units import FOUR_CHANNEL
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 G6_ROOT = REPO_ROOT / "codes" / "results" / "g6_horizontal_comparison"
@@ -304,7 +306,7 @@ def save_best_objective_distribution(path: Path, seed_rows: list[dict[str, objec
     ax.set_yticks(y)
     ax.set_yticklabels(labels)
     ax.invert_yaxis()
-    ax.set_xlabel("Best high-fidelity objective, lower is better")
+    ax.set_xlabel("Best high-fidelity objective $J$ (dimensionless), lower is better")
     ax.set_title("Best objective across seeds")
     ax.grid(axis="x", alpha=0.24)
     finite = means[np.isfinite(means)]
@@ -471,7 +473,7 @@ def save_convergence(path: Path, curve_rows: list[dict[str, object]]) -> None:
         plotted_series.append({"method": method, "x": x_grid, "center": center, "q25": q25, "q75": q75, "color": color})
     ax.set_title("Best-so-far convergence")
     ax.set_xlabel("Optimization evaluations")
-    ax.set_ylabel("Best objective so far")
+    ax.set_ylabel("Best objective $J$ so far (dimensionless)")
     ax.grid(True, alpha=0.24)
     ax.legend(frameon=False, fontsize=8.0, loc="upper center", bbox_to_anchor=(0.5, -0.13), ncol=5)
     if plotted_series:
@@ -558,7 +560,7 @@ def save_control_profiles(path: Path, seed_rows: list[dict[str, object]]) -> Non
     if image is not None:
         cbar_ax = fig.add_axes([0.89, 0.17, 0.020, 0.64])
         cbar = fig.colorbar(image, cax=cbar_ax)
-        cbar.set_label("Rate upper bound q")
+        cbar.set_label("Rate upper bound q (ped/s)")
     save_fig(fig, path, tight=False)
 
 
@@ -566,10 +568,11 @@ def control_matrix(control: dict[str, object]) -> np.ndarray:
     q_by_gate = control.get("q_by_gate", {})
     if not isinstance(q_by_gate, dict):
         q_by_gate = {}
+    rate_to_ped_per_sec = FOUR_CHANNEL.ped_per_sec_per_rate_unit
     rows = []
     for gate in GATE_ROWS:
         raw = q_by_gate.get(gate, [])
-        values = [to_float(item) for item in raw] if isinstance(raw, list) else []
+        values = [to_float(item) * rate_to_ped_per_sec for item in raw] if isinstance(raw, list) else []
         rows.append((values + [math.nan] * 4)[:4])
     return np.array(rows, dtype=float)
 

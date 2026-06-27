@@ -219,6 +219,7 @@ def render_comparison_panel(
     wall_linewidth: float | None,
     title_fontsize: float,
     row_label_fontsize: float,
+    seconds_per_step: float = 0.0,
 ) -> Path:
     if len(steps) != 4:
         raise ValueError(f"Expected exactly 4 steps, got {len(steps)}")
@@ -288,7 +289,11 @@ def render_comparison_panel(
                 alpha=wall_alpha,
                 linewidth=wall_linewidth,
             )
-            ax.set_title(f"Step={frame.step}", fontsize=title_fontsize, pad=5)
+            if seconds_per_step > 0.0:
+                title_text = f"t = {frame.step * seconds_per_step:.0f} s"
+            else:
+                title_text = f"Step={frame.step}"
+            ax.set_title(title_text, fontsize=title_fontsize, pad=5)
             ax.set_axis_off()
 
     fig.subplots_adjust(left=0.075, right=0.945, bottom=0.06, top=0.91, wspace=0.035, hspace=0.28)
@@ -307,7 +312,7 @@ def render_comparison_panel(
     if last_image is not None:
         cbar_ax = fig.add_axes([0.958, 0.18, 0.012, 0.62])
         cbar = fig.colorbar(last_image, cax=cbar_ax)
-        cbar.set_label("density", fontsize=max(8.0, row_label_fontsize - 1.0))
+        cbar.set_label("density (ped/m$^2$)", fontsize=max(8.0, row_label_fontsize - 1.0))
 
     output.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output, facecolor="white", bbox_inches="tight", pad_inches=0.03)
@@ -334,6 +339,13 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--wall-linewidth", type=float, default=None, help="Fixed wall linewidth in points. Defaults to scene widths.")
     parser.add_argument("--title-fontsize", type=float, default=11.0)
     parser.add_argument("--row-label-fontsize", type=float, default=11.0)
+    parser.add_argument(
+        "--seconds-per-step",
+        type=float,
+        default=0.43625,
+        help="Physical seconds per simulation step; panel titles show physical time. "
+        "Default 0.43625 (Bund: 698 s horizon / 1600 steps). Pass 0 to label by step index.",
+    )
     return parser
 
 
@@ -362,6 +374,7 @@ def main(argv: list[str] | None = None) -> None:
         wall_linewidth=args.wall_linewidth,
         title_fontsize=args.title_fontsize,
         row_label_fontsize=args.row_label_fontsize,
+        seconds_per_step=args.seconds_per_step,
     )
     print(json.dumps({"output": str(written), "steps": steps}, ensure_ascii=False, indent=2))
 

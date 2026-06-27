@@ -17,9 +17,9 @@
 
 \begin{document}
 
-\title{Joint Passage Direction and Entrance-Rate Optimization for Large-Scale Crowd Control in Open Pedestrian Zones: A Bellman Conservation Law Approach}
+\title{Bellman Conservation Law-based Large-Scale Pedestrian Flow Control via Passage Direction and Entrance-Rate Optimization in Metropolitan tourism hotspots}
 
-\author{Author Name
+\author{Bingyu Wei, Cuiling Li, Rongyong Zhao, Zhengyang Shi, Li Chen, Yuxin Cai, Lingchen Han
 \thanks{The author is with the Department, Institution, City, Country (e-mail: email@address).}}
 
 % \markboth{Journal Name,~Vol.~XX, No.~X, Month~2026}%
@@ -240,7 +240,7 @@ Q_{(\sigma,r)\to(\sigma+1,k)}(x,t)
 \rho_{\sigma,r}(x,t),
 \label{eq:transition}
 \end{equation}
-where $\kappa_{\sigma,r}$ is the stage-switching rate and $\chi_{G_{\sigma,r}}$ is the indicator function of the completion region.
+where $\kappa_{\sigma,r}$ is the stage-switching rate, with dimension of inverse time, and $\chi_{G_{\sigma,r}}$ is the indicator function of the completion region.
 The parameter $\hat p$ represents historically inferred or scenario-given route preferences and is fixed in the optimization problem \cite{RN2302,RN2301,RN2303}.
 
 \subsection{Direction Constraints and Geometric Guidance}
@@ -324,6 +324,7 @@ q=\{q_c^+(t),q_c^-(t)\}_{c=1}^C,
 \end{equation}
 where $q_c^+(t)$ and $q_c^-(t)$ denote the maximum admitted rates at the reference forward and reverse entrances of channel $c$.
 These controls act on internal channel entrance fluxes rather than on external boundary inflows.
+In physical units, both the attempted flux $A_c^\pm(t)$ and the capacity bound $q_c^\pm(t)$ are entrance flow rates measured in ped/s.
 
 The direction state and entrance capacity must satisfy the hard consistency constraints
 \begin{equation}
@@ -381,6 +382,7 @@ The high-density exposure metric is
 J_2(z) = \int_0^T \int_{\Omega_w} \mathbf{1}_{\rho(x,t) > \rho_{\text{safe}}} \, dx \, dt.
 \label{eq:j2}
 \end{equation}
+The safety threshold is the density above which exposure is counted, and is fixed at $\rho_{\text{safe}}=3.5$~ped/m$^2$ in both the four-channel and Bund scenarios.
 Let
 \begin{equation}
 R_c(T)=\int_0^T(\hat A_c^+(t)+\hat A_c^-(t))\,dt
@@ -473,6 +475,26 @@ The paper solves this fixed-weight scalarized management problem.
 Different weights can represent different management preferences, but the algorithm itself does not depend on one specific objective term being independently optimal.
 Although $J$, $J^{(3)}$, and $\tilde J_k$ are dimensionless ranking quantities, their interpretation is anchored by the normalization above \cite{RN2123,marler2004survey_moo_engineering}.
 When physical interpretation is needed, the experiments also report raw or ratio-based diagnostics such as channel-flow shares, system mass, and density peaks.
+Table~\ref{tab:objective_units} lists the physical units of the raw objective terms and their normalizers; in each case the term and its normalizer share the same unit, so every reported $\tilde J_k$ is dimensionless.
+
+\begin{table}[!t]
+\centering
+\caption{Raw Units of the Objective Terms and Their Normalizers}
+\label{tab:objective_units}
+\scriptsize
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{l l l l}
+\hline
+Term & Raw unit & Normalizer (same unit) & Reported \\
+\hline
+$J_1$ & ped$\cdot$s & $M_{\mathrm{ref}}T_e$ (ped$\cdot$s) & dimensionless \\
+$J_2$ & m$^2\cdot$s & $|\Omega_w|T_e$ (m$^2\cdot$s) & dimensionless \\
+$J_3$ & ped$^2$ & $D_R$ (ped$^2$) & dimensionless \\
+$J_4$ & ped$\cdot$s & $M_{\mathrm{ref}}T_e$ (ped$\cdot$s) & dimensionless \\
+$J_5$ & (ped/s)$^2$ & $(\bar q_c^\sigma)^2$ (ped/s)$^2$ & dimensionless \\
+\hline
+\end{tabular}
+\end{table}
 
 For mechanism-verification experiments and fixed-strategy diagnostic experiments that only test direction rules, geometric guidance, or fixed entrance-rate responses, we use the reduced three-term objective
 \begin{equation}
@@ -534,7 +556,7 @@ The loop terminates after the finite optimization budget has been allocated acro
 \small
 \raggedright
 \begin{algorithmic}[1]
-\REQUIRE Direction constraints $\Omega_s$; simulator $\mathcal S$; objective $J$; gate-rate bounds $\bar q$; budget $B$; initial design size $n_0$; pool size $P$; LCB coefficient $\kappa$; high-fidelity shortlist size $K$.
+\REQUIRE Direction constraints $\Omega_s$; simulator $\mathcal S$; objective $J$; gate-rate bounds $\bar q$; budget $B$; initial design size $n_0$; pool size $P$; LCB coefficient $\beta$; high-fidelity shortlist size $K$.
 \ENSURE Best high-fidelity policy $z^*$.
 \STATE Generate $\mathcal S_{\mathrm{cand}}$ by enumerating $s\in\Omega_s$ and retaining only configurations satisfying open-channel and connectivity constraints.
 \STATE Rank $\mathcal S_{\mathrm{cand}}$ using the prescribed priority templates and direction proxy score, and then truncate it to the direction-candidate limit.
@@ -555,7 +577,7 @@ The loop terminates after the finite optimization budget has been allocated acro
 \FORALL{$u\in\mathcal P_s$}
 \STATE Estimate $\hat\mu_s(u)$ by weighted averaging with $w_i(u)=\exp(-\|x_i-u\|_2^2/(2\ell_s^2))$ over $(x_i,z_i,J_i)\in\mathcal D_s$.
 \STATE Set $\hat\sigma_s(u)=\min\{1,\min_{(x_i,z_i,J_i)\in\mathcal D_s}\|u-x_i\|_2/\sqrt{d_s}\}$.
-\STATE Compute $a_s(u)=\hat\mu_s(u)-\kappa\,\operatorname{std}(\mathcal D_s)\hat\sigma_s(u)$.
+\STATE Compute $a_s(u)=\hat\mu_s(u)-\beta\,\operatorname{std}(\mathcal D_s)\hat\sigma_s(u)$.
 \ENDFOR
 \STATE Select $x_{\mathrm{next}}\leftarrow\arg\min_{u\in\mathcal P_s}a_s(u)$.
 \STATE Evaluate $z_{\mathrm{next}}=(s,T_s(x_{\mathrm{next}}))$ and append the result to $\mathcal D_s$ and $\mathcal D$.
@@ -579,16 +601,22 @@ This structured treatment reduces invalid candidates and concentrates the finite
 
 We validate the proposed model and optimizer on a four-channel scenic-platform scenario abstracted from the Bund sightseeing platform setting.
 The scenario consists of an inflow region, a Bund sightseeing platform and exit region, a central wall, and four connecting channels: upper, middle, lower-middle, and bottom channels.
+Throughout this paper, channel denotes a model flow entity indexed by $c$, whereas passage refers to a real-world walkway at the Bund site that a channel abstracts.
 The experiments are organized as mechanism validation, directional-response analysis, entrance-rate response, horizontal optimizer comparison, and HCMBO ablation.
 
 \subsection{Experimental Setup}
 \label{sec:setup}
 
-The domain is discretized on a $128\times96$ grid with spacing $\Delta x=0.5$.
-The channel width is $2$, and the controlled internal entrance interface width is $8$.
-The free-flow speed is $v_{\max}=1.5$, the maximum density is $\rho_{\max}=5.0$, the initial density is $\rho_{\mathrm{init}}=2.2$, and the CFL factor is $0.9$.
+The domain is discretized on a $128\times96$ grid.
+To report results in physical units, simulation quantities are mapped through a representative calibration based on three reference scales: a grid cell size of $\Delta x=1.0$~m, so that the domain spans $128~\mathrm{m}\times96~\mathrm{m}$; a free-flow walking speed of $1.5$~m/s; and a jam density of $5.0$~ped/m$^2$.
+The induced time step is then $\Delta t=0.2$~s, and pedestrian counts follow by integrating density over physical area, so that a fully occupied cell holds $\rho_{\max}\Delta x^2=5$~ped. As a coherence check, a fully packed domain of this size would hold at most $\rho_{\max}\times128\times96\approx6.1\times10^4$~ped, which bounds all reported pedestrian counts.
+These physical units are adopted only for readability and reflect a representative assumption; they do not represent any specific venue.
+
+The channel width is $4$~m, and the controlled internal entrance interface width is $16$~m.
+The free-flow speed is $v_{\max}=1.5$~m/s, the maximum density is $\rho_{\max}=5.0$~ped/m$^2$, the initial density is $\rho_{\mathrm{init}}=2.2$~ped/m$^2$, and the CFL factor is $0.9$.
 Mechanism and response experiments use the corresponding validation horizons.
-The optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, horizon $160$, and Bellman updates every five steps.
+The optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, a horizon of $320$~s (i.e. $\Delta t=0.2$~s), and Bellman updates every five steps.
+
 Final optimizer rankings are based on the high-fidelity objective in Section~\ref{sec:metrics}.
 Unless otherwise stated, optimization experiments are ranked by the full five-term scalar objective $J$ after high-fidelity rechecking.
 Mechanism-validation, directional-response, fixed-rate response, and supplementary transfer diagnostics use the reduced objective $J^{(3)}=\lambda_1\tilde J_1+\lambda_2\tilde J_2+\lambda_3\tilde J_3$.
@@ -597,9 +625,10 @@ Equivalently, $\lambda_4=\lambda_5=0$.
 Therefore, the numerical values of $J$ and $J^{(3)}$ should not be compared across experiment groups.
 Comparisons are meaningful only within the same objective definition, normalization rule, and weight setting.
 A high-fidelity best candidate is called feasible if the density-cap removal mass is no more than $2\%$ of the reference mass.
-Unless otherwise stated, cumulative flow, waiting mass, unreleased attempted flow, and system mass are reported in simulation mass units.
-Mass-time quantities are reported in simulation mass-time units.
-Counterflow cell-time is reported in grid-cell-time units.
+
+Unless otherwise stated, cumulative flow, waiting mass, unreleased attempted flow, and system mass are reported in pedestrians (ped), obtained by integrating density over the physical cell area.
+Mass-time quantities are reported in ped$\cdot$s.
+Counterflow area-time is reported in m$^2\cdot$s.
 Channel-flow shares are computed from realized cumulative channel throughputs, $R_c(T)/\sum_jR_j(T)$.
 Scalar objectives and normalized terms are dimensionless.
 Raw cumulative quantities are rounded to three significant digits in the text, while tables retain four decimals for dimensionless objective terms.
@@ -627,15 +656,15 @@ The reverse-direction mass time is
 \mathbf 1\{\mathbf u_i^n\cdot\tau_c<0\}
 \Delta x^2\Delta t,
 \]
-which measures the cumulative simulation mass-time moving against the prescribed channel direction.
-The counterflow cell-time is
+which measures the cumulative reverse-direction mass-time (in ped$\cdot$s) moving against the prescribed channel direction.
+The counterflow area-time is
 \[
-\mathrm{CCT}=
+\mathrm{CAT}=
 \sum_n\sum_{i\in\Omega_c}
-\mathbf 1\{\rho_{i,+}^n>0,\rho_{i,-}^n>0\}\Delta t,
+\mathbf 1\{\rho_{i,+}^n>0,\rho_{i,-}^n>0\}\,\Delta x^2\Delta t,
 \]
-which counts the cumulative grid-cell-time during which opposite-direction subpopulations coexist in the same channel region.
-In the baseline bidirectional inflow test, the westbound middle-channel share, RMT, and CCT are $73.18\%$, $415.75$ simulation mass-time units, and $1213.76$ grid-cell-time units, respectively.
+which measures the cumulative area-time (in m$^2\cdot$s) during which opposite-direction subpopulations coexist in the same channel region.
+In the baseline bidirectional inflow test, the westbound middle-channel share, RMT, and CAT are $73.18\%$, $3.33\times10^{3}$~ped$\cdot$s, and $2.43\times10^{3}$~m$^2\cdot$s, respectively.
 After imposing the eastbound one-way rule, all three quantities are reduced to zero.
 
 \begin{figure*}[!t]
@@ -709,7 +738,7 @@ U_{\mathrm{rel}}=
 (A_c^-(t)-\hat A_c^-(t))_+
 \right]dt,
 \]
-in simulation mass units, and its demand ratio is $r_{\mathrm{rel}}=U_{\mathrm{rel}}/\int_0^T\sum_c(A_c^+(t)+A_c^-(t))dt$.
+in pedestrian-equivalent demand (ped-eq.); because held-back mass re-attempts the interface at later steps, $U_{\mathrm{rel}}$ is a cumulative time integral of repeatedly denied demand rather than an instantaneous queue length, and may exceed the number of distinct waiting pedestrians. Its demand ratio is $r_{\mathrm{rel}}=U_{\mathrm{rel}}/\int_0^T\sum_c(A_c^+(t)+A_c^-(t))dt$.
 This scan is a fixed-rate diagnostic experiment rather than a final optimizer-ranking experiment; the table therefore reports $J^{(3)}$, treats entrance waiting as a diagnostic quantity, and sets the smoothness contribution to zero because each policy uses a fixed rate level.
 
 \begin{table*}[!t]
@@ -723,24 +752,24 @@ This scan is a fixed-rate diagnostic experiment rather than a final optimizer-ra
 Level & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $J^{(3)}$ & $U_{\mathrm{rel}}$ & $r_{\mathrm{rel}}$ & Binding ratio \\
 \hline
 No limit & 0.6274 & 0.174 & 0.8838 & 1.6851 & 0.00 & 0 & 0.000 \\
-High & 0.6262 & 0.358 & 0.8814 & 1.8652 & 241.40 & 70.8\% & 0.605 \\
-Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 329.26 & 82.6\% & 0.666 \\
-Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 427.89 & 92.1\% & 0.721 \\
+High & 0.6262 & 0.358 & 0.8814 & 1.8652 & 965.60 & 70.8\% & 0.605 \\
+Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 1317.04 & 82.6\% & 0.666 \\
+Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 1711.56 & 92.1\% & 0.721 \\
 \hline
 \end{tabular}
 \vspace{1mm}
-\parbox{0.95\textwidth}{\scriptsize $U_{\mathrm{rel}}$ is reported in simulation mass units. The safety column is a scaled normalized safety term, not a direct space-time percentage.}
+\parbox{0.95\textwidth}{\scriptsize $U_{\mathrm{rel}}$ is reported in pedestrian-equivalent demand (ped-eq.), a cumulative time integral of denied entrance demand and not an instantaneous queue length. The safety column is a scaled normalized safety term, not a direct space-time percentage.}
 \end{table*}
 
 \begin{figure}[!t]
 \centering
 \includegraphics[width=\columnwidth]{../images/experiment_result_archive/g2/g2_capacity_levels.png}
-\caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow; the latter is reported in simulation mass units.}
+\caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow; the latter is reported in pedestrian-equivalent demand (ped-eq.).}
 \label{fig:entrance_rate_response}
 \end{figure}
 
 Table~\ref{tab:entrance_rate_response} and Fig.~\ref{fig:entrance_rate_response} show that tightening the rate upper bound does not simply improve safety.
-From the no-limit case to the low level, unreleased attempted flow increases from $0$ to $427.89$ simulation mass units, corresponding to $r_{\mathrm{rel}}=92.1\%$ of attempted entrance demand.
+From the no-limit case to the low level, unreleased attempted flow increases from $0$ to $1.71\times10^{3}$~ped-eq., corresponding to $r_{\mathrm{rel}}=92.1\%$ of attempted entrance demand.
 The binding ratio increases from $0$ to $0.721$, and the scaled normalized safety term $\tilde J_2$ increases from $0.174$ to $0.466$.
 Thus, $q$ is a genuine continuous control variable that changes system response and must be optimized jointly with $s$.
 
@@ -812,7 +841,7 @@ The ablation experiments examine whether the control variables and search mechan
 First, direction and entrance-rate variables must be optimized jointly.
 Optimizing only direction with a fixed high rate gives best high-fidelity objective $3.3751$, while optimizing only rates under prior directions gives $3.3140$; both are clearly worse than joint optimization.
 Second, short-horizon low-fidelity hard screening increases the best objective to $2.9441$ and yields an infeasible best candidate, because early simulations do not reliably reflect long-horizon entrance waiting and load redistribution.
-Third, removing the entrance-waiting penalty slightly reduces the scalar objective to $2.6015$, but increases unreleased attempted flow to approximately $3.24\times10^3$ simulation mass units, showing that waiting should remain in the management objective.
+Third, removing the entrance-waiting penalty slightly reduces the scalar objective to $2.6015$, but increases unreleased attempted flow to approximately $1.30\times10^4$~ped-eq., showing that waiting should remain in the management objective.
 
 \begin{table*}[!t]
 \centering
@@ -822,22 +851,22 @@ Third, removing the entrance-waiting penalty slightly reduces the scalar objecti
 \setlength{\tabcolsep}{4pt}
 \begin{tabular}{lrrrrl}
 \hline
-Variant & Best objective & Feasible rate & $\tilde J_2$ & Unreleased flow (sim. mass) & Main meaning \\
+Variant & Best objective & Feasible rate & $\tilde J_2$ & Unreleased flow (ped-eq.) & Main meaning \\
 \hline
-HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & $2.55{\times}10^3$ & Structured direction-wise rate search \\
-Queue-aware LCB & 2.6162 & 100\% & 1.8521 & $\mathbf{2.41{\times}10^3}$ & Queue-aware acquisition \\
-RF-style constrained BO & 2.6162 & 100\% & 1.8521 & $\mathbf{2.41{\times}10^3}$ & Constraint surrogate variant \\
-Adaptive racing & 2.6561 & 100\% & 1.9474 & $3.20{\times}10^3$ & Stage-wise budget concentration \\
-Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & $2.66{\times}10^3$ & Combined racing and queue signal \\
-Trust-region search & 3.0317 & 100\% & 1.9224 & $3.97{\times}10^3$ & Local trust-region search \\
+HCMBO & \textbf{2.4495} & 100\% & \textbf{1.6759} & $1.02{\times}10^4$ & Structured direction-wise rate search \\
+Queue-aware LCB & 2.6162 & 100\% & 1.8521 & $\mathbf{9.64{\times}10^3}$ & Queue-aware acquisition \\
+RF-style constrained BO & 2.6162 & 100\% & 1.8521 & $\mathbf{9.64{\times}10^3}$ & Constraint surrogate variant \\
+Adaptive racing & 2.6561 & 100\% & 1.9474 & $1.28{\times}10^4$ & Stage-wise budget concentration \\
+Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & $1.06{\times}10^4$ & Combined racing and queue signal \\
+Trust-region search & 3.0317 & 100\% & 1.9224 & $1.59{\times}10^4$ & Local trust-region search \\
 \hline
 \end{tabular}
 \vspace{1mm}
-\parbox{0.95\textwidth}{\scriptsize Unreleased flow is unreleased attempted entrance flow in simulation mass units.}
+\parbox{0.95\textwidth}{\scriptsize Unreleased flow is the cumulative unreleased attempted entrance flow over the full horizon, in pedestrian-equivalent demand (ped-eq.); it integrates repeatedly denied demand and is not an instantaneous queue length.}
 \end{table*}
 
 Table~\ref{tab:search_ablation} shows that the final HCMBO mainline obtains the lowest scalar objective among the tested variants.
-Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to approximately $2.41\times10^3$ simulation mass units, but their scalar objective increases to $2.6162$.
+Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to approximately $9.64\times10^3$~ped-eq., but their scalar objective increases to $2.6162$.
 Thus, queue information is useful for executable and safety-aware extensions, whereas the final mainline should retain structured direction-wise rate search as the primary budget allocation mechanism.
 
 \subsection{Transfer Validation on a Bund-Inspired Scenario}
@@ -855,17 +884,19 @@ Instead, it preserves the Bund sightseeing platform, the lateral passage connect
 \label{fig:bund_transfer_scene}
 \end{figure*}
 
-The computational grid has resolution $512\times224$ with $\Delta x=0.125$.
+The computational grid has resolution $512\times224$.
+Because this scenario preserves the real Bund outline, its physical scale is calibrated from georeferenced control points that match the scene coordinates to satellite latitude and longitude; a four-point affine fit gives $0.435$~m per scene unit with sub-$1.5$~m residual, which corresponds to a physical cell size of about $1.75$~m.
+The $512\times224$ grid therefore spans approximately $894~\mathrm{m}\times391~\mathrm{m}$, the induced time step is $\Delta t\approx0.44$~s, and pedestrian counts again follow by integrating density over physical area (a cell area of about $3.0$~m$^2$).
 Pedestrians enter from the outer-side entrance, pass through the middle connecting channels, and move toward the Bund sightseeing platform and its central target region.
-The inflow-rate multiplier is $3.0$, corresponding to an actual inflow rate of $0.24$; the maximum density is $\rho_{\max}=4.0$, and the transition smoothing parameter is $\kappa=32$.
+The inflow-rate multiplier is $3.0$, corresponding to an actual inflow rate of about $3.35$~ped/s; the maximum density is $\rho_{\max}=4.0$~ped/m$^2$, and the stage-switching rate is $\kappa_{\sigma,r}=32$ in simulation time units.
 The experimental channels \texttt{channel\_1}, \texttt{channel\_2}, \texttt{channel\_3}, and \texttt{channel\_4} correspond to the locally named Bund Passages 3, 4, 5, and 6, respectively.
-Both the controlled and uncontrolled groups use $1600$ steps and a time horizon of $50$.
+Both the controlled and uncontrolled groups use $1600$ steps over a physical horizon of about $698$~s.
 For the controlled group, the transferred entrance-rate bounds are multiplied by a capacity-scale factor of $3$, providing a less restrictive entrance-capacity setting.
 
 The controlled group uses the best HCMBO policy obtained from the multi-direction high-fidelity recheck.
 Its reduced high-fidelity objective in the optimization stage is $0.7350$, and its direction structure leaves the upper and lower channels bidirectional while assigning opposite dominant directions to the two middle channels.
 Table~\ref{tab:bund_transfer_q} reports the effective two-segment entrance-rate upper bounds after applying the capacity-scale factor of $3$.
-The rate upper bounds are measured in simulation mass per unit time.
+The rate upper bounds are measured in ped/s.
 
 \begin{table*}[!t]
 \centering
@@ -875,16 +906,16 @@ The rate upper bounds are measured in simulation mass per unit time.
 \setlength{\tabcolsep}{5pt}
 \begin{tabular}{l l l r r}
 \hline
-Experimental channel & Local passage name & Entrance side & Segment 1 & Segment 2 \\
+Experimental channel & Local passage name & Entrance side & Segment 1 (ped/s) & Segment 2 (ped/s) \\
 \hline
-\texttt{channel\_1} & Bund Passage 3 & Forward entrance & 0.2474 & 0.6000 \\
-\texttt{channel\_1} & Bund Passage 3 & Reverse entrance & 0.2269 & 0.0000 \\
-\texttt{channel\_2} & Bund Passage 4 & Forward entrance & 0.6000 & 0.1688 \\
-\texttt{channel\_2} & Bund Passage 4 & Reverse entrance & 0.0000 & 0.0000 \\
-\texttt{channel\_3} & Bund Passage 5 & Forward entrance & 0.0000 & 0.0000 \\
-\texttt{channel\_3} & Bund Passage 5 & Reverse entrance & 0.2560 & 0.4975 \\
-\texttt{channel\_4} & Bund Passage 6 & Forward entrance & 0.3785 & 0.2169 \\
-\texttt{channel\_4} & Bund Passage 6 & Reverse entrance & 0.2215 & 0.2122 \\
+\texttt{channel\_1} & Bund Passage 3 & Forward entrance & 3.45 & 8.38 \\
+\texttt{channel\_1} & Bund Passage 3 & Reverse entrance & 3.17 & 0.00 \\
+\texttt{channel\_2} & Bund Passage 4 & Forward entrance & 8.38 & 2.36 \\
+\texttt{channel\_2} & Bund Passage 4 & Reverse entrance & 0.00 & 0.00 \\
+\texttt{channel\_3} & Bund Passage 5 & Forward entrance & 0.00 & 0.00 \\
+\texttt{channel\_3} & Bund Passage 5 & Reverse entrance & 3.57 & 6.95 \\
+\texttt{channel\_4} & Bund Passage 6 & Forward entrance & 5.28 & 3.03 \\
+\texttt{channel\_4} & Bund Passage 6 & Reverse entrance & 3.09 & 2.96 \\
 \hline
 \end{tabular}
 \end{table*}
@@ -918,16 +949,19 @@ $\tilde J_3$ & 0.2908 & 0.6043 & $-51.9\%$ \\
 \hline
 Raw diagnostic & Controlled & Uncontrolled & Unit \\
 \hline
-Final cumulative sink flow & 6.82 & 8.57 & sim. mass \\
-Final cumulative inflow & 11.92 & 12.00 & sim. mass \\
-Final system mass & 7.85 & 6.18 & sim. mass \\
-Peak density maximum & $\approx 4.0$ & $\approx 4.0$ & sim. mass/area \\
-Average mean density & $3.47{\times}10^{-3}$ & $3.21{\times}10^{-3}$ & sim. mass/area \\
-Attempted entrance flow & 7.65 & 0 & sim. mass \\
-Actual entrance flow & 5.78 & 0 & sim. mass \\
-Unreleased attempted flow & 1.87 & 0 & sim. mass \\
+Final cumulative sink flow & $1.33{\times}10^3$ & $1.67{\times}10^3$ & ped \\
+Final cumulative inflow & $2.32{\times}10^3$ & $2.34{\times}10^3$ & ped \\
+Final system mass & $1.53{\times}10^3$ & $1.20{\times}10^3$ & ped \\
+Peak density maximum & $\approx 4.0$ & $\approx 4.0$ & ped/m$^2$ \\
+Domain-mean density (incl. empty space) & $3.47{\times}10^{-3}$ & $3.21{\times}10^{-3}$ & ped/m$^2$ \\
+Attempted entrance flow & $1.49{\times}10^3$ & -- & ped-eq. \\
+Actual entrance flow & $1.13{\times}10^3$ & -- & ped \\
+Unreleased attempted flow & $364$ & -- & ped-eq. \\
 \hline
 \end{tabular}
+
+\vspace{1mm}
+\parbox{0.95\textwidth}{\scriptsize Sink flow, inflow, system mass, and actual entrance flow are pedestrian counts (ped). Attempted and unreleased entrance flow are cumulative pedestrian-equivalent demand (ped-eq.): they integrate repeatedly denied demand over the horizon and may exceed the number of distinct waiting pedestrians. Entries marked $-$ are not applicable because the uncontrolled case activates no internal metering interface. The domain-mean density is averaged over the full walkable domain, including empty space, and is therefore much smaller than the local peak.}
 \end{table*}
 
 The channel-flow shares in Table~\ref{tab:bund_transfer_flux} further explain this reduction.
@@ -957,21 +991,21 @@ Channel & Local name & Controlled & Uncontrolled \\
 \begin{figure*}[!t]
 \centering
 \includegraphics[width=0.95\textwidth]{../../codes/results/bund_control_comparison_hcmbo_capacity3/figures/bund_comparison_density_panel_steps_0050_0350_0900_1500.png}
-\caption{Density evolution comparison between uncontrolled and controlled cases at steps 50, 350, 900, and 1500. The controlled policy redistributes the later-stage flow from the terminal channel toward the middle-channel group.}
+\caption{Density evolution comparison between uncontrolled and controlled cases at approximately $22$, $153$, $393$, and $654$~s. The controlled policy redistributes the later-stage flow from the terminal channel toward the middle-channel group.}
 \label{fig:bund_transfer_density_panel}
 \end{figure*}
 
-Fig.~\ref{fig:bund_transfer_density_panel} visualizes the density evolution at steps $50$, $350$, $900$, and $1500$.
+Fig.~\ref{fig:bund_transfer_density_panel} visualizes the density evolution at approximately $22$, $153$, $393$, and $654$~s.
 Both groups initially form a local density concentration near the right-side target region of the Bund sightseeing platform, reflecting the same inflow and target-attraction structure.
 At later stages, the uncontrolled case remains more concentrated around the terminal channel and the adjacent Bund sightseeing platform area, whereas the controlled case develops a more stable flow band through the middle-channel group.
 This visual evidence is consistent with the channel-share statistics and confirms that the main effect of the HCMBO policy is load redistribution across channels.
 
 The supplementary transfer experiment also reveals an important trade-off.
 Compared with the uncontrolled group, the controlled group shows a higher efficiency term ($\tilde J_1$ increases from $0.3813$ to $0.4145$) and a slightly higher safety-exposure term ($\tilde J_2$ increases from $0.0284$ to $0.0357$).
-At the same time, its cumulative sink flow is smaller ($6.82$ versus $8.57$ simulation mass units) and its final system mass is larger ($7.85$ versus $6.18$).
+At the same time, its cumulative sink flow is smaller ($1.33{\times}10^3$ versus $1.67{\times}10^3$~ped) and its final system mass is larger ($1.53{\times}10^3$ versus $1.20{\times}10^3$~ped).
 Therefore, the transferred HCMBO policy should not be interpreted as uniformly improving safety and efficiency.
 Rather, under the present reduced-objective weights, it reduces $J^{(3)}$ mainly by improving channel-load balance, while sacrificing part of the exit throughput and travel efficiency.
-The capacity-scale factor of $3$ reduces unreleased attempted flow to $1.87$ simulation mass units, but it does not remove the efficiency cost of the control policy.
+The capacity-scale factor of $3$ reduces unreleased attempted flow to $364$~ped-eq., but it does not remove the efficiency cost of the control policy.
 Overall, the supplementary Bund-inspired experiment shows that the optimized HCMBO policy can still reduce the reduced objective and redistribute flow away from the dominant terminal channel in a simplified real-world spatial abstraction.
 However, the improvement is accompanied by unreleased attempted entrance flow, lower exit throughput, and higher residual mass in the system.
 Future deployment-oriented extensions should therefore include explicit throughput constraints, waiting upper bounds, or multi-weight scenario analysis to avoid obtaining policies that improve load balance at the cost of overly strong metering.

@@ -17,6 +17,7 @@ from crowd_bellman.config_workflow import run_from_config
 from crowd_bellman.g2_strategy import G2StrategyCollector
 from crowd_bellman.metrics import save_json
 from crowd_bellman.plotting import parse_density_contour_levels
+from paper_physical_units import FOUR_CHANNEL
 
 
 BASELINE_CONFIG = Path("codes/scenes/examples/g2_multistage_directional/run_baseline.toml")
@@ -626,9 +627,10 @@ def _save_capacity_levels_plot(path: Path, rows: list[dict[str, object]]) -> Non
     ax1.set_xlabel("internal entrance rate upper-bound level")
     ax1.set_title("Entrance-rate upper-bound response")
     ax1.grid(alpha=0.25)
+    ped_per_mass = FOUR_CHANNEL.ped_per_mass_unit
     ax2 = ax1.twinx()
-    ax2.plot(x, [float(row["gate_rejected"]) for row in selected], color="#D95F02", marker="s", label="unreleased demand")
-    ax2.set_ylabel("unreleased attempted flow")
+    ax2.plot(x, [float(row["gate_rejected"]) * ped_per_mass for row in selected], color="#D95F02", marker="s", label="unreleased demand")
+    ax2.set_ylabel("unreleased attempted flow (ped-eq.)")
     lines, labels_left = ax1.get_legend_handles_labels()
     lines2, labels_right = ax2.get_legend_handles_labels()
     ax1.legend(
