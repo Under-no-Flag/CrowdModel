@@ -10,6 +10,7 @@
 \usepackage{verbatim}
 \usepackage{graphicx}
 \usepackage{balance}
+\usepackage{etoolbox}
 \usepackage{amssymb}
 \usepackage{bm}
 
@@ -677,7 +678,10 @@ This non-monotonic response makes manual rule selection from a small set insuffi
 \label{tab:g2_nondominated}
 \footnotesize
 \setlength{\tabcolsep}{2pt}
-\begin{tabular}{@{}c c c r r r r >{\raggedright\arraybackslash}p{0.22\columnwidth}@{}}
+\makebox[\columnwidth][c]{%
+\renewcommand{\arraystretch}{1.12}%
+\setlength{\extrarowheight}{0.6pt}%
+\begin{tabular}{@{}c c c r r r r >{\raggedright\arraybackslash}m{0.22\columnwidth}@{}}
 \hline
 Case & Policy & Code & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $J^{(3)}$ & Main characteristic \\
 \hline
@@ -689,6 +693,7 @@ C8 & SR-LM & EEWE & 0.3395 & 0.01311 & 0.1576 & \textbf{0.5102} & Lowest reduced
 C9 & SR-B & EEEW & 0.4377 & 0.01344 & \textbf{0.1138} & 0.5649 & Most balanced channel loads \\
 \hline
 \end{tabular}
+}
 \par\vspace{3.5mm}
 \noindent\parbox{\columnwidth}{\footnotesize All objective terms in this table are dimensionless scaled normalized quantities. The reduced objective uses $\lambda_4=\lambda_5=0$ and is used only for directional-response diagnosis; it is not directly comparable with the full five-term objective in Table~\ref{tab:optimizer_summary}.}
 \end{table}
@@ -716,11 +721,14 @@ This scan is a fixed-rate diagnostic experiment rather than a final optimizer-ra
 
 \begin{table}[!t]
 \centering
-\caption{Response Under Internal Entrance-Rate Upper-Bound Levels}
+\caption[Response Under Internal Entrance-Rate Upper-Bound Levels]{Response Under Internal Entrance-Rate\\ Upper-Bound Levels}
 \label{tab:entrance_rate_response}
 \footnotesize
 \setlength{\tabcolsep}{2pt}
-\begin{tabular}{@{}l r r r r r r >{\centering\arraybackslash}p{0.13\columnwidth}@{}}
+\makebox[\columnwidth][c]{%
+\renewcommand{\arraystretch}{1.12}%
+\setlength{\extrarowheight}{0.6pt}%
+\begin{tabular}{@{}l r r r r r r >{\centering\arraybackslash}m{0.13\columnwidth}@{}}
 \hline
 Level & $\tilde J_1$ & $\tilde J_2$ & $\tilde J_3$ & $J^{(3)}$ & $U_{\mathrm{rel}}$ & $r_{\mathrm{rel}}$ & Binding ratio \\
 \hline
@@ -730,6 +738,7 @@ Medium & 0.6228 & 0.443 & 0.8620 & 1.9276 & 1317.04 & 82.6\% & 0.666 \\
 Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 1711.56 & 92.1\% & 0.721 \\
 \hline
 \end{tabular}
+}
 \par\vspace{3.5mm}
 \noindent\parbox{\columnwidth}{\footnotesize $U_{\mathrm{rel}}$ is reported in pedestrian-equivalent demand (ped-eq.), a cumulative time integral of denied entrance demand and not an instantaneous queue length. The safety column is a scaled normalized safety term, not a direct space-time percentage.}
 \end{table}
@@ -826,12 +835,15 @@ The waiting term should therefore remain in the management objective.
 \label{tab:search_ablation}
 \footnotesize
 \setlength{\tabcolsep}{1pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.22\columnwidth}
->{\centering\arraybackslash}p{0.12\columnwidth}
->{\centering\arraybackslash}p{0.11\columnwidth}
->{\centering\arraybackslash}p{0.10\columnwidth}
->{\centering\arraybackslash}p{0.16\columnwidth}
->{\raggedright\arraybackslash}p{0.23\columnwidth}@{}}
+\makebox[\columnwidth][c]{%
+\renewcommand{\arraystretch}{1.12}%
+\setlength{\extrarowheight}{0.6pt}%
+\begin{tabular}{@{}>{\raggedright\arraybackslash}m{0.22\columnwidth}
+>{\centering\arraybackslash}m{0.12\columnwidth}
+>{\centering\arraybackslash}m{0.11\columnwidth}
+>{\centering\arraybackslash}m{0.10\columnwidth}
+>{\centering\arraybackslash}m{0.16\columnwidth}
+>{\raggedright\arraybackslash}m{0.23\columnwidth}@{}}
 \hline
 Variant & Best objective & Feasible rate & $\tilde J_2$ & Unreleased flow (ped-eq.) & Main meaning \\
 \hline
@@ -843,6 +855,7 @@ Adaptive racing + queue-aware & 2.6683 & 100\% & 1.7862 & $1.06{\times}10^4$ & C
 Trust-region search & 3.0317 & 100\% & 1.9224 & $1.59{\times}10^4$ & Local trust-region search \\
 \hline
 \end{tabular}
+}
 \par\vspace{3.5mm}
 \noindent\parbox{\columnwidth}{\footnotesize Unreleased flow is the cumulative unreleased attempted entrance flow over the full horizon, in pedestrian-equivalent demand (ped-eq.); it integrates repeatedly denied demand and is not an instantaneous queue length.}
 \end{table}
@@ -1002,7 +1015,9 @@ A deployment-oriented version should add explicit throughput constraints and wai
 \label{sec:conclusion}
 
 This paper has presented a unified macroscopic crowd-management framework for metropolitan tourism hotspots, integrating passage-direction rules, anisotropic geometric guidance, multi-stage route behavior, and internal entrance-rate control within a single Bellman–conservation-law operator. By coupling an interpretable crowd-flow simulator with the proposed HCMBO optimizer, the framework turns experience-driven crowd control into a quantitative, reproducible, and budget-aware decision process.
+
 Three findings stand out. First, the modeling components behave exactly as designed, and the two control dimensions are fundamentally complementary rather than interchangeable: direction settings induce genuinely non-monotonic trade-offs among efficiency, safety exposure, and load balance, while entrance-rate limits reshape unreleased attempted flow, binding-time ratios, and local risk patterns. Second, HCMBO consistently delivers the strongest performance among all tested optimizers—achieving the lowest mean management objective, a 3.9\% lower fixed-weight score than the next-best TPE-Mixed BO, and a perfect 100\% feasible rate across five random seeds under unified high-fidelity rechecking. Third, our ablation study pinpoints the sources of this advantage: joint direction–rate optimization, the deliberate avoidance of short-horizon hard screening, and structured direction-wise rate search.
+
 The Bund-inspired transfer experiment further demonstrates the framework's practical reach: an HCMBO-derived policy reorganizes pedestrian flow in a realistic spatial abstraction, cutting the management objective by 26.9\% by steering crowds away from the overloaded terminal channel and rebalancing load across the middle-channel group. Together, these results establish the proposed framework as an effective and interpretable foundation for proactive, optimization-driven crowd management in public spaces.
 
 The study also has several limitations.
@@ -1016,8 +1031,6 @@ Future work should address these limits before operational deployment, especiall
 This research was supported by the National Natural Science Foundation of China (No. 72374154) and the 20th Experimental Teaching Reform Special Foundation of Tongji University (No. 0800104347).
 The authors deeply appreciate this support.
 
-\balance
-
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 
@@ -1027,6 +1040,10 @@ The authors deeply appreciate this support.
 \def\@IEEEBIOhangwidth{0.888in}
 \def\@IEEEBIOhangdepth{0.936in}
 \def\@IEEEBIOskipN{0.8\baselineskip}
+\expandafter\patchcmd\csname\string\IEEEbiography\endcsname
+  {\vskip \@IEEEBIOskipN plus 1fil minus 0\baselineskip}
+  {\vskip \@IEEEBIOskipN\relax}
+  {}{\typeout{WARNING: IEEEbiography spacing patch failed.}}
 \makeatother
 \newcommand{\authorbiophoto}[1]{\includegraphics[width=0.744in,height=0.936in,clip,keepaspectratio]{#1}}
 \newcommand{\compactbiogap}{\vspace{0.25\baselineskip}}
