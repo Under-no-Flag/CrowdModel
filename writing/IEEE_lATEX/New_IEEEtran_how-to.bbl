@@ -67,11 +67,6 @@ Z.~Shahhoseini and M.~Sarvi, ``Pedestrian crowd flows in shared spaces:
   measures,'' \emph{Transportation Research Part B: Methodological}, vol. 122,
   pp. 57--87, 2019.
 
-\bibitem{RN2174}
-C.-Z.~T. Xie, J.~Xu, B.~Zhu, T.-Q. Tang, S.~Lo, B.~Zhang, and Y.~Tian,
-  ``Advancing crowd forecasting with graphs across microscopic trajectory to
-  macroscopic dynamics,'' \emph{Information Fusion}, vol. 106, p. 102275, 2024.
-
 \bibitem{RN2056}
 N.~W.~F. Bode, M.~Chraibi, and S.~Holl, ``The emergence of macroscopic
   interactions between intersecting pedestrian streams,'' \emph{Transportation
@@ -81,6 +76,11 @@ N.~W.~F. Bode, M.~Chraibi, and S.~Holl, ``The emergence of macroscopic
 F.~Bourdin, ``Splitting scheme for a macroscopic crowd motion model with
   congestion for a two-typed population,'' \emph{Networks and Heterogeneous
   Media}, vol.~17, no.~5, pp. 783--801, 2022.
+
+\bibitem{RN2174}
+C.-Z.~T. Xie, J.~Xu, B.~Zhu, T.-Q. Tang, S.~Lo, B.~Zhang, and Y.~Tian,
+  ``Advancing crowd forecasting with graphs across microscopic trajectory to
+  macroscopic dynamics,'' \emph{Information Fusion}, vol. 106, p. 102275, 2024.
 
 \bibitem{RN2302}
 L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns
@@ -181,11 +181,6 @@ X.~C. Liao, W.~N. Chen, X.~Q. Guo, J.~Zhong, and D.~J. Wang, ``Drift: A dynamic
   crowd inflow control system using lstm-based deep reinforcement learning,''
   \emph{IEEE Transactions on Systems, Man, and Cybernetics: Systems}, vol.~55,
   no.~6, pp. 4202--4215, 2025.
-
-\bibitem{ronchi2016vv_evacuation_models}
-E.~Ronchi, D.~Nilsson, E.~D. Kuligowski, R.~D. Peacock, and P.~A. Reneke,
-  ``Assessing the verification and validation of building fire evacuation
-  models,'' \emph{Fire Technology}, vol.~52, no.~1, pp. 197--219, 2016.
 
 \bibitem{RN2000}
 H.~M. Al-Ahmadi, I.~Reza, A.~Jamal, W.~S. Alhalabi, and K.~J. Assi,
