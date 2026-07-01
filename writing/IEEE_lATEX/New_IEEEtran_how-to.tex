@@ -13,6 +13,7 @@
 \usepackage{etoolbox}
 \usepackage{amssymb}
 \usepackage{bm}
+\usepackage[colorlinks=true,citecolor=blue,linkcolor=blue,urlcolor=blue]{hyperref}
 
 \newcommand{\figcaptiontight}{\par\vspace{-2.5mm}}
 
@@ -22,9 +23,9 @@
 
 \title{Bellman Conservation Law-based Large-scale Pedestrian Flow Control via Passage Direction and Entrance-Rate Optimization in Metropolitan Tourism Hotspots}
 
-\author{Bingyu Wei, Cuiling Li, Rongyong Zhao, Zhengyang Shi, Yuxin Cai, and Lingchen Han}
+\author{Bingyu Wei, Cuiling Li, Rongyong Zhao, Zhengyang Shi, Li Chen, Yuxin Cai, and Lingchen Han}
 % \thanks{Bingyu Wei, Cuiling Li, Rongyong Zhao, Yuxin Cai, and Lingchen Han are with Tongji University, Shanghai, China.}
-% \thanks{Zhengyang Shi is with Huangpu Public Security Bureau, Shanghai, China.}}
+% \thanks{Zhengyang Shi and Li Chen are with Huangpu Public Security Bureau, Shanghai, China.}}
 
 % \markboth{Journal Name,~Vol.~XX, No.~X, Month~2026}%
 % {Author: Channel Optimization for Crowd Management}
@@ -32,8 +33,7 @@
 \maketitle
 
 \begin{abstract}
-Metropolitan tourism hotspots and major event venues frequently face systemic crowd stampede risks due to highly dense pedestrian flows, yet existing large-scale crowd management methods largely rely on empirical rules and post-hoc reviews, making proactive prevention and quantitative assessment difficult to achieve.
-In such scenarios, the primary regulatory tools available to managers are setting passage directional configurations (unidirectional, bidirectional, or closed) and controlling time-phased admission intensities at entrances. However, the coupled effects of these two factors on global pedestrian flow have long lacked quantifiable modeling and optimization frameworks. This paper develops a macroscopic crowd-control model based on the Hughes continuum framework. Local admissible direction sets represent one-way, bidirectional, and closed passages, while anisotropic mobility tensors encode channel-guidance effects. Internal channel entrance-rate controls are added so that one policy specifies both passage directions and release rates. We then solve the mixed discrete-continuous problem with a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm. In a simplified scenic-platform scenario, the model reproduces multi-stage movement, channel guidance, and direction constraints. Under a weighted objective combining efficiency, safety exposure, load balance, waiting, and smoothness, HCMBO gives the lowest mean score within the tested budget. Its mean objective is about 3.9\% lower than TPE-Mixed BO and lower than the other tested baselines. These results give a simulation-based basis for comparing routing and entrance-release strategies in metropolitan tourism hotspots.
+Metropolitan tourism hotspots and major event venues face systemic crowd stampede risks from high-density pedestrian flows, yet existing crowd management still relies mainly on empirical rules and post-hoc review rather than proactive, quantitative assessment. In such settings, managers' main regulatory tools, passage directional configurations and time-phased entrance admission rates, still lack a quantifiable framework for jointly modeling and optimizing their coupled effects on global pedestrian flow. This paper develops a macroscopic crowd-control model based on the Hughes continuum framework. Local admissible direction sets represent one-way, bidirectional, and closed passages, while anisotropic mobility tensors encode channel-guidance effects. Internal channel entrance-rate controls are added so that one policy specifies both passage directions and release rates. We then solve the mixed discrete-continuous problem with a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm. In a simplified scenic-platform scenario, the model reproduces multi-stage movement, channel guidance, and direction constraints. Under a weighted objective combining efficiency, safety exposure, load balance, waiting, and smoothness, HCMBO gives the lowest mean score within the tested budget. Its mean objective is about 3.9\% lower than the Tree-structured Parzen estimator-based mixed-variable Bayesian optimization (TPE-Mixed BO) baseline and lower than the other tested baselines. These results give a simulation-based basis for comparing routing and entrance-release strategies in metropolitan tourism hotspots.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -43,11 +43,11 @@ Crowd dynamics modeling, crowd flow control, mixed-variable black-box optimizati
 \section{Introduction}
 \label{sec:introduction}
 
-\IEEEPARstart{L}{arge-scale} crowd safety governance constitutes a critical component of urban governance and social security management. Crowd aggregation risks not only threaten individual life and health, but may also escalate into stampede incidents that undermine social order and public safety; the effectiveness of their mitigation directly reflects the modernization level of urban governance capacity and social security management systems.\cite{RN2147,RN1998}. Tourism hotspots, public celebrations, commercial-district promotions, New Year events, and major sports gatherings increasingly concentrate pedestrian demand in core urban areas over short time windows \cite{RN2154,RN1193,RN673}. These conditions strain on-site organization, passage management, risk warning, and emergency dispatch. A central problem is therefore how to use modeling, simulation, and optimization to evaluate crowd-control strategies before an event, improve operational efficiency, and reduce local congestion risk \cite{RN1226,RN2059}.
+\IEEEPARstart{L}{arge-scale} crowd safety governance constitutes a critical component of urban governance and social security management. Crowd aggregation factors not only threaten individual life and health, but may also escalate into stampede incidents that undermine social order and public safety; the effectiveness of their mitigation directly reflects the modernization level of urban governance capacity and social security management systems.\cite{RN2147,RN1998}. Tourism hotspots, public celebrations, commercial-district promotions, New Year events, and major sports gatherings increasingly concentrate pedestrian demand in core urban areas over short time windows \cite{RN2154,RN1193,RN673}. These conditions strain on-site organization, passage management, risk warning, and emergency dispatch. A central problem is therefore how to use modeling, simulation, and optimization to evaluate crowd-control strategies before an event, improve operational efficiency, and reduce local congestion risk \cite{RN1226,RN2059}.
 
-Large-scale pedestrian flow are complex systems. Individuals with different desired speeds, destinations, and route preferences interact in limited space, producing collective spatiotemporal patterns through nonlinear and multi-scale mechanisms \cite{RN1193,RN1100}. At the macroscopic level, these patterns appear as destination-oriented flow, passage convergence, bottleneck queues, local retention, exit competition, and directional responses to control rules \cite{RN2056,RN2102}. At the microscopic level, pedestrians respond to surrounding density, visible paths, obstacle boundaries, and guidance facilities \cite{RN2174}. Open scenic areas add a further stage structure: visitors may first move toward a viewing platform, then tour along a main viewing corridor, and later choose among several exit passages according to preference \cite{RN2302}. Static capacity analysis and single shortest-path models cannot represent this mixture of staged movement, route choice, and shared congestion.
+The difficulty of modeling large-scale pedestrian flow lies in the coupling between individual route choice and the collective spatiotemporal patterns it produces. Individuals with different desired speeds, destinations, and route preferences interact in limited space, so that microscopic decisions aggregate into macroscopic flow structure through nonlinear, multi-scale mechanisms \cite{RN1193,RN1100}. At the macroscopic level, these patterns appear as destination-oriented flow, passage convergence, bottleneck queues, local retention, exit competition, and directional responses to control rules \cite{RN2056,RN2102}. At the microscopic level, pedestrians respond to surrounding density, visible paths, obstacle boundaries, and guidance facilities \cite{RN2174}. However, reproducing every instantaneous pedestrian decision is not always the most relevant modeling target for crowd-management planning. The key issue is to choose a modeling resolution that can connect local behavioral responses with area-level congestion, load redistribution, and controllable operational measures.
 
-Among urban crowd-gathering scenarios, open scenic areas, waterfront viewing platforms, and historic commercial districts are especially representative. Unlike enclosed facilities such as stadiums and subway stations with clear boundaries \cite{RN761,RN2194}, these areas combine open spaces, main tourist corridors, lateral connecting passages, and return flow lines. Visitors commonly follow a continuous behavioral chain of entry, touring along the main corridor, passage selection for leaving, and return movement \cite{RN2301}. Their movement is therefore shaped jointly by spatial geometry, control rules, and historical behavioral preferences \cite{RN2303}. In the Shanghai Nanjing East Road--Bund area, for example, visitors approach the Bund from Nanjing East Road, ascend to the waterfront sightseeing platform through multiple stepped passages, move along the waterfront, and then leave through several southern passages before returning along lower streets. This layout can be abstracted as a ``waterfront platform--multi-stepped passage'' crowd-flow scenario. Its management difficulty comes from three coupled features: multiple passages simultaneously serve entry, exit, and diversion; transitions between the main corridor and lateral passages invalidate a single origin--destination description; and local congestion feeds back into global route choice, so changing one passage may redistribute load in adjacent areas. Fig.~\ref{fig:bund_scene} illustrates two field-control contexts for this scenario: Fig.~\ref{fig:bund_scene_crowd} shows a large holiday crowd under one-way passage organization, while Fig.~\ref{fig:bund_scene_capacity} shows entrance-capacity control at a major visitor inflow location.
+Among urban crowd-gathering scenarios, open scenic areas, waterfront viewing platforms, and historic commercial districts are especially representative. Unlike enclosed facilities such as stadiums and subway stations with clear boundaries \cite{RN761,RN2194}, these areas combine open spaces, main tourist corridors, lateral connecting passages, and return flow lines. Visitors commonly follow a continuous behavioral chain of entry, touring along the main corridor, passage selection for leaving, and return movement \cite{RN2301}. Their movement is therefore shaped jointly by spatial geometry, control rules, and historical behavioral preferences \cite{RN2303}. For such open scenarios, sufficiently fine-grained and continuous individual trajectory data are often unavailable for calibrating detailed microscopic decision models. Field observations may be fragmented by camera coverage, occlusion, privacy restrictions, and changing temporary-control layouts. In contrast, managers usually need aggregate operational outputs: how regional density evolves over time, how loads are distributed across passages, how long queues or waiting masses accumulate near controlled entrances, and how much exposure occurs in high-density areas. These requirements motivate a macroscopic modeling perspective, in which pedestrian movement is represented through density evolution, route-stage subpopulations, passage fluxes, and entrance-release constraints rather than through the instantaneous decisions of every individual pedestrian. In the Shanghai Nanjing East Road--Bund area, for example, visitors approach the Bund from Nanjing East Road, ascend to the waterfront sightseeing platform through multiple stepped passages, move along the waterfront, and then leave through several southern passages before returning along lower streets. This layout can be abstracted as a ``waterfront platform--multi-stepped passage'' crowd-flow scenario. Its management difficulty comes from three coupled features: multiple passages simultaneously serve entry, exit, and diversion; transitions between the main corridor and lateral passages invalidate a single origin--destination description; and local congestion feeds back into global route choice, so changing one passage may redistribute load in adjacent areas. Fig.~\ref{fig:bund_scene} illustrates two field-control contexts for this scenario: Fig.~\ref{fig:bund_scene_crowd} shows a large holiday crowd under one-way passage organization, while Fig.~\ref{fig:bund_scene_capacity} shows entrance-capacity control at a major visitor inflow location.
 
 \begin{figure*}[!t]
 \centering
@@ -65,7 +65,7 @@ Existing security practice for large events usually combines system-dynamics rea
 
 Despite these practices, high-pedestrian-flow management still depends heavily on manual experience and static contingency plans \cite{RN1662}. Many schemes do not quantitatively describe how passage-direction configurations, entrance release rates, and stage-dependent route preferences shape density evolution. Monitoring based on single-point counts or local density is also insufficient for the coupled process linking passage direction rules, entrance metering, local optimal directions, collective density evolution, and exit-load distribution \cite{RN2124}. In multi-entrance, multi-passage, and multi-stage scenic areas, neglecting route preference and behavioral phase transitions can misjudge passage load and high-risk locations. Moreover, many simulation-optimization studies treat the crowd simulator as an opaque evaluator, rather than exploiting structural information from passage geometry, one-way rules, internal entrance capacities, and multi-route subpopulations \cite{RN2146,RN2122}. This limits search efficiency and makes it difficult to separate whether a candidate strategy works because the underlying control mechanism behaves correctly or because a fixed aggregate score happens to improve.
 
-We propose a macroscopic crowd modeling and control optimization framework for the ``Bund sightseeing platform--multi-stepped passage'' open scenic area scenario.
+Therefore, this paper proposes a macroscopic crowd modeling and control optimization framework for the ``Bund sightseeing platform--multi-stepped passage'' open scenic area scenario.
 The framework connects multi-stage pedestrian movement, passage direction management, geometric guidance, and entrance release control in one simulation-and-optimization workflow.
 It compares candidate strategies under limited simulation budgets, rather than relying only on empirical rules or post-event assessment.
 
@@ -98,7 +98,7 @@ Carmona and Paricio-Garcia \cite{RN2119} proposed dynamic exit-choice recommenda
 
 Other studies use optimization and reinforcement learning.
 Liao et al. \cite{RN2121} formulated fence layout as subset selection.
-Subsequent work \cite{RN2122} used LSTM features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance-flow regulation.
+Subsequent work \cite{RN2122} used long short-term memory (LSTM) features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance-flow regulation.
 Differential Evolution (DE) \cite{RN2190} has been used to optimize guardrail layout and flow guidance in scenarios such as Chengdu East Railway Station, with average travel time and crowd pressure as objectives \cite{RN2123}.
 
 \subsection{Macroscopic Crowd Modeling}
@@ -508,7 +508,7 @@ To avoid discarding good long-horizon strategies due to short-horizon bias, low-
 
 \subsubsection{High-Fidelity Rechecking and Final Selection}
 
-All finalist candidates are re-evaluated under a unified high-fidelity setting.
+All finalist candidates are re-evaluated under a unified high-fidelity (HF) setting.
 Let $\mathcal C_{\mathrm{HF}}$ be the candidate set selected for high-fidelity rechecking.
 The final output is
 \begin{equation}
@@ -526,7 +526,7 @@ The loop terminates after the finite optimization budget has been allocated acro
 \small
 \raggedright
 \begin{algorithmic}[1]
-\REQUIRE Direction constraints $\Omega_s$; simulator $\mathcal S$; objective $J$; gate-rate bounds $\bar q$; budget $B$; initial design size $n_0$; pool size $P$; LCB coefficient $\beta$; high-fidelity shortlist size $K$.
+\REQUIRE Direction constraints $\Omega_s$; simulator $\mathcal S$; objective $J$; gate-rate bounds $\bar q$; budget $B$; initial design size $n_0$; pool size $P$; lower confidence bound (LCB) coefficient $\beta$; high-fidelity shortlist size $K$.
 \ENSURE Best high-fidelity policy $z^*$.
 \STATE Generate $\mathcal S_{\mathrm{cand}}$ by enumerating $s\in\Omega_s$ and retaining only configurations satisfying open-channel and connectivity constraints.
 \STATE Rank $\mathcal S_{\mathrm{cand}}$ using the prescribed priority templates and direction proxy score, and then truncate it to the direction-candidate limit.
@@ -583,7 +583,7 @@ The induced time step is then $\Delta t=0.2$~s, and pedestrian counts follow by 
 These physical units are adopted only for readability and reflect a representative assumption; they do not represent any specific venue.
 
 The channel width is $4$~m, and the controlled internal entrance interface width is $16$~m.
-The free-flow speed is $v_{\max}=1.5$~m/s, the maximum density is $\rho_{\max}=5.0$~ped/m$^2$, the initial density is $\rho_{\mathrm{init}}=2.2$~ped/m$^2$, and the CFL factor is $0.9$.
+The free-flow speed is $v_{\max}=1.5$~m/s, the maximum density is $\rho_{\max}=5.0$~ped/m$^2$, the initial density is $\rho_{\mathrm{init}}=2.2$~ped/m$^2$, and the Courant--Friedrichs--Lewy (CFL) factor is $0.9$.
 
 Mechanism and response experiments use the corresponding validation horizons.
 The optimizer comparison uses high-fidelity rechecks with $1600$ simulation steps, a horizon of $320$~s (i.e. $\Delta t=0.2$~s), and Bellman updates every five steps.
@@ -620,7 +620,7 @@ The fixed anisotropic mobility tensor $M(x;\eta_0)$ should reshape the channel a
 When $M$ is applied to the middle channel, its flow share increases from $48.78\%$ in the baseline to $100.00\%$.
 When a one-way rule excludes the originally dominant middle-channel direction, the middle-channel share becomes zero and the flow is redistributed to the upper, lower-middle, and bottom channels with shares $19.25\%$, $68.76\%$, and $12.00\%$, respectively.
 For the bidirectional validation case, we use two diagnostic quantities.
-The reverse-direction mass time is
+The reverse-direction mass time (RMT) is
 \[
 \mathrm{RMT}=
 \sum_n\sum_{i\in\Omega_c}
@@ -629,7 +629,7 @@ The reverse-direction mass time is
 \Delta x^2\Delta t,
 \]
 which measures the cumulative reverse-direction mass-time (in ped$\cdot$s) moving against the prescribed channel direction.
-The counterflow area-time is
+The counterflow area-time (CAT) is
 \[
 \mathrm{CAT}=
 \sum_n\sum_{i\in\Omega_c}
@@ -656,7 +656,8 @@ This supports using the Bellman--conservation-law simulator as the lower-level e
 
 We next examine whether the discrete direction configuration $s$ creates nontrivial system-level trade-offs.
 The response experiment uses thirteen interpretable direction settings: an all-free baseline, four single-entry cases, four single-return cases, and four one-channel-closure cases.
-The direction code is ordered as $[T,M,LM,B]$, where $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, bidirectional free channel, and closure.
+The direction code is ordered as $[T,M,LM,B]$, representing the top, middle, lower-middle, and bottom channels, where $E$, $W$, $F$, and $X$ denote eastbound entry, westbound return, bidirectional free channel, and closure.
+Policy labels use baseline (BSL), single-entry (SE), and single-return (SR), with suffixes identifying the affected channel.
 
 \begin{figure*}[!t]
 \centering
@@ -759,9 +760,9 @@ Thus, $q$ is a genuine continuous control variable that changes system response 
 \subsection{Horizontal Optimization Comparison}
 \label{sec:optimal}
 
-The horizontal comparison evaluates Prior Baseline, Random Search, Pure Simulated Annealing, Enumeration plus Differential Evolution, TPE-Mixed BO, and HCMBO.
+The horizontal comparison evaluates Prior Baseline, Random Search, Pure Simulated Annealing (Pure SA), Enumeration plus Differential Evolution (Enum-DE), TPE-Mixed BO, and HCMBO.
 All optimizers use $B=400$ candidate evaluations and top-$10$ high-fidelity rechecks over seeds $11$, $23$, $37$, $51$, and $73$.
-The final HCMBO data are taken from the G7-D mainline, whereas the other baselines are taken from the G6 horizontal comparison under the same high-fidelity protocol.
+
 
 \begin{table}[!t]
 \centering
@@ -828,6 +829,7 @@ Optimizing only directions with a fixed high rate gives a best high-fidelity obj
 Short-horizon low-fidelity hard screening raises the best objective to $2.9441$ and selects an infeasible best candidate, because early simulations do not reliably capture long-horizon entrance waiting and load redistribution.
 Removing the entrance-waiting penalty slightly lowers the scalar objective to $2.6015$, but increases unreleased attempted flow to approximately $1.30\times10^4$~ped-eq.
 The waiting term should therefore remain in the management objective.
+In the search-mechanism variants, lower confidence bound (LCB) denotes the acquisition rule, and random-forest-style (RF-style) denotes the constrained Bayesian-optimization surrogate variant.
 
 \begin{table}[!t]
 \centering
@@ -1016,7 +1018,7 @@ A deployment-oriented version should add explicit throughput constraints and wai
 
 This paper has presented a unified macroscopic crowd-management framework for metropolitan tourism hotspots, integrating passage-direction rules, anisotropic geometric guidance, multi-stage route behavior, and internal entrance-rate control within a single Bellman–conservation-law operator. By coupling an interpretable crowd-flow simulator with the proposed HCMBO optimizer, the framework turns experience-driven crowd control into a quantitative, reproducible, and budget-aware decision process.
 
-Three findings stand out. First, the modeling components behave exactly as designed, and the two control dimensions are fundamentally complementary rather than interchangeable: direction settings induce genuinely non-monotonic trade-offs among efficiency, safety exposure, and load balance, while entrance-rate limits reshape unreleased attempted flow, binding-time ratios, and local risk patterns. Second, HCMBO consistently delivers the strongest performance among all tested optimizers—achieving the lowest mean management objective, a 3.9\% lower fixed-weight score than the next-best TPE-Mixed BO, and a perfect 100\% feasible rate across five random seeds under unified high-fidelity rechecking. Third, our ablation study pinpoints the sources of this advantage: joint direction–rate optimization, the deliberate avoidance of short-horizon hard screening, and structured direction-wise rate search.
+Three findings stand out. First, the modeling components behave exactly as designed, and the two control dimensions are fundamentally complementary rather than interchangeable: direction settings induce genuinely non-monotonic trade-offs among efficiency, safety exposure, and load balance, while entrance-rate limits reshape unreleased attempted flow, binding-time ratios, and local risk patterns. Second, HCMBO consistently delivers the strongest performance among all tested optimizers—achieving the lowest mean management objective, a 3.9\% lower fixed-weight score than the next-best TPE-Mixed BO, and a 100\% feasible rate across five random seeds under unified high-fidelity rechecking. Third, our ablation study pinpoints the sources of this advantage: joint direction–rate optimization, the deliberate avoidance of short-horizon hard screening, and structured direction-wise rate search.
 
 The Bund-inspired transfer experiment further demonstrates the framework's practical reach: an HCMBO-derived policy reorganizes pedestrian flow in a realistic spatial abstraction, cutting the management objective by 26.9\% by steering crowds away from the overloaded terminal channel and rebalancing load across the middle-channel group. Together, these results establish the proposed framework as an effective and interpretable foundation for proactive, optimization-driven crowd management in public spaces.
 
@@ -1031,8 +1033,11 @@ Future work should address these limits before operational deployment, especiall
 This research was supported by the National Natural Science Foundation of China (No. 72374154) and the 20th Experimental Teaching Reform Special Foundation of Tongji University (No. 0800104347).
 The authors deeply appreciate this support.
 
+\begingroup
+\let\url\nolinkurl
 \bibliographystyle{IEEEtran}
 \bibliography{references}
+\endgroup
 
 \makeatletter
 \def\@IEEEBIOphotowidth{0.744in}
@@ -1070,7 +1075,13 @@ His research interests include pedestrian dynamics, crowd evacuation, and comput
 \begin{IEEEbiography}[{\authorbiophoto{authors/shizhengyang_bw.png}}]{Zhengyang Shi}
 is currently a senior engineer with Huangpu Public Security Bureau, Shanghai, China.
 His research interests include large-scale pedestrian-crowd safety, large language models, and artificial intelligence.
-He has published more than ten SCI papers in related fields and holds several authorized patents.
+He has published more than ten Science Citation Index (SCI) papers in related fields and holds several authorized patents.
+\end{IEEEbiography}
+\compactbiogap
+
+\begin{IEEEbiography}[{\authorbiophoto{authors/chenli_bw.png}}]{Li Chen}
+is currently a senior engineer with Huangpu Public Security Bureau, Shanghai, China.
+His research interests include large-scale pedestrian-crowd management, computer vision for crowd monitoring, and artificial intelligence.
 \end{IEEEbiography}
 \compactbiogap
 

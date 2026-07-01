@@ -184,6 +184,7 @@ def build_g2_strategy_report(
     _save_channel_plot(output_root / "g2_direction_channel_loads.png", rows)
     _save_hotspot_plot(output_root / "g2_direction_hotspot_migration.png", rows)
     _save_control_tradeoff_summary(output_root / "g2_control_tradeoff_summary.png", rows)
+    _save_control_tradeoff_summary_ab(output_root / "g2_control_tradeoff_summary_ab.png", rows)
     _save_spatial_mechanism_summary(output_root / "g2_spatial_mechanism_summary.png", rows)
 
     report = {
@@ -195,6 +196,7 @@ def build_g2_strategy_report(
         "families": sorted({str(row["family"]) for row in rows}),
         "journal_outputs": {
             "control_tradeoff_summary": str(output_root / "g2_control_tradeoff_summary.png"),
+            "control_tradeoff_summary_ab": str(output_root / "g2_control_tradeoff_summary_ab.png"),
             "spatial_mechanism_summary": str(output_root / "g2_spatial_mechanism_summary.png"),
             "pareto_projection": str(output_root / "g2_direction_pareto.png"),
             "hotspot_migration": str(output_root / "g2_direction_hotspot_migration.png"),
@@ -347,14 +349,15 @@ def _set_publication_axes(ax: plt.Axes, *, grid: bool = False) -> None:
         ax.grid(False)
 
 
-def _panel_label(ax: plt.Axes, label: str) -> None:
+def _panel_label(ax: plt.Axes, label: str, *, inside: bool = False) -> None:
+    x, y = (0.0, 1.055) if inside else (-0.075, 1.045)
     ax.text(
-        -0.075,
-        1.045,
+        x,
+        y,
         label,
         transform=ax.transAxes,
         ha="left",
-        va="top",
+        va="bottom" if inside else "top",
         fontsize=13,
         fontweight="bold",
         color="black",
@@ -745,10 +748,29 @@ def _save_control_tradeoff_summary(path: Path, rows: list[dict[str, object]]) ->
     _draw_design_matrix(axes[0], rows)
     _draw_pareto_projection(axes[1], fig, rows)
     _draw_objective_heatmap(axes[2], rows)
-    for label, ax in zip(("A", "B", "C"), axes):
-        _panel_label(ax, label)
+    for label, ax in zip(("(a)", "(b)", "(c)"), axes):
+        _panel_label(ax, label, inside=True)
     fig.subplots_adjust(left=0.035, right=0.985, top=0.92, bottom=0.08, wspace=0.28)
     fig.savefig(path, bbox_inches="tight")
+    plt.close(fig)
+
+
+def _save_control_tradeoff_summary_ab(path: Path, rows: list[dict[str, object]]) -> None:
+    if not rows:
+        return
+    fig, axes = plt.subplots(
+        1,
+        2,
+        figsize=(10.6, 5.2),
+        dpi=360,
+        gridspec_kw={"width_ratios": [0.84, 1.26], "wspace": 0.42},
+    )
+    _draw_design_matrix(axes[0], rows)
+    _draw_pareto_projection(axes[1], fig, rows)
+    for label, ax in zip(("(a)", "(b)"), axes):
+        _panel_label(ax, label, inside=True)
+    fig.subplots_adjust(left=0.055, right=0.985, top=0.89, bottom=0.12, wspace=0.42)
+    fig.savefig(path, bbox_inches="tight", pad_inches=0.06)
     plt.close(fig)
 
 

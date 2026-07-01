@@ -66,6 +66,7 @@ def redraw_g2_figures() -> list[Path]:
 
     outputs = [
         result_dir / "g2_control_tradeoff_summary.png",
+        result_dir / "g2_control_tradeoff_summary_ab.png",
         result_dir / "g2_spatial_mechanism_summary.png",
     ]
     for output in outputs:

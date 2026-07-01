@@ -12,6 +12,8 @@ Cuiling Li received the B.E. degree in Automation from Northwestern Polytechnica
 
 Zhengyang Shi. He is currently a senior engineer of Huangpu Public Security Bureau. His research interests cover big-size pedestrian-crowd safety, large language models and artificial intelligence. He has published more than ten SCI papers in related fields and holds several authorized patents.
 
+Li Chen. He is currently a senior engineer of Huangpu Public Security Bureau. His research interests include large-scalepedestrian-crowd management, computer vision for crowd monitoring, and artificial intelligence.
+
 Yuxin Cai received the B.E. degree from China University of Petroleum(Beijing) in 2024. He is currently pursuing a master’s degree in digital Information at Tongji University, Shanghai. His Research interests include pedestrian anomaly detection, public safety, and computer vision.
 
 Lingchen Han received the B.E. degree from Shanghai Polytechnic University in 2024. He is currently pursuing a master’s degree in digital information at Tongji University, Shanghai. His research interests include pedestrian anomaly detection, crowd stability, and computer vision.
