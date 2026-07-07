@@ -82,12 +82,6 @@ C.-Z.~T. Xie, J.~Xu, B.~Zhu, T.-Q. Tang, S.~Lo, B.~Zhang, and Y.~Tian,
   ``Advancing crowd forecasting with graphs across microscopic trajectory to
   macroscopic dynamics,'' \emph{Information Fusion}, vol. 106, p. 102275, 2024.
 
-\bibitem{RN2302}
-L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns
-  within free-roaming scenic architectural complexes: Considering impacts of
-  temporal, spatial, and environmental factors,'' \emph{Frontiers of
-  Architectural Research}, vol.~13, no.~5, pp. 990--1008, 2024.
-
 \bibitem{RN761}
 X.~Yang, R.~Zhang, F.~Pan, Y.~Yang, Y.~Li, and X.~Yang, ``Stochastic user
   equilibrium path planning for crowd evacuation at subway station based on
@@ -109,6 +103,23 @@ P.~X. Liu, X.~Xiao, J.~Zhang, R.~H. Wu, and H.~L. Zhang, ``Spatial
 A.~M. Caldeira and E.~Kastenholz, ``Spatiotemporal tourist behaviour in urban
   destinations: a framework of analysis,'' \emph{Tourism Geographies}, vol.~22,
   no.~1, pp. 22--50, 2020.
+
+\bibitem{kretz2026empirical_travel_time_calibration}
+T.~Kretz, L.~Eckes, L.~Knappik, J.~Diz, D.~Lipp, and S.~Muller, ``Using
+  empirical travel time distributions for calibration of a model of pedestrian
+  dynamics,'' \emph{EURO Journal on Transportation and Logistics}, vol.~15, p.
+  100179, 2026.
+
+\bibitem{haghani2024crowd_model_calibration}
+M.~Haghani and M.~Sarvi, ``Crowd model calibration at strategic, tactical, and
+  operational levels: Full-spectrum sensitivity analyses show bottleneck
+  parameters are most critical, followed by exit-choice-changing parameters,''
+  \emph{Transportation Letters}, vol.~16, no.~4, pp. 354--381, 2024.
+
+\bibitem{king2023measurement_errors_destination_choice}
+C.~King, O.~Koltsova, and N.~W.~F. Bode, ``Simulating the effect of measurement
+  errors on pedestrian destination choice model calibration,''
+  \emph{Transportmetrica A: Transport Science}, vol.~19, no.~1, 2023.
 
 \bibitem{qq2024huangpu_security}
 {Jingmin Zhitongche Shanghai}, ``Tourism, shopping festival, and commercial
@@ -343,6 +354,12 @@ J.~Liu, L.~Hu, X.~Xu, and J.~Wu, ``A queuing network simulation optimization
   method for coordination control of passenger flow in urban rail transit
   stations,'' \emph{Neural Computing and Applications}, vol.~33, no.~17, pp.
   10\,935--10\,959, 2021.
+
+\bibitem{RN2302}
+L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns
+  within free-roaming scenic architectural complexes: Considering impacts of
+  temporal, spatial, and environmental factors,'' \emph{Frontiers of
+  Architectural Research}, vol.~13, no.~5, pp. 990--1008, 2024.
 
 \bibitem{hu2025passenger_capacity_allocation}
 H.~Hu, R.~Zhang, Y.~Hao, Y.~He, and Z.~Liu, ``Optimization model for passenger
