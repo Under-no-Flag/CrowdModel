@@ -16,6 +16,7 @@
 | $\Delta t$ | 时间步长。 |
 | $\Omega\subset\mathbb R^2$ | 计算域。 |
 | $\Omega_w\subset\Omega$ | 可通行区域，障碍物、墙体等不可行区域不属于 $\Omega_w$。 |
+| $\Omega_{\mathrm{solid}}$ | 障碍物与墙体区域的并集；代码中由 `obstacles` 与 `walls` 编译得到。 |
 | $\partial\Omega$ | 计算域外边界。本文的通道入口截面通常不在 $\partial\Omega$ 上，而是内部界面。 |
 | $x=(x_1,x_2)$ | 空间位置变量。 |
 | $K_i$ | 有限体积网格单元。 |
@@ -24,6 +25,12 @@
 | $\mathcal F_c^\pm$ | 第 $c$ 条通道正向或反向入口截面对应的离散内部网格面集合。 |
 | $\Delta x$ | 网格空间步长；在 Bellman 离散方程中表示一次步进的基本长度。 |
 | $dS$ | 沿截面或边界的线积分测度。 |
+| $d_{\mathrm{wall}}(x)$ | 网格点 $x$ 到不可通行区域 $\Omega\setminus\Omega_w$ 的离散距离，单位为网格 cell。 |
+| $C_{\mathrm{wall}}(x)$ | 墙体避让代价因子；远离墙体时为 $1$，靠近墙体时大于 $1$。 |
+| $\gamma_{\mathrm{wall}}$ | 墙体避让权重，对应代码中的 `wall_avoidance_weight`。 |
+| $\sigma_{\mathrm{wall}}$ | 墙体避让衰减尺度，对应代码中的 `wall_avoidance_sigma_cells`。 |
+| $r_{\mathrm{wall}}$ | 墙体避让作用半径，对应代码中的 `wall_avoidance_radius_cells`。 |
+| $n_{\mathrm{clear}}$ | 墙体安全净距膨胀 cell 数，对应代码中的 `wall_clearance_cells`。 |
 
 ### 0.2 通道与方向符号
 
@@ -75,6 +82,7 @@
 | $u_g^*(x,t)$ | 子群体 $g$ 的最优行走方向。 |
 | $v_g(x,t)$ | 子群体 $g$ 的速度场，$v_g=F(\rho)u_g^*$。 |
 | $M_g(x)$ | 子群体 $g$ 使用的空间度量张量。本文保留为几何引导机制，但不再把其强度作为优化变量。 |
+| $H_g(x,u)$ | Bellman 离散步进代价；代码实现中由度量张量步长代价与墙体避让代价共同构成。 |
 | $A_c^\pm(t)$ | 第 $c$ 条通道正向或反向入口的总尝试流量。 |
 | $\widehat A_c^\pm(t)$ | 第 $c$ 条通道正向或反向入口的实际允许通过量。 |
 | $q_c^\pm(t)$ | 第 $c$ 条通道正向或反向入口的控制速率上限。 |
@@ -227,6 +235,41 @@ $$
 \Omega_w\subset\Omega.
 $$
 
+代码实现中，障碍物和墙体先合成为不可通行集合
+
+$$
+\Omega_{\mathrm{solid}}
+=
+\Omega_{\mathrm{obs}}\cup\Omega_{\mathrm{wall}},
+$$
+
+并从可通行区域中删除。若设置墙体安全净距 $n_{\mathrm{clear}}>0$，则先对 $\Omega_{\mathrm{solid}}$ 做离散膨胀，再从 $\Omega_w$ 中剔除。该处理对应代码中的 `wall_clearance_cells`，用于避免数值路径贴着墙体或障碍边界穿行。
+
+在得到最终可通行区域后，代码进一步计算每个可通行网格点到不可通行区域的离散距离
+
+$$
+d_{\mathrm{wall}}(x)
+=
+\operatorname{dist}_{\mathrm{grid}}\bigl(x,\Omega\setminus\Omega_w\bigr),
+\qquad x\in\Omega_w.
+$$
+
+墙体避让并不改变守恒方程中的质量，也不额外删除行人，而是通过 Bellman 路径代价实现。定义墙体避让代价因子
+
+$$
+C_{\mathrm{wall}}(x)
+=
+\begin{cases}
+1+\gamma_{\mathrm{wall}}
+\exp\!\left(-d_{\mathrm{wall}}(x)/\sigma_{\mathrm{wall}}\right),
+& x\in\Omega_w,\ d_{\mathrm{wall}}(x)\le r_{\mathrm{wall}},\\
+1,
+& \text{otherwise}.
+\end{cases}
+$$
+
+当 $\gamma_{\mathrm{wall}}=0$ 时，$C_{\mathrm{wall}}(x)\equiv 1$，墙体避让代价关闭。该形式对应当前代码中的 `wall_avoidance_weight`、`wall_avoidance_sigma_cells` 和 `wall_avoidance_radius_cells`。因此，墙体在模型中有两层作用：不可通行墙体单元直接从 $\Omega_w$ 中移除；靠墙但仍可通行的单元通过 $C_{\mathrm{wall}}(x)$ 提高路径代价，从而鼓励路径远离墙体。
+
 第 $c$ 条通道区域为
 
 $$
@@ -360,10 +403,22 @@ $$
 \left[
 \phi_g(x+\Delta x u)
 +
-\frac{\Delta x}{F(\rho(x,t))}
+\frac{\Delta x\,C_{\mathrm{wall}}(x)}{F(\rho(x,t))}
 \frac{1}{\sqrt{u^\top M_g(x)u}}
 \right].
 $$
+
+等价地，定义单步代价
+
+$$
+H_g(x,u)
+=
+\frac{\Delta x}{F(\rho(x,t))}
+\frac{1}{\sqrt{u^\top M_g(x)u}}
+\,C_{\mathrm{wall}}(x),
+$$
+
+则 Bellman 更新就是在允许方向集合 $U_g(x;s)$ 上选择使 $\phi_g(x+\Delta x u)+H_g(x,u)$ 最小的方向。当前代码实现中，`precompute_step_factors()` 先计算度量张量对应的几何步长代价 $\Delta x/\sqrt{u^\top M_g(x)u}$，随后在 `runner.py` 中将其乘以 `scene.wall_cost`。因此，墙体避让只增加靠墙路径的到达代价，不改变速度--密度函数 $F(\rho)$，也不改变守恒律质量更新。
 
 最优方向为
 
@@ -374,7 +429,7 @@ u_g^*(x,t)
 \left[
 \phi_g(x+\Delta x u)
 +
-\frac{\Delta x}{F(\rho(x,t))}
+\frac{\Delta x\,C_{\mathrm{wall}}(x)}{F(\rho(x,t))}
 \frac{1}{\sqrt{u^\top M_g(x)u}}
 \right].
 $$
@@ -419,7 +474,17 @@ $$
 
 或取其他固定背景度量。本文不再优化 $\eta_0$，其作用仅是使行人倾向于沿通道方向行走，而不是精确控制入口流量。
 
-### 3.4 多阶段源汇项
+### 3.4 墙体避让与几何引导的关系
+
+墙体避让代价 $C_{\mathrm{wall}}(x)$ 与通道几何引导张量 $M_g(x)$ 是两类不同机制：
+
+1. $M_g(x)$ 改变不同方向的相对步进代价，用于表达通道内部沿 $\tau_c$ 方向移动更容易；
+2. $C_{\mathrm{wall}}(x)$ 对靠近墙体或障碍边界的可通行网格施加各向同性惩罚，用于降低路径贴墙的倾向；
+3. 两者都作用在 Bellman 路径选择层，而不是直接作为入口流率控制变量。
+
+因此，V2 模型的优化变量仍为 $z=(s,q)$。墙体避让参数属于场景或数值设置，用于提高几何路径的合理性，不进入 HCMBO 搜索空间。
+
+### 3.5 多阶段源汇项
 
 对每个群体 $g$，密度守恒方程为
 
@@ -1042,7 +1107,7 @@ $$
 \left[
 \phi_g(x+\Delta xu)
 +
-\frac{\Delta x}{F(\rho)}
+\frac{\Delta x\,C_{\mathrm{wall}}(x)}{F(\rho)}
 \frac{1}{\sqrt{u^\top M_g(x)u}}
 \right].
 $$
@@ -1054,10 +1119,12 @@ u_g^*(x,t)
 \left[
 \phi_g(x+\Delta xu)
 +
-\frac{\Delta x}{F(\rho)}
+\frac{\Delta x\,C_{\mathrm{wall}}(x)}{F(\rho)}
 \frac{1}{\sqrt{u^\top M_g(x)u}}
 \right].
 $$
+
+其中 $C_{\mathrm{wall}}(x)$ 是可选墙体避让代价因子；若未启用墙体避让，则 $C_{\mathrm{wall}}(x)\equiv1$。
 
 $$
 v_g(x,t)=F(\rho(x,t))u_g^*(x,t).
@@ -1148,7 +1215,7 @@ $$
 
 可以将本模型概括为：
 
-> 本文在 Bellman--守恒律耦合的 Hughes 型宏观人群模型中，引入内部通道入口通行速率作为可实施管控变量。通道方向配置 $s$ 通过允许方向集合 $U(x;s)$ 表达单向、双向与关闭规则；固定度量张量 $M(x)$ 保留为通道内部几何引导机制；入口通行速率 $q_c^\pm(t)$ 通过内部截面通量约束限制进入通道的实际流量。该设计将方向规则、几何引导和入口限流统一到同一连续介质仿真框架中，并避免将内部通道入口误写为计算域外边界入流条件。
+> 本文在 Bellman--守恒律耦合的 Hughes 型宏观人群模型中，引入内部通道入口通行速率作为可实施管控变量。通道方向配置 $s$ 通过允许方向集合 $U(x;s)$ 表达单向、双向与关闭规则；固定度量张量 $M(x)$ 保留为通道内部几何引导机制；墙体避让代价 $C_{\mathrm{wall}}(x)$ 在 Bellman 路径选择层提高靠墙路径的代价；入口通行速率 $q_c^\pm(t)$ 通过内部截面通量约束限制进入通道的实际流量。该设计将方向规则、几何引导、墙体避让和入口限流统一到同一连续介质仿真框架中，并避免将内部通道入口误写为计算域外边界入流条件。
 
 ---
 
@@ -1161,3 +1228,4 @@ $$
 5. 明确了内部入口限流的连续形式和有限体积离散形式之间的对应关系。
 6. 补充了等待区质量 $B_c^\pm(t)$、入口积压指标 $J_B$ 和可选的管控平滑性指标 $J_R$。
 7. 明确说明该方案是内部瓶颈通量约束，不是外边界 Neumann 入流条件。
+8. 根据当前代码实现补充了墙体避让机制：墙体和障碍物先从可通行域中剔除，靠墙可通行单元再通过 $C_{\mathrm{wall}}(x)$ 提高 Bellman 步进代价；该机制不改变守恒律质量更新，也不进入 $z=(s,q)$ 优化变量。

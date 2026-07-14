@@ -23,9 +23,9 @@
 
 \title{Bellman Conservation Law-based Crowd Flow Control via Passage Direction and Entrance-Rate Optimization in Metropolitan Tourism Hotspots With Capacity of 50,000 Pedestrians}
 
-\author{Bingyu Wei, Cuiling Li, Rongyong Zhao, \textit{Member, IEEE}, Zhengyang Shi, Li Chen, Yuxin Cai, and Lingchen Han
-\thanks{Bingyu Wei, Cuiling Li, Rongyong Zhao, Yuxin Cai, and Lingchen Han are with the CIMS Research Center, Tongji University, Shanghai 201804, China. (e-mail: \{weiby,licuiling,zhaorongyong,2432091,2432090\}@tongji.edu.cn). (\textit{Corresponding author: Rongyong Zhao}.)}
-\thanks{Zhengyang Shi and Li Chen are with Huangpu Public Security Bureau, Shanghai, China. (e-mail: \{13817036566,kevin\_c2009\}@163.com).}}
+\author{Bingyu Wei, Rongyong Zhao, \textit{Member, IEEE}, Cuiling Li, Zhengyang Shi, Li Chen, Yuxin Cai, and Lingchen Han
+\thanks{Bingyu Wei, Rongyong Zhao, Cuiling Li, Yuxin Cai, and Lingchen Han are with the CIMS Research Center, Tongji University, Shanghai 201804, China. (e-mail: \{weiby, zhaorongyong, licuiling, 2432091, 2432090\}@tongji.edu.cn). (\textit{Corresponding author: Rongyong Zhao}.)}
+\thanks{Zhengyang Shi and Li Chen are with Huangpu Public Security Bureau, Shanghai, China. (e-mail: \{13817036566, kevin\_c2009\}@163.com).}}
 
 % \markboth{Journal Name,~Vol.~XX, No.~X, Month~2026}%
 % {Author: Channel Optimization for Crowd Management}
@@ -101,7 +101,7 @@ Liao et al. \cite{RN2121} formulated fence layout as subset selection.
 Subsequent work \cite{RN2122} used long short-term memory (LSTM) features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance-flow regulation.
 Differential Evolution (DE) \cite{RN2190} has been used to optimize guardrail layout and flow guidance in scenarios such as Chengdu East Railway Station, with average travel time and crowd pressure as objectives \cite{RN2123}.
 
-\subsection{Macroscopic Crowd Modeling}
+\subsection{Macroscopic Crowd Modeling and Current Discrepancy Analysis}
 
 Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency and analytical tractability compared to microscopic approaches.
 Henderson \cite{RN282} first applied fluid dynamics to pedestrian traffic in the early 1970s, comparing crowd motion to the behavior of gas or fluid particles.
@@ -1014,6 +1014,43 @@ Under the present reduced-objective weights, it lowers $J^{(3)}$ mainly by redis
 The capacity-scale factor of $3$ reduces unreleased attempted flow to $364$~ped-eq., but it does not remove the efficiency cost.
 A deployment-oriented version should add explicit throughput constraints and waiting upper bounds, and should test several objective-weight settings before selecting a policy.
 
+The real Bund waterfront operates at crowd scales far beyond the demonstration level of this section.
+According to official holiday reports, the instantaneous on-site crowd in the Bund waterfront area peaked at $5.7\times10^4$ pedestrians during the 2025 National Day holiday \cite{qq2025bund_holiday_peak} and reached $7.1\times10^4$ during the 2019 holiday \cite{chinanews2019bund_flow_guidance}.
+The present experiment deliberately adopts a lower demand setting so that the transfer of control mechanisms and optimized policies can be examined under controlled conditions, rather than reproducing peak holiday loads.
+
+We emphasize that the computational cost of the macroscopic model is determined solely by the grid resolution and the number of simulation steps, and is independent of the number of pedestrians present: crowd size enters the model only through the magnitude of the density field and the entrance inflow rates.
+Scaling from the demonstration level to a 50,000-pedestrian operating condition therefore requires no change to the model structure, the numerical scheme, or the grid; only demand-side parameters change.
+Table~\ref{tab:bund_scale_projection} contrasts the two operating conditions.
+The spatial extent, grid resolution, time step, and per-step cost are identical in both conditions; only the instantaneous population, the entrance inflow rates, and the horizon differ, and among these only the horizon increases the total cost, linearly in the number of steps.
+
+\begin{table*}[!t]
+\centering
+\caption{Parameter Correspondence Between the Transfer Experiment and a Real-Scale Bund Operating Condition}
+\label{tab:bund_scale_projection}
+\footnotesize
+\setlength{\tabcolsep}{6pt}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}
+>{\raggedright\arraybackslash}p{0.26\textwidth}
+>{\raggedright\arraybackslash}p{0.28\textwidth}
+>{\raggedright\arraybackslash}p{0.24\textwidth}@{}}
+\hline
+Parameter & Transfer experiment & Real-scale condition & Effect on cost \\
+\hline
+Spatial extent & $\approx894~\mathrm{m}\times391$~m (georeferenced) & identical (covers the waterfront core area) & unchanged \\
+Grid resolution & $512\times224$, $\Delta x\approx1.75$~m & identical & sole spatial cost factor; unchanged \\
+Time step & $\Delta t\approx0.44$~s (CFL-induced) & identical (independent of crowd size) & unchanged \\
+Instantaneous population & peak $\approx1.5\times10^3$~ped & $5\times10^4$--$7\times10^4$~ped & none (density values only) \\
+Peak local density & $\approx4.0$~ped/m$^2$ ($=\rho_{\max}$) & same saturated regime & none; regime already covered \\
+Total entrance inflow & $\approx3.35$~ped/s (single main entrance) & $\approx20$--$30$~ped/s (multiple entrances, field-calibrated) & none (boundary condition) \\
+Simulation horizon & $\approx698$~s ($1600$ steps) & $1$--$2$~h peak period ($\approx8\times10^3$--$1.6\times10^4$ steps) & total cost grows linearly with steps \\
+\hline
+\end{tabular}
+\end{table*}
+
+From a dynamics viewpoint, a crowd of $5\times10^4$--$7\times10^4$ pedestrians corresponds to an average walkable density of roughly $0.3$--$0.6$~ped/m$^2$, far below the jam density $\rho_{\max}=4.0$~ped/m$^2$, whereas the local peak density in this section already reaches $\rho_{\max}$; that is, the saturated congested branch of the fundamental diagram is exercised by the present experiments.
+Scaling up therefore enlarges the spatial extent of high-density regions rather than pushing the model into a density regime untouched by the experiments.
+The proposed framework thus supports control analysis at the 50,000-pedestrian scale in terms of both computational feasibility and dynamical coverage; a full-region peak validation with field-calibrated demand profiles is left for future work.
+
 
 
 \section{Conclusion}
@@ -1058,16 +1095,16 @@ His research interests include pedestrian behavior, crowd stability, and compute
 \end{IEEEbiography}
 \compactbiogap
 
-\begin{IEEEbiography}[{\authorbiophoto{authors/licuiling_bw.png}}]{Cuiling Li}
-received the B.E. degree in automation from Northwestern Polytechnical University, China, the M.E. degree in automation from Lanzhou University of Technology, China, and the Ph.D. degree in systems engineering from Tongji University, China, in 1998, 2002, and 2007, respectively.
-Her research interests include pedestrian dynamics, crowd stability, and artificial intelligence.
-\end{IEEEbiography}
-\compactbiogap
-
 \begin{IEEEbiography}[{\authorbiophoto{authors/zhaorongyong_bw.png}}]{Rongyong Zhao}
 received the B.E. degree in mechanical science from Jinan University, China, the M.E. degree in mechanical automation from Lanzhou University of Technology, China, and the Ph.D. degree in control theory and engineering from Tongji University, China, in 1999, 2002, and 2005, respectively.
 He is currently an Associate Professor with Tongji University, Shanghai, China.
 His research interests include pedestrian dynamics, crowd evacuation, and computer vision.
+\end{IEEEbiography}
+\compactbiogap
+
+\begin{IEEEbiography}[{\authorbiophoto{authors/licuiling_bw.png}}]{Cuiling Li}
+received the B.E. degree in automation from Northwestern Polytechnical University, China, the M.E. degree in automation from Lanzhou University of Technology, China, and the Ph.D. degree in systems engineering from Tongji University, China, in 1998, 2002, and 2007, respectively.
+Her research interests include pedestrian dynamics, crowd stability, and artificial intelligence.
 \end{IEEEbiography}
 \compactbiogap
 
