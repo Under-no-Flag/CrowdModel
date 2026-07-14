@@ -51,10 +51,10 @@ Among urban crowd-gathering scenarios, open scenic areas, waterfront viewing pla
 
 \begin{figure*}[!t]
 \centering
-\subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/63988092.jpeg}
+\subfloat[]{\includegraphics[width=0.47\textwidth]{figures/bund_holiday_crowd.jpeg}
 \label{fig:bund_scene_crowd}}
 \hfill
-\subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/入口容量控制.png}
+\subfloat[]{\includegraphics[width=0.47\textwidth]{figures/bund_entrance_control.png}
 \label{fig:bund_scene_capacity}}
 \figcaptiontight
 \caption{Field-control context of the Shanghai Nanjing East Road--Bund area. (a) Large-scale holiday crowd under one-way passage pedestrian flow control on Nanjing East Road; image source: \cite{qq2024huangpu_security}. (b) Entrance-capacity pedestrian flow control link of Bund Passge No.5- Chenyi Square-Nanjing East Road; image source: \cite{chinanews2019bund_flow_guidance}.}
@@ -149,7 +149,7 @@ The overall method framework is shown in Fig.~\ref{fig:method_framework}.
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=\textwidth]{../images/framework/method_framework_tikz.pdf}
+\includegraphics[width=\textwidth]{figures/method_framework.pdf}
 \figcaptiontight
 \caption{Method framework for joint direction and entrance-rate optimization. Fixed scenario inputs, behavioral preferences, and geometric guidance parameters define the lower-level Bellman--conservation-law crowd simulator. The controllable direction configuration and entrance-rate profile are jointly evaluated by efficiency, safety, load-balance, waiting, and smoothness objectives, and are updated by the upper-level HCMBO optimizer.}
 \label{fig:method_framework}
@@ -609,7 +609,7 @@ Raw cumulative quantities are rounded to three significant digits in the text, w
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/scene.png}
+\includegraphics[width=\columnwidth]{figures/scene.png}
 \figcaptiontight
 \caption{Four-channel scenic-platform simulation scenario used in the numerical experiments.}
 \label{fig:experiment_scene}
@@ -644,7 +644,7 @@ After imposing the eastbound one-way rule, all three quantities are reduced to z
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.82\textwidth]{../../codes/results/g1_mechanism_reframed/g1_um_configuration_flow_comparison.png}
+\includegraphics[width=0.82\textwidth]{figures/g1_flow_comparison.png}
 \figcaptiontight
 \caption{Spatial transferability of the combined $U+M$ mechanism. Moving the controlled channel induces corresponding migration of dominant flow channels, streamlines, and density hotspots.}
 \label{fig:g1_um_configuration}
@@ -664,7 +664,7 @@ Policy labels use baseline (BSL), single-entry (SE), and single-return (SR), wit
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.92\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
+\includegraphics[width=0.92\textwidth]{figures/g2_tradeoff_summary.png}
 \figcaptiontight
 \caption{Directional-control design matrix and objective-space trade-off. Color encodes $\tilde J_3$, marker size encodes the reduced dimensionless diagnostic objective $J^{(3)}$, and diamonds indicate non-dominated cases.}
 \label{fig:g2_control_tradeoff}
@@ -749,7 +749,7 @@ Low & 0.6181 & 0.466 & 0.8493 & 1.9337 & 1711.56 & 92.1\% & 0.721 \\
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/g2/g2_capacity_levels.png}
+\includegraphics[width=\columnwidth]{figures/g2_capacity_levels.png}
 \figcaptiontight
 \caption{Objective-term response under internal entrance-rate upper-bound levels. Tightening the upper bound changes safety exposure, load balance, and unreleased attempted flow; the latter is reported in pedestrian-equivalent demand (ped-eq.).}
 \label{fig:entrance_rate_response}
@@ -798,7 +798,7 @@ The remaining high HCMBO objective is mainly caused by a larger safety-exposure 
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_best_objective.png}
+\includegraphics[width=\columnwidth]{figures/hcmbo_best_objective.png}
 \figcaptiontight
 \caption{Best high-fidelity full objective $J$ across seeds. The objective is dimensionless and lower is better. Range bars show the seed-wise spread, and the short vertical mark indicates the median.}
 \label{fig:optimizer_best_objective}
@@ -806,7 +806,7 @@ The remaining high HCMBO objective is mainly caused by a larger safety-exposure 
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_convergence.png}
+\includegraphics[width=\columnwidth]{figures/hcmbo_convergence.png}
 \figcaptiontight
 \caption{Best-so-far convergence curves under the same $400$-evaluation budget. The inset highlights the final-stage separation among methods.}
 \label{fig:optimizer_convergence}
@@ -814,7 +814,7 @@ The remaining high HCMBO objective is mainly caused by a larger safety-exposure 
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../../codes/results/final_hcmbo_cross_experiment_summary/final_method_control_profiles.png}
+\includegraphics[width=\columnwidth]{figures/hcmbo_control_profiles.png}
 \figcaptiontight
 \caption{Best-solution entrance-rate profiles for Random Search, Pure SA, Enum-DE, TPE-Mixed BO, and HCMBO. The common direction structure is $[T,M,LM,B]=[W,E,E,W]$ for several methods, but the segment-wise rate allocations differ substantially.}
 \label{fig:control_profiles}
@@ -879,7 +879,7 @@ Instead, it preserves the Bund sightseeing platform, the lateral passage connect
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.82\textwidth]{../图表/visio架构图/外滩场景示意图_页-7.jpg}
+\includegraphics[width=0.82\textwidth]{figures/bund_scene_schematic.jpg}
 \figcaptiontight
 \caption{Real Bund scene and its simplified simulation abstraction. The abstraction retains the Bund sightseeing platform boundary, the main entrance, and the passage connections used for control validation. The satellite basemap was obtained from Google Maps. The right-side local photographs were shot in the Shanghai Bund waterfront passage area by the Tongji Public Safety Experimental Team, June 21, 2026.}
 \label{fig:bund_transfer_scene}
@@ -995,7 +995,7 @@ Channel & Local name & Controlled & Uncontrolled \\
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.95\textwidth]{../../codes/results/bund_control_comparison_hcmbo_capacity3/figures/bund_comparison_density_panel_steps_0050_0350_0900_1500.png}
+\includegraphics[width=0.95\textwidth]{figures/bund_density_panel.png}
 \figcaptiontight
 \caption{Density evolution comparison between uncontrolled and controlled cases at approximately $22$, $153$, $393$, and $654$~s. The controlled policy redistributes the later-stage flow from the terminal channel toward the middle-channel group.}
 \label{fig:bund_transfer_density_panel}
