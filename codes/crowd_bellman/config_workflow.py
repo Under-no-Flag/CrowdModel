@@ -47,6 +47,11 @@ def _write_config_snapshot(
         shutil.copy2(source_path, destination_path)
         copied_files[label] = str(destination_path)
 
+    if scene_path.name == 'manifest.json':
+        # The GIS manifest addresses sibling arrays. Preserve the self-contained bundle.
+        for name in ('grid.npz', 'source.gpkg'):
+            shutil.copy2(scene_path.parent / name, snapshot_dir / name)
+
     manifest = {
         "generated_at": datetime.now().astimezone().isoformat(),
         "output_root": str(output_root),
@@ -79,14 +84,19 @@ def run_from_config(
     if simulation_overrides:
         simulation = SimulationConfig(**{**asdict(simulation), **simulation_overrides})
 
-    scene_spec = load_scene_spec(run_spec.scene_path)
     population_spec = load_population_spec(run_spec.population_path)
     route_spec = load_route_spec(run_spec.routes_path)
     scene_background_path = run_spec.scene_path.parent / "grid_overlay.png"
     if not scene_background_path.exists():
         scene_background_path = None
 
-    bundle = compile_scene(scene_spec=scene_spec, cfg=simulation)
+    if run_spec.scene_path.name == 'manifest.json':
+        from .loaders.gis_loader import load_gis_scene
+        bundle, simulation, gis_manifest = load_gis_scene(run_spec.scene_path.parent, simulation)
+    else:
+        scene_spec = load_scene_spec(run_spec.scene_path)
+        bundle = compile_scene(scene_spec=scene_spec, cfg=simulation)
+        gis_manifest = None
     scene, case = compile_case(
         bundle=bundle,
         population_spec=population_spec,
@@ -122,6 +132,8 @@ def run_from_config(
     )
     summary["config_path"] = str(run_spec.config_path)
     summary["scene_path"] = str(run_spec.scene_path)
+    if gis_manifest is not None:
+        summary['gis_scene'] = gis_manifest
     summary["population_path"] = str(run_spec.population_path)
     summary["routes_path"] = str(run_spec.routes_path)
     summary["config_snapshot"] = _write_config_snapshot(
