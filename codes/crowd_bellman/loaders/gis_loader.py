@@ -23,6 +23,8 @@ def load_gis_scene(version_dir, cfg: SimulationConfig | None = None):
     payload = (root / 'grid.npz').read_bytes()
     if hashlib.sha256(payload).hexdigest() != manifest['grid_sha256']:
         raise ValueError('GIS grid hash mismatch')
+    if hashlib.sha256((root / 'source.gpkg').read_bytes()).hexdigest() != manifest['source_sha256']:
+        raise ValueError('GIS source snapshot hash mismatch')
     ny, nx = manifest['shape_yx']
     dx = manifest['dx_m']
     if not np.isfinite(dx) or dx <= 0:
