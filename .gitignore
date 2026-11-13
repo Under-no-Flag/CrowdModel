@@ -7,3 +7,8 @@ __pycache__/
 *.nbc
 *.nbi
 codes/results_*/
+
+# Local test caches and packaged submission outputs.
+.pytest_cache/
+TITS submission/*/*.zip
+TITS submission/*/*.pdf

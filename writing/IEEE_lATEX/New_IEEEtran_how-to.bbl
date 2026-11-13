@@ -211,32 +211,15 @@ R.~X. Zhong, Y.~P. Huang, C.~Chen, W.~H.~K. Lam, D.~B. Xu, and A.~Sumalee,
   \emph{Transportation Research Part B: Methodological}, vol. 111, pp.
   327--355, 2018.
 
-\bibitem{RN1196}
-R.~Zhao, Q.~Liu, Q.~Hu, D.~Dong, C.~Li, and Y.~Ma, ``Lyapunov-based crowd
-  stability analysis for asymmetric pedestrian merging layout at t-shaped
-  street junction,'' \emph{IEEE Transactions on Intelligent Transportation
-  Systems}, vol.~22, no.~11, pp. 6833--6842, 2021.
-
 \bibitem{RN280}
 S.~A. Wadoo and P.~Kachroo, ``Feedback control of crowd evacuation in one
   dimension,'' \emph{IEEE Transactions on Intelligent Transportation Systems},
   vol.~11, no.~1, pp. 182--193, 2010.
 
-\bibitem{RN277}
-W.~Qin, ``Unit sliding mode control for disturbed crowd dynamics system based
-  on integral barrier lyapunov function,'' \emph{IEEE Access}, vol.~8, pp.
-  91\,257--91\,264, 2020.
-
 \bibitem{RN286}
 Y.~Zhu, D.~Zhao, and H.~He, ``Optimal feedback control of pedestrian flow in
   heterogeneous corridors,'' \emph{IEEE Transactions on Automation Science and
   Engineering}, vol.~18, no.~3, pp. 1097--1108, 2021.
-
-\bibitem{RN2145}
-Y.~Zhou, M.~Zhong, Z.~Li, X.~Xu, F.~Hua, and R.~Pan, ``Simulation-based
-  adaptive optimization for passenger flow control measures at metro
-  stations,'' \emph{Simulation Modelling Practice and Theory}, vol. 138, p.
-  103021, 2025.
 
 \bibitem{RN2118}
 X.~Yang, B.~Shi, G.~Zhang, and Y.~Li, ``Optimization modeling of automatic
@@ -248,33 +231,11 @@ X.~Yang, G.~Zhang, B.~Shi, C.-Z. Xie, and B.~Zhang, ``Partition independent
   control and collaborative optimization of high-density crowd in subway
   stations,'' \emph{Chaos, Solitons \& Fractals}, vol. 200, p. 117108, 2025.
 
-\bibitem{RN2119}
-M.~A. Lopez-Carmona and A.~Paricio-Garcia, ``Crowd evacuation management with
-  optimal time-multiplexed exit-choice recommendations through simulation
-  optimization,'' \emph{Advanced Theory and Simulations}, vol.~7, no.~7, p.
-  2400265, 2024.
-
-\bibitem{RN2196}
-M.~A. Lopez-Carmona and A.~Paricio~Garcia, ``Linear and nonlinear model
-  predictive control (mpc) for regulating pedestrian flows with discrete speed
-  instructions,'' \emph{Physica A: Statistical Mechanics and its Applications},
-  vol. 625, p. 128996, 2023.
-
 \bibitem{RN2121}
 X.~C. Liao, W.~N. Chen, X.~Q. Guo, J.~Zhong, and X.~M. Hu, ``Crowd management
   through optimal layout of fences: An ant colony approach based on crowd
   simulation,'' \emph{IEEE Transactions on Intelligent Transportation Systems},
   vol.~24, no.~9, pp. 9137--9149, 2023.
-
-\bibitem{RN2189}
-J.~Schulman, F.~Wolski, P.~Dhariwal, A.~Radford, and O.~Klimov, ``Proximal
-  policy optimization algorithms,'' \emph{arXiv preprint arXiv:1707.06347},
-  2017.
-
-\bibitem{RN2190}
-K.~Price, R.~M. Storn, and J.~A. Lampinen, \emph{Differential Evolution: A
-  Practical Approach to Global Optimization}.\hskip 1em plus 0.5em minus
-  0.4em\relax Springer Publishing Company, Incorporated, 2014.
 
 \bibitem{RN2123}
 W.~L. Liu, Y.~Chen, X.~Li, J.~Zhong, R.~Chen, and H.~Jin, ``Automatic
@@ -311,21 +272,6 @@ B.~Raimund, G.~Paola, I.~Daniel, and V.~Luis~Miguel, ``A non-local pedestrian
 \bibitem{RN2099}
 B.~Maury and J.~Venel, ``A mathematical framework for a crowd motion model,''
   \emph{Comptes Rendus Mathematique}, vol. 346, no.~23, p. 1245–1250, 2008.
-
-\bibitem{RN2081}
-B.~Maury, A.~Roudneff-Chupin, F.~Santambrogio, and J.~Venel, ``Handling
-  congestion in crowd motion modeling,'' \emph{Networks and Heterogeneous
-  Media}, vol.~6, no.~3, p. 485–519, 2011.
-
-\bibitem{RN2188}
-R.~Jordan, D.~Kinderlehrer, and F.~Otto, ``The variational formulation of the
-  fokker--planck equation,'' \emph{SIAM Journal on Mathematical Analysis},
-  vol.~29, no.~1, p. 1–17, 1998.
-
-\bibitem{RN2103}
-A.~Aw and M.~Rascle, ``Resurrection of "second order" models of traffic flow,''
-  \emph{SIAM Journal on Applied Mathematics}, vol.~60, no.~3, p. 916–938,
-  2000.
 
 \bibitem{RN2104}
 J.-P. Lebacque, S.~Mammar, and H.~Haj-Salem, ``The aw–rascle and zhang’s
@@ -365,6 +311,24 @@ L.~Y. Wang and W.~X. Huang, ``Visitors' consistent stay behavior patterns
 H.~Hu, R.~Zhang, Y.~Hao, Y.~He, and Z.~Liu, ``Optimization model for passenger
   flow control and service capacity allocation in subway station pedestrian
   facility networks,'' \emph{Sustainability}, vol.~17, no.~21, p. 9816, 2025.
+
+\bibitem{RN2145}
+Y.~Zhou, M.~Zhong, Z.~Li, X.~Xu, F.~Hua, and R.~Pan, ``Simulation-based
+  adaptive optimization for passenger flow control measures at metro
+  stations,'' \emph{Simulation Modelling Practice and Theory}, vol. 138, p.
+  103021, 2025.
+
+\bibitem{RN2119}
+M.~A. Lopez-Carmona and A.~Paricio-Garcia, ``Crowd evacuation management with
+  optimal time-multiplexed exit-choice recommendations through simulation
+  optimization,'' \emph{Advanced Theory and Simulations}, vol.~7, no.~7, p.
+  2400265, 2024.
+
+\bibitem{RN2196}
+M.~A. Lopez-Carmona and A.~Paricio~Garcia, ``Linear and nonlinear model
+  predictive control (mpc) for regulating pedestrian flows with discrete speed
+  instructions,'' \emph{Physica A: Statistical Mechanics and its Applications},
+  vol. 625, p. 128996, 2023.
 
 \bibitem{marler2004survey_moo_engineering}
 R.~T. Marler and J.~S. Arora, ``Survey of multi-objective optimization methods

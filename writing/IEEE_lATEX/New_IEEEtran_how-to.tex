@@ -33,7 +33,7 @@
 \maketitle
 
 \begin{abstract}
-Metropolitan tourism hotspots and major event venues are particularly vulnerable to crowd stampedes due to the high density and stochasticity of pedestrian flows. Yet existing control methods remain largely empirical and reactive, leaving the coupled effects of passage directions and time-phased admission rates insufficiently quantified. To address this academic issue,this paper develops a macroscopic crowd-control model based on the Bellman Conservation Law. Local admissible direction sets represent one-way, bidirectional, and closed passages, while anisotropic mobility tensors encode channel-guidance effects. Internal channel entrance-rate controls are added so that one policy specifies both passage directions and release rates. We then solve the mixed discrete-continuous problem with a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm. In a simplified scenic-platform scenario, the model reproduces multi-stage movement, channel guidance, and direction constraints. Under a weighted objective combining efficiency, safety exposure, load balance, waiting, and smoothness, HCMBO gives the lowest mean score within the tested budget. Its mean objective is about 3.9\% lower than the Tree-structured Parzen estimator-based mixed-variable Bayesian optimization (TPE-Mixed BO) baseline and lower than the other tested baselines. These results can supply a large-scale qualitative basis to timely compare routing and entrance-release strategies in metropolitan tourism hotspots.
+Metropolitan tourism hotspots and major event venues are particularly vulnerable to crowd stampedes due to the high density and stochasticity of pedestrian flows. Yet existing control methods remain largely empirical and reactive, leaving the coupled effects of passage directions and time-phased admission rates insufficiently quantified. To address this issue, this paper develops a macroscopic crowd-control model based on the Bellman Conservation Law. Local admissible direction sets represent one-way, bidirectional, and closed passages, while anisotropic mobility tensors encode channel-guidance effects. Internal channel entrance-rate controls are added so that one policy specifies both passage directions and release rates. We then solve the mixed discrete-continuous problem with a Hierarchical Constrained Mixed-variable Black-box Optimization (HCMBO) algorithm. In a simplified scenic-platform scenario, the model reproduces multi-stage movement, channel guidance, and direction constraints. Under a weighted objective combining efficiency, safety exposure, load balance, waiting, and smoothness, HCMBO gives the lowest mean score within the tested budget. Its mean objective is about 3.9\% lower than the Tree-structured Parzen estimator-based mixed-variable Bayesian optimization (TPE-Mixed BO) baseline and lower than the other tested baselines. These results can supply a large-scale qualitative basis to timely compare routing and entrance-release strategies in metropolitan tourism hotspots.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -51,10 +51,10 @@ Among urban crowd-gathering scenarios, open scenic areas, waterfront viewing pla
 
 \begin{figure*}[!t]
 \centering
-\subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/63988092.jpeg}
+\subfloat[]{\includegraphics[width=0.40\textwidth]{../images/外滩场景/63988092.jpeg}
 \label{fig:bund_scene_crowd}}
 \hfill
-\subfloat[]{\includegraphics[width=0.47\textwidth]{../images/外滩场景/入口容量控制.png}
+\subfloat[]{\includegraphics[width=0.40\textwidth]{../images/外滩场景/入口容量控制.png}
 \label{fig:bund_scene_capacity}}
 \figcaptiontight
 \caption{Field-control context of the Shanghai Nanjing East Road--Bund area. (a) Large-scale holiday crowd under one-way passage pedestrian flow control on Nanjing East Road; image source: \cite{qq2024huangpu_security}. (b) Entrance-capacity pedestrian flow control link of Bund Passge No.5- Chenyi Square-Nanjing East Road; image source: \cite{chinanews2019bund_flow_guidance}.}
@@ -85,49 +85,34 @@ Our main contributions are fourfold:
 
 \subsection{Massive Crowd Management and Control}
 
-Crowd management studies in urban centers have mainly used boundary regulation, facility layout, and decision-making models \cite{RN2000,RN2193}.
-Zhong et al. \cite{RN279} designed boundary control strategies for urban traffic-flow networks and proved convergence to uncongested states under disturbances through Lyapunov analysis \cite{RN1196}.
-Wadoo and Kachroo \cite{RN280} used advection and diffusion control to prevent blocking and shock waves in one-dimensional evacuation.
-Qin \cite{RN277} proposed a unit sliding-mode controller based on integral barrier Lyapunov functions for multi-directional disturbance propagation.
-Zhu et al. \cite{RN286} combined policy learning and neural networks to adjust inflow rates and free-flow speeds in heterogeneous corridors.
-
-Infrastructure-based regulation has also been studied.
-Obstacle placement can change outflow, velocity, and local density in merging areas \cite{RN1662,RN2145}.
-Yang et al. \cite{RN2118,RN2120} used Model Predictive Control (MPC) to optimize barrier lengths at subway bottlenecks and later included entrance limiters, gates, and escalator directions.
-Carmona and Paricio-Garcia \cite{RN2119} proposed dynamic exit-choice recommendations using multinomial Logit models, but the approach depends on discrete speed instructions (e.g., ``stop,'' ``walk,'' ``run'') transmitted through electronic wristbands \cite{RN2196}, which are hard to deploy in open urban areas.
-
-Other studies use optimization and reinforcement learning.
-Liao et al. \cite{RN2121} formulated fence layout as subset selection.
-Subsequent work \cite{RN2122} used long short-term memory (LSTM) features and Proximal Policy Optimization (PPO) \cite{RN2189} for real-time entrance-flow regulation.
-Differential Evolution (DE) \cite{RN2190} has been used to optimize guardrail layout and flow guidance in scenarios such as Chengdu East Railway Station, with average travel time and crowd pressure as objectives \cite{RN2123}.
+Urban crowd management research has considered boundary regulation, facility layout, and data-driven control \cite{RN2000,RN2193}.
+Boundary controllers regulate inflow or velocity to suppress congestion and shock waves \cite{RN279,RN280,RN286}, while infrastructure-based approaches optimize obstacles, barriers, gates, and escalator directions at merging areas and bottlenecks \cite{RN1662,RN2118,RN2120}.
+The former primarily acts at external boundaries and derives control laws from aggregate traffic states; the latter changes feasible movement inside the domain to redistribute local demand.
+Both can reduce congestion, but their effectiveness depends strongly on scenario geometry and on whether the crowd can be redirected before reaching a bottleneck.
+Other studies formulate fence or guardrail layout and entrance regulation as optimization problems, using subset selection, reinforcement learning, or Differential Evolution \cite{RN2121,RN2122,RN2123}.
+Learning-based regulation can adapt entrance flow online, whereas layout optimization usually selects a fixed facility configuration before operation.
+These methods demonstrate the value of active control, but most focus on evacuation corridors or transport facilities and optimize one class of intervention at a time.
+Open scenic areas instead require passage-direction changes and entrance metering to be coordinated across multiple routes and behavioral stages.
 
 \subsection{Macroscopic Crowd Modeling and Current Discrepancy Analysis}
 
-Macroscopic crowd models treat pedestrian flows as continuous media, offering computational efficiency and analytical tractability compared to microscopic approaches.
-Henderson \cite{RN282} first applied fluid dynamics to pedestrian traffic in the early 1970s, comparing crowd motion to the behavior of gas or fluid particles.
+Macroscopic models treat pedestrian flow as a continuum, providing computational efficiency and analytical structure.
+Early fluid-dynamic descriptions \cite{RN282} were followed by the first-order Hughes model \cite{hughes2003}, in which density determines walking speed and a travel-time potential determines direction.
+Numerical extensions coupled high-resolution conservation-law solvers with fast methods for the potential equation \cite{RN2078}.
+Other formulations introduced nonlocal density for anticipation \cite{RN2097}, anisotropic perception and wall effects \cite{RN2080}, hard density constraints through velocity projection \cite{RN2099}, and second-order pressure dynamics for stop-and-go waves and lane formation \cite{RN2104}.
+Together, these studies improve physical fidelity by modifying how pedestrians perceive congestion, respect obstacles, or respond to density limits.
+They also show the trade-off relevant here: richer continuum dynamics can reproduce more local phenomena, but management optimization requires a solver that remains efficient over many policy evaluations.
 
-Hughes \cite{hughes2003} pioneered a first-order continuum theory for pedestrian flow, in which walking speed depends on local density through a fundamental diagram, and movement direction follows the steepest-descent path of a potential function representing the remaining travel time to exits.
-The model links congestion and route choice through this potential.
-Ling et al. \cite{RN2078} generalized the Hughes formulation and solved it with a weighted essentially non-oscillatory (WENO) scheme for the conservation law and a fast-sweeping method for the eikonal equation.
-
-Several extensions modify the density, perception, and constraint terms in macroscopic models.
-Colombo et al. \cite{RN2097} proposed nonlocal flux models that replace pointwise density with a neighborhood-averaged quantity in the velocity function to account for anticipatory behavior.
-Later work included anisotropic perception fields and wall or obstacle boundary effects, together with high-resolution schemes and well-posedness results for architectural domains \cite{RN2080}.
-Maury et al. \cite{RN2099} introduced a projection model for the hard incompressibility constraint, formulating the actual velocity as a least-squares projection of the desired velocity onto the set of feasible non-overlapping configurations.
-The same idea was later recast as a Wasserstein gradient flow with density constraints \cite{RN2081}, using the Jordan--Kinderlehrer--Otto (JKO) scheme \cite{RN2188} to keep density below its upper bound.
-
-To overcome non-physical behaviors such as supersonic information propagation that may arise in first-order models, Aw and Rascle \cite{RN2103} introduced a second-order model based on a generalized momentum conservation law that preserves anisotropy.
-The Aw--Rascle (AR) framework was subsequently adapted to pedestrian flows \cite{RN2104}, where the congestion pressure term successfully reproduces characteristic phenomena including stop-and-go waves and spontaneous lane formation.
-
-Beyond the classical Hughes-type framework, extensions have incorporated control and guidance mechanisms relevant to crowd management.
-Anisotropic formulations using mobility tensors have been developed to represent channel geometries and directional preferences \cite{cristiani2016,priuli2015control}, allowing for continuous geometric guidance without explicit prohibition.
-Constrained Hamilton-Jacobi-Bellman (HJB) formulations have been employed to model strict directional constraints such as one-way corridors, with the Bellman optimality principle providing a natural framework for unifying anisotropic geometric guidance with discrete directional constraints.
-
-Despite these advances, three gaps remain for large open scenic areas.
-First, Hughes-type single-potential models are destination-oriented and describe one population evacuating toward fixed exits \cite{hughes2003,RN2078}; they cannot represent the multi-stage chain of entering, touring, leaving, and returning, in which subpopulations with stage-dependent goals share the same congested space.
-Second, most macroscopic extensions refine the description of flow \cite{RN2097,RN2099,RN2104}, whereas the operational levers used in practice, switching passages among one-way, two-way, and closed states and metering entrance release, are treated as fixed boundary conditions rather than as a joint discrete--continuous decision space \cite{RN2118,RN2122}.
-Third, local density or single-point counts are insufficient for such coupled systems \cite{RN2124}; strategy assessment requires area-level indicators linking regional density, passage loads, entrance queues, and exit allocation, which few macroscopic studies provide.
-These gaps motivate the multi-stage operator, the joint direction--capacity control space, and the evaluation protocol of this paper.
+Control-oriented extensions are closer to the present problem.
+Mobility tensors encode channel geometry and directional preference \cite{cristiani2016,priuli2015control}, whereas constrained Hamilton--Jacobi--Bellman formulations can impose strict admissible directions such as one-way corridors.
+These mechanisms serve different operational roles.
+Anisotropic mobility provides soft geometric guidance by changing travel cost without prohibiting motion; a constrained direction set represents enforceable rules such as one-way operation or closure.
+Entrance metering adds a separate capacity mechanism because an open passage may still admit only a limited flow.
+However, three gaps remain for large open scenic areas.
+First, Hughes-type single-potential models are destination-oriented and generally describe one population moving toward fixed exits \cite{hughes2003,RN2078}; they do not represent the coupled sequence of entry, touring, exit, and return, in which stage-dependent subpopulations share the same space.
+Second, most macroscopic extensions refine flow dynamics \cite{RN2097,RN2099,RN2104}, while practical controls such as switching passages among one-way, bidirectional, and closed states and metering entrance release are usually prescribed rather than jointly optimized \cite{RN2118,RN2122}.
+Third, local density or single-point counts do not capture the resulting redistribution across passages \cite{RN2124}; evaluation must connect regional density, passage loads, entrance waiting, and exit allocation.
+These gaps motivate the proposed multi-stage operator, joint direction--capacity decision space, and area-level evaluation protocol.
 
 \section{Methodology}
 \label{sec:model}
@@ -149,7 +134,7 @@ The overall method framework is shown in Fig.~\ref{fig:method_framework}.
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=\textwidth]{../images/framework/method_framework_tikz.pdf}
+\includegraphics[width=0.85\textwidth]{../images/framework/method_framework_tikz.pdf}
 \figcaptiontight
 \caption{Method framework for joint direction and entrance-rate optimization. Fixed scenario inputs, behavioral preferences, and geometric guidance parameters define the lower-level Bellman--conservation-law crowd simulator. The controllable direction configuration and entrance-rate profile are jointly evaluated by efficiency, safety, load-balance, waiting, and smoothness objectives, and are updated by the upper-level HCMBO optimizer.}
 \label{fig:method_framework}
@@ -609,7 +594,7 @@ Raw cumulative quantities are rounded to three significant digits in the text, w
 
 \begin{figure}[!t]
 \centering
-\includegraphics[width=\columnwidth]{../images/experiment_result_archive/scene.png}
+\includegraphics[width=0.70\columnwidth]{../images/experiment_result_archive/scene.png}
 \figcaptiontight
 \caption{Four-channel scenic-platform simulation scenario used in the numerical experiments.}
 \label{fig:experiment_scene}
@@ -664,7 +649,7 @@ Policy labels use baseline (BSL), single-entry (SE), and single-return (SR), wit
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.92\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
+\includegraphics[width=0.80\textwidth]{../images/experiment_result_archive/g2_control_tradeoff_summary_ab.png}
 \figcaptiontight
 \caption{Directional-control design matrix and objective-space trade-off. Color encodes $\tilde J_3$, marker size encodes the reduced dimensionless diagnostic objective $J^{(3)}$, and diamonds indicate non-dominated cases.}
 \label{fig:g2_control_tradeoff}
@@ -869,129 +854,52 @@ Table~\ref{tab:search_ablation} shows that the final HCMBO mainline has the lowe
 Queue-aware LCB and RF-style constrained BO reduce unreleased attempted flow to approximately $9.64\times10^3$~ped-eq., but their scalar objective increases to $2.6162$.
 Thus, queue information is useful for executable and safety-aware extensions, whereas the final mainline should retain structured direction-wise rate search as the primary budget allocation mechanism.
 
-\subsection{Transfer Validation on a Bund-Inspired Scenario}
+\subsection{Bund-Inspired Transfer Validation}
 \label{sec:bund_transfer}
 
-The preceding experiments use a standardized four-channel platform scenario to verify modeling mechanisms and optimization behavior under controlled conditions.
-As a supplementary validation, we further construct a simplified abstract scenario inspired by the spatial form of the Shanghai Bund waterfront.
-This experiment does not claim to reproduce all architectural details of the real site.
-Instead, it preserves the Bund sightseeing platform, the lateral passage connections, the major inflow location, and the dominant movement direction, so as to examine whether an HCMBO-derived policy can still change the load distribution in a more realistic spatial outline.
+To test geometric transfer without claiming a site-exact reconstruction, we use a Bund-inspired scenario retaining the sightseeing platform, four passages, the main inflow, and the dominant movement direction.
 
 \begin{figure*}[!t]
 \centering
-\includegraphics[width=0.82\textwidth]{../图表/visio架构图/外滩场景示意图_页-7.jpg}
+\includegraphics[width=0.70\textwidth]{../图表/visio架构图/外滩场景示意图_页-7.jpg}
 \figcaptiontight
-\caption{Real Bund scene and its simplified simulation abstraction. The abstraction retains the Bund sightseeing platform boundary, the main entrance, and the passage connections used for control validation. The satellite basemap was obtained from Google Maps. The right-side local photographs were shot in the Shanghai Bund waterfront passage area by the Tongji Public Safety Experimental Team, June 21, 2026.}
+\caption{Bund waterfront and simplified transfer scenario. The abstraction preserves the platform, main entrance, and four controlled passages. Basemap: Google Maps; photographs: Tongji Public Safety Experimental Team, June 21, 2026.}
 \label{fig:bund_transfer_scene}
 \end{figure*}
 
-The computational grid has resolution $512\times224$.
-Because this scenario preserves the real Bund outline, its physical scale is calibrated from georeferenced control points that match the scene coordinates to satellite latitude and longitude; a four-point affine fit gives $0.435$~m per scene unit with sub-$1.5$~m residual, which corresponds to a physical cell size of about $1.75$~m.
-The $512\times224$ grid therefore spans approximately $894~\mathrm{m}\times391~\mathrm{m}$, the induced time step is $\Delta t\approx0.44$~s, and pedestrian counts again follow by integrating density over physical area (a cell area of about $3.0$~m$^2$).
-Pedestrians enter from the outer-side entrance, pass through the middle connecting channels, and move toward the Bund sightseeing platform and its central target region.
-The inflow-rate multiplier is $3.0$, corresponding to an actual inflow rate of about $3.35$~ped/s; the maximum density is $\rho_{\max}=4.0$~ped/m$^2$, and the stage-switching rate is $\kappa_{\sigma,r}=32$ in simulation time units.
-The experimental channels \texttt{channel\_1}, \texttt{channel\_2}, \texttt{channel\_3}, and \texttt{channel\_4} correspond to the locally named Bund Passages 3, 4, 5, and 6, respectively.
-Both the controlled and uncontrolled groups use $1600$ steps over a physical horizon of about $698$~s.
-For the controlled group, the transferred entrance-rate bounds are multiplied by a capacity-scale factor of $3$, providing a less restrictive entrance-capacity setting.
-
-The controlled group uses the best HCMBO policy obtained from the multi-direction high-fidelity recheck.
-Its reduced high-fidelity objective in the optimization stage is $0.7350$, and its direction structure leaves the upper and lower channels bidirectional while assigning opposite dominant directions to the two middle channels.
-Table~\ref{tab:bund_transfer_q} reports the effective two-segment entrance-rate upper bounds after applying the capacity-scale factor of $3$.
-The rate upper bounds are measured in ped/s.
+Four georeferenced control points map the $512\times224$ grid to approximately $894~\mathrm{m}\times391~\mathrm{m}$, with $\Delta x\approx1.75$~m, $\Delta t\approx0.44$~s, and a sub-$1.5$~m affine-fit residual.
+Channels 1--4 correspond to Bund Passages 3--6.
+Both cases use the same $1600$-step ($698$~s) horizon and approximately $3.35$~ped/s inflow.
+The controlled case transfers the best high-fidelity HCMBO policy: the outer passages remain bidirectional, the middle passages receive opposite directions, and entrance rates are metered; the uncontrolled case leaves all passages unrestricted.
 
 \begin{table}[!t]
 \centering
-\caption{Effective Entrance-Rate Upper Bounds in the Bund Transfer Experiment}
-\label{tab:bund_transfer_q}
-\footnotesize
-\setlength{\tabcolsep}{1pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.23\columnwidth}
->{\raggedright\arraybackslash}p{0.18\columnwidth}
->{\raggedright\arraybackslash}p{0.18\columnwidth}
->{\centering\arraybackslash}p{0.16\columnwidth}
->{\centering\arraybackslash}p{0.16\columnwidth}@{}}
-\hline
-Experimental channel & Local passage name & Entrance side & Segment 1 (ped/s) & Segment 2 (ped/s) \\
-\hline
-\texttt{channel\_1} & Bund Passage 3 & Forward entrance & 3.45 & 8.38 \\
-\texttt{channel\_1} & Bund Passage 3 & Reverse entrance & 3.17 & 0.00 \\
-\texttt{channel\_2} & Bund Passage 4 & Forward entrance & 8.38 & 2.36 \\
-\texttt{channel\_2} & Bund Passage 4 & Reverse entrance & 0.00 & 0.00 \\
-\texttt{channel\_3} & Bund Passage 5 & Forward entrance & 0.00 & 0.00 \\
-\texttt{channel\_3} & Bund Passage 5 & Reverse entrance & 3.57 & 6.95 \\
-\texttt{channel\_4} & Bund Passage 6 & Forward entrance & 5.28 & 3.03 \\
-\texttt{channel\_4} & Bund Passage 6 & Reverse entrance & 3.09 & 2.96 \\
-\hline
-\end{tabular}
-\end{table}
-
-Table~\ref{tab:bund_transfer_metrics} compares the controlled and uncontrolled groups under the same high-fidelity protocol.
-It separates dimensionless normalized terms from raw simulation diagnostics.
-The reduced objective $J^{(3)}$ decreases from $1.0140$ to $0.7410$, corresponding to an absolute reduction of approximately $0.2730$ and a relative reduction of $26.9\%$.
-The largest reduction comes from the load-balance term $\tilde J_3$, which decreases by $51.9\%$, from $0.6043$ to $0.2908$.
-In contrast, $\tilde J_1$ increases by $8.7\%$ and $\tilde J_2$ increases by $25.7\%$.
-This indicates that the transferred policy changes how pedestrians use the channels, rather than merely reducing all density values uniformly.
-
-\begin{table}[!t]
-\centering
-\caption{Controlled and Uncontrolled Results in the Bund Transfer Experiment}
+\caption{Transfer-Experiment Performance and Diagnostics}
 \label{tab:bund_transfer_metrics}
 \footnotesize
 \setlength{\tabcolsep}{2pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.35\columnwidth}r r r@{}}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.34\columnwidth}r r l@{}}
 \hline
-Dimensionless term & Controlled & Uncontrolled & Relative change \\
+Metric & Ctrl. & Unctrl. & Change/unit \\
 \hline
 $J^{(3)}$ & 0.7410 & 1.0140 & $-26.9\%$ \\
 $\tilde J_1$ & 0.4145 & 0.3813 & $+8.7\%$ \\
 $\tilde J_2$ & 0.0357 & 0.0284 & $+25.7\%$ \\
 $\tilde J_3$ & 0.2908 & 0.6043 & $-51.9\%$ \\
 \hline
-\end{tabular}
-
-\vspace{1.5mm}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.43\columnwidth}c c l@{}}
-\hline
-Raw diagnostic & Controlled & Uncontrolled & Unit \\
-\hline
 Final cumulative sink flow & $1.33{\times}10^3$ & $1.67{\times}10^3$ & ped \\
-Final cumulative inflow & $2.32{\times}10^3$ & $2.34{\times}10^3$ & ped \\
 Final system mass & $1.53{\times}10^3$ & $1.20{\times}10^3$ & ped \\
-Peak density maximum & $\approx 4.0$ & $\approx 4.0$ & ped/m$^2$ \\
-Domain-mean density (incl. empty space) & $3.47{\times}10^{-3}$ & $3.21{\times}10^{-3}$ & ped/m$^2$ \\
-Attempted entrance flow & $1.49{\times}10^3$ & \multicolumn{1}{c}{--} & ped-eq. \\
-Actual entrance flow & $1.13{\times}10^3$ & \multicolumn{1}{c}{--} & ped \\
 Unreleased attempted flow & $364$ & \multicolumn{1}{c}{--} & ped-eq. \\
 \hline
 \end{tabular}
-
-\par\vspace{3.5mm}
-\noindent\parbox{\columnwidth}{\footnotesize Sink flow, inflow, system mass, and actual entrance flow are pedestrian counts (ped). Attempted and unreleased entrance flow are cumulative pedestrian-equivalent demand (ped-eq.): they integrate repeatedly denied demand over the horizon and may exceed the number of distinct waiting pedestrians. Entries marked $-$ are not applicable because the uncontrolled case activates no internal metering interface. The domain-mean density is averaged over the full walkable domain, including empty space, and is therefore much smaller than the local peak.}
+\par\vspace{2mm}
+\noindent\parbox{\columnwidth}{\footnotesize Unreleased flow is cumulative denied demand; ``--'' denotes no internal metering.}
 \end{table}
 
-The channel-flow shares in Table~\ref{tab:bund_transfer_flux} further explain this reduction.
-In the uncontrolled group, $82.30\%$ of the channel flow concentrates on \texttt{channel\_4}, i.e., Bund Passage 6.
-After applying the HCMBO policy, the flow is redistributed mainly to \texttt{channel\_2} and \texttt{channel\_3}, whose combined share reaches approximately $91.34\%$.
-
-\begin{table}[!t]
-\centering
-\caption{Channel-Flow Shares in the Bund Transfer Experiment}
-\label{tab:bund_transfer_flux}
-\footnotesize
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{l l r r}
-\hline
-Channel & Local name & Controlled & Uncontrolled \\
-\hline
-\texttt{channel\_1} & Bund Passage 3 & 2.83\% & 0.32\% \\
-\texttt{channel\_2} & Bund Passage 4 & 30.38\% & 1.35\% \\
-\texttt{channel\_3} & Bund Passage 5 & 60.96\% & 16.03\% \\
-\texttt{channel\_4} & Bund Passage 6 & 5.83\% & 82.30\% \\
-\hline
-\end{tabular}
-\par\vspace{3.5mm}
-\noindent\parbox{\columnwidth}{\footnotesize Channel-flow shares are computed as $R_c(T)/\sum_{j=1}^{C}R_j(T)$, where $R_c(T)$ is the realized cumulative admitted throughput of channel $c$ during the simulation horizon.}
-\end{table}
+Table~\ref{tab:bund_transfer_metrics} shows that $J^{(3)}$ decreases by $26.9\%$, driven by a $51.9\%$ reduction in the load-balance term.
+However, the efficiency and safety-exposure terms increase, sink flow decreases, and final system mass increases.
+Channel throughput confirms redistribution: the uncontrolled case sends $82.30\%$ of flow through Passage 6, whereas the controlled case sends $91.34\%$ through Passages 4 and 5 combined.
+The transferred policy therefore improves load balance rather than safety or efficiency uniformly; deployment would require explicit throughput and waiting constraints.
 
 \begin{figure*}[!t]
 \centering
@@ -1001,55 +909,36 @@ Channel & Local name & Controlled & Uncontrolled \\
 \label{fig:bund_transfer_density_panel}
 \end{figure*}
 
-Fig.~\ref{fig:bund_transfer_density_panel} visualizes the density evolution at approximately $22$, $153$, $393$, and $654$~s.
-Both groups initially form a local density concentration near the right-side target region of the Bund sightseeing platform, reflecting the same inflow and target-attraction structure.
-At later stages, the uncontrolled case remains more concentrated around the terminal channel and the adjacent Bund sightseeing platform area, whereas the controlled case develops a more stable flow band through the middle-channel group.
-This visual evidence is consistent with the channel-share statistics and confirms that the main effect of the HCMBO policy is load redistribution across channels.
+Fig.~\ref{fig:bund_transfer_density_panel} provides the same visual pattern: the uncontrolled flow remains concentrated near Passage 6, while the controlled flow shifts toward the middle passages at later times.
+This agreement with the objective and throughput statistics supports load redistribution as the principal transfer effect.
 
-The transfer experiment exposes a trade-off.
-Compared with the uncontrolled group, the controlled group has a higher efficiency term ($\tilde J_1$ increases from $0.3813$ to $0.4145$) and a slightly higher safety-exposure term ($\tilde J_2$ increases from $0.0284$ to $0.0357$).
-Its cumulative sink flow is also smaller ($1.33{\times}10^3$ vs. $1.67{\times}10^3$~ped), and its final system mass is larger ($1.53{\times}10^3$ vs. $1.20{\times}10^3$~ped).
-The transferred HCMBO policy therefore should not be read as a uniform safety or efficiency improvement.
-Under the present reduced-objective weights, it lowers $J^{(3)}$ mainly by redistributing channel load, while giving up part of exit throughput and travel efficiency.
-The capacity-scale factor of $3$ reduces unreleased attempted flow to $364$~ped-eq., but it does not remove the efficiency cost.
-A deployment-oriented version should add explicit throughput constraints and waiting upper bounds, and should test several objective-weight settings before selecting a policy.
-
-The real Bund waterfront operates at crowd scales far beyond the demonstration level of this section.
-According to official holiday reports, the instantaneous on-site crowd in the Bund waterfront area peaked at $5.7\times10^4$ pedestrians during the 2025 National Day holiday \cite{qq2025bund_holiday_peak} and reached $7.1\times10^4$ during the 2019 holiday \cite{chinanews2019bund_flow_guidance}.
-The present experiment deliberately adopts a lower demand setting so that the transfer of control mechanisms and optimized policies can be examined under controlled conditions, rather than reproducing peak holiday loads.
-
-We emphasize that the computational cost of the macroscopic model is determined solely by the grid resolution and the number of simulation steps, and is independent of the number of pedestrians present: crowd size enters the model only through the magnitude of the density field and the entrance inflow rates.
-Scaling from the demonstration level to a 50,000-pedestrian crowd-scale scenario therefore requires no change to the model structure, the numerical scheme, or the grid; only demand-side parameters change.
-Table~\ref{tab:bund_scale_projection} contrasts the two crowd-scale scenarios.
-The spatial extent, grid resolution, time step, and per-step cost are identical in both conditions; only the instantaneous population, the entrance inflow rates, and the horizon differ, and among these only the horizon increases the total cost, linearly in the number of steps.
+Official reports place Bund holiday peaks at $5.7\times10^4$ pedestrians in 2025 \cite{qq2025bund_holiday_peak} and $7.1\times10^4$ in 2019 \cite{chinanews2019bund_flow_guidance}; the present experiment deliberately uses lower demand to isolate transfer behavior.
+Per-step cost is determined by the fixed grid, while crowd size enters through density and boundary inflow; only a longer horizon increases total cost, linearly with the number of steps.
+Thus, the 50,000-pedestrian projection changes demand and horizon rather than the model structure or numerical scheme (Table~\ref{tab:bund_scale_projection}).
 
 \begin{table*}[!t]
 \centering
-\caption{Parameter Correspondence Between the Transfer Experiment and a Real-Scale Bund Crowd-scale Scenario}
+\caption{Transfer-to-Real-Scale Parameter Correspondence}
 \label{tab:bund_scale_projection}
 \footnotesize
 \setlength{\tabcolsep}{6pt}
-\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.15\textwidth}
->{\raggedright\arraybackslash}p{0.26\textwidth}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.17\textwidth}
+>{\raggedright\arraybackslash}p{0.25\textwidth}
 >{\raggedright\arraybackslash}p{0.28\textwidth}
->{\raggedright\arraybackslash}p{0.24\textwidth}@{}}
+>{\raggedright\arraybackslash}p{0.23\textwidth}@{}}
 \hline
 Parameter & Transfer experiment & Real-scale scenario & Effect on cost \\
 \hline
-Spatial extent & $\approx894~\mathrm{m}\times391$~m (georeferenced) & identical (covers the waterfront core area) & unchanged \\
-Grid resolution & $512\times224$, $\Delta x\approx1.75$~m & identical & sole spatial cost factor; unchanged \\
-Time step & $\Delta t\approx0.44$~s (CFL-induced) & identical (independent of crowd size) & unchanged \\
+Grid and scheme & $512\times224$, $\Delta x\approx1.75$~m, $\Delta t\approx0.44$~s & identical grid and numerical scheme & per-step cost unchanged \\
 Instantaneous population & peak $\approx1.5\times10^3$~ped & $5\times10^4$--$7\times10^4$~ped & none (density values only) \\
-Peak local density & $\approx4.0$~ped/m$^2$ ($=\rho_{\max}$) & same saturated regime & none; regime already covered \\
-Total entrance inflow & $\approx3.35$~ped/s (single main entrance) & $\approx20$--$30$~ped/s (multiple entrances, field-calibrated) & none (boundary condition) \\
+Entrance inflow & $\approx3.35$~ped/s, one main entrance & $\approx20$--$30$~ped/s, multiple entrances to be calibrated & boundary data only \\
 Simulation horizon & $\approx698$~s ($1600$ steps) & $1$--$2$~h peak period ($\approx8\times10^3$--$1.6\times10^4$ steps) & total cost grows linearly with steps \\
 \hline
 \end{tabular}
 \end{table*}
 
-From a dynamics viewpoint, a crowd of $5\times10^4$--$7\times10^4$ pedestrians corresponds to an average walkable density of roughly $0.3$--$0.6$~ped/m$^2$, far below the jam density $\rho_{\max}=4.0$~ped/m$^2$, whereas the local peak density in this section already reaches $\rho_{\max}$; that is, the saturated congested branch of the fundamental diagram is exercised by the present experiments.
-Scaling up therefore enlarges the spatial extent of high-density regions rather than pushing the model into a density regime untouched by the experiments.
-The proposed framework thus supports control analysis at the 50,000-pedestrian scale in terms of both computational feasibility and dynamical coverage; a full-region peak validation with field-calibrated demand profiles is left for future work.
+The present experiment already reaches the local saturation density $\rho_{\max}=4.0$~ped/m$^2$, so scaling primarily enlarges the extent of congested regions rather than introducing an untested local-density regime.
+The framework therefore supports computational and dynamical analysis at the 50,000-pedestrian scale, while full-region validation with field-calibrated demand profiles remains future work.
 
 
 
@@ -1058,7 +947,7 @@ The proposed framework thus supports control analysis at the 50,000-pedestrian s
 
 This paper presents a unified macroscopic crowd management framework tailored for high-density metropolitan tourism hotspots, which seamlessly integrates passage-direction regulation, anisotropic geometric guidance, multi-stage route choice behavior, and internal entrance-rate control into a single Bellman-conservation-law operator. By tightly coupling a fully interpretable first-principles crowd flow simulator with the proposed Hybrid Constrained Multi-output Bayesian Optimization (HCMBO) optimizer, the proposed framework transforms the traditionally experience-driven, ad-hoc crowd control practice into a quantitative, fully reproducible, and operational-budget-aware decision-making pipeline.
 
-Three core findings stand out from the extensive numerical experiments. First, all embedded modeling components behave exactly as designed, and the two proposed control dimensions are fundamentally complementary rather than interchangeable: direction settings induce genuinely non-monotonic trade-offs among traffic efficiency, safety exposure, and network load balance, while entrance-rate limits reshape the distribution of unreleased attempted flow, binding-time ratios, and local spatiotemporal risk patterns. Second, the proposed HCMBO algorithm consistently delivers the strongest overall performance across all tested optimization scenarios, achieving the lowest mean value of the predefined management objective, with a 3.9\% reduction in the fixed-weight comprehensive score compared to the state-of-the-art optimizer , and maintains a perfect 100\% feasible policy rate across five independent random seeds under unified high-fidelity safety rechecking. Third, the designed ablation study rigorously pinpoints the three dominant sources of HCMBO’s performance advantage: the joint optimization of direction and rate control variables, the deliberate avoidance of myopic short-horizon hard screening that discards potentially high-quality solutions, and the proposed structured direction-wise rate search mechanism that reduces redundant exploration in the high-dimensional decision space.
+Three core findings stand out from the extensive numerical experiments. First, all embedded modeling components behave exactly as designed, and the two proposed control dimensions are fundamentally complementary rather than interchangeable: direction settings induce genuinely non-monotonic trade-offs among traffic efficiency, safety exposure, and network load balance, while entrance-rate limits reshape the distribution of unreleased attempted flow, binding-time ratios, and local spatiotemporal risk patterns. Second, the proposed HCMBO algorithm consistently delivers the strongest overall performance across all tested optimization scenarios, achieving the lowest mean value of the predefined management objective, with a 3.9\% reduction in the fixed-weight comprehensive score compared with the TPE-Mixed BO baseline, and maintains a perfect 100\% feasible policy rate across five independent random seeds under unified high-fidelity safety rechecking. Third, the designed ablation study rigorously pinpoints the three dominant sources of HCMBO’s performance advantage: the joint optimization of direction and rate control variables, the deliberate avoidance of myopic short-horizon hard screening that discards potentially high-quality solutions, and the proposed structured direction-wise rate search mechanism that reduces redundant exploration in the high-dimensional decision space.
 
 The Shanghai Bund transfer experiment tests the framework in a high-fidelity spatial abstraction of a metropolitan tourism hotspot. The policy found by HCMBO reduces the overall management objective by 26.9\% by steering excess flow away from the overloaded terminal passage and redistributing pedestrian loads across the middle passages. More importantly, the scale-transfer analysis shows that the same model structure, numerical scheme, and grid can be scaled to a simulation of 50,000 pedestrians without increasing the per-step computational cost. Scaling changes only the density and inflow parameters, while a longer simulation horizon increases the total cost linearly with the number of time steps. The framework therefore provides a computationally feasible basis for crowd-control analysis at the 50,000-pedestrian scale. Full-region validation with field-calibrated demand profiles at this scale remains future work.
 

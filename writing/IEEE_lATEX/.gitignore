@@ -4,3 +4,7 @@
 *.fdb_latexmk
 *.blg
 *.synctex.gz
+*.out
+
+# Rebuild the manuscript PDF locally from the tracked sources.
+New_IEEEtran_how-to.pdf

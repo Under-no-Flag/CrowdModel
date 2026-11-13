@@ -93,6 +93,8 @@ output_root = "../../../results/my_case"
 
 `scene.toml` 只负责定义几何和统计区域，不负责人群和路线。
 
+场景从原始几何到 `walkable`、墙体无通量边界以及 Bellman/守恒方程的完整映射，见 `codes/doc/连续介质模型仿真场景构建与PDE耦合说明.md`。
+
 最小结构：
 
 ```toml
@@ -131,9 +133,13 @@ probe_x = 10
   - 列表中的每个名字都必须在 `[[regions]]` 里定义过。
   - 这些区域会被从可通行区域里扣掉。
 - `[[regions]]`
-  - 当前仅支持轴对齐矩形区域。
-  - `x0:x1, y0:y1` 采用左闭右开切片语义。
+  - 支持轴对齐矩形和 `shape = "polygon"` 的任意多边形区域。
+  - 矩形的 `x0:x1, y0:y1` 采用左闭右开切片语义。
+  - 多边形使用 `points = [[x1, y1], ...]`，可选 `axis = [tx, ty]` 指定区域主轴；未指定时采用最长边方向。
   - 所有后续引用都靠 `name`。
+- `[[walls]]`
+  - 使用 `shape = "polyline"`、`points` 和正数 `width` 定义折线墙。
+  - 折线墙会自动从可行区域中扣除，不需要再加入 `obstacles`。
 - `[[exits]]`
   - 用于构造出口 mask。
   - 支持 `region = "name"` 或 `regions = ["a", "b"]`。
